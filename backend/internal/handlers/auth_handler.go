@@ -62,6 +62,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			"contact_email": user.School.ContactEmail,
 			"motto":         user.School.Motto,
 			"logo_url":      user.School.LogoURL,
+			"config":        user.School.Config,
 		}
 	}
 

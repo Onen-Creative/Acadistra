@@ -1,18 +1,32 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { schoolsApi, usersApi, auditApi } from '@/services/api';
 import type { User } from '@/types';
 import NotificationAlert from '@/components/NotificationAlert';
 import { useActivityDialog } from '@/hooks/useActivityDialog';
 import ActivityDialog from '@/components/ActivityDialog';
+import Sidebar from '@/components/Sidebar';
+import Pagination from '@/components/Pagination';
+import { useWebSocket } from '@/hooks/useWebSocket';
 
 export default function SystemAdminDashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const user: User = JSON.parse(localStorage.getItem('user') || '{}');
+  
+  useWebSocket(['school:', 'user:', 'audit:']);
   const { dialog, showSuccess, showError, showConfirm, closeDialog } = useActivityDialog();
-  const [activeTab, setActiveTab] = useState<'schools' | 'users'>('schools');
+  
+  // Determine active section from URL
+  const getInitialSection = () => {
+    if (location.pathname === '/schools') return 'schools';
+    if (location.pathname === '/admins') return 'admins';
+    return 'dashboard';
+  };
+  
+  const [activeSection, setActiveSection] = useState<'dashboard' | 'schools' | 'admins'>(getInitialSection());
   const [showEditSchool, setShowEditSchool] = useState(false);
   const [showAddSchool, setShowAddSchool] = useState(false);
   const [editingSchool, setEditingSchool] = useState<any>(null);
@@ -20,6 +34,16 @@ export default function SystemAdminDashboard() {
   const [editingUser, setEditingUser] = useState<any>(null);
   const [schoolType, setSchoolType] = useState<string>('Nursery');
   const [schoolLogo, setSchoolLogo] = useState<File | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [schoolsPage, setSchoolsPage] = useState(1);
+  const [usersPage, setUsersPage] = useState(1);
+  const [schoolsSearch, setSchoolsSearch] = useState('');
+  const [usersSearch, setUsersSearch] = useState('');
+
+  // Update section when URL changes
+  useEffect(() => {
+    setActiveSection(getInitialSection());
+  }, [location.pathname]);
 
   const levelsByType: Record<string, string[]> = {
     Nursery: ['Baby', 'Middle', 'Top'],
@@ -28,15 +52,20 @@ export default function SystemAdminDashboard() {
   };
 
   const { data: schools, isLoading: loadingSchools } = useQuery({
-    queryKey: ['schools'],
-    queryFn: () => schoolsApi.list(),
+    queryKey: ['schools', schoolsPage, schoolsSearch],
+    queryFn: () => schoolsApi.list({ page: schoolsPage, limit: 9, search: schoolsSearch }),
   });
 
   const { data: users, isLoading: loadingUsers } = useQuery({
-    queryKey: ['users'],
-    queryFn: () => usersApi.list(),
-    enabled: activeTab === 'users',
-    select: (data) => data?.filter((u: any) => u.role !== 'system_admin' || u.email === user.email),
+    queryKey: ['users', usersPage, usersSearch],
+    queryFn: () => usersApi.list({ page: usersPage, limit: 10, search: usersSearch }),
+    enabled: activeSection === 'admins',
+    select: (data) => ({
+      users: data?.users?.filter((u: any) => u.role === 'school_admin') || [],
+      total: data?.total || 0,
+      page: data?.page || 1,
+      limit: data?.limit || 10,
+    }),
   });
 
   const { data: stats } = useQuery({
@@ -223,72 +252,231 @@ export default function SystemAdminDashboard() {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <nav className="bg-white shadow-lg border-b border-gray-200">
+    <div className="flex h-screen bg-gray-50">
+      <Sidebar role="system_admin" isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+      <div className="flex-1 flex flex-col lg:ml-64">
+      <nav className="bg-white shadow-lg border-b border-gray-200 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-            <div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">System Admin Dashboard</h1>
-              <p className="text-sm text-gray-500 mt-1">Manage schools and users</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <NotificationAlert />
-              <div className="bg-blue-50 px-4 py-2 rounded-lg">
-                <p className="text-sm font-semibold text-blue-900">{user.full_name}</p>
-                <p className="text-xs text-blue-600">{user.role}</p>
-              </div>
-              <button onClick={handleLogout} className="bg-red-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-600 transition shadow-md hover:shadow-lg">
-                Logout
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden mr-4 text-gray-600"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
               </button>
+              <div>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">System Admin Dashboard</h1>
+                <p className="text-sm text-gray-500 mt-1">Manage schools and users</p>
+              </div>
             </div>
+            <NotificationAlert />
           </div>
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Overview */}
-        {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-blue-500">
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">Total Schools</h3>
-              <p className="text-3xl font-bold text-blue-600">{stats.total_schools}</p>
-              <div className="mt-3 space-y-1">
-                {Object.entries(stats.schools_by_type).map(([type, count]) => (
-                  <p key={type} className="text-sm text-gray-600">{type}: {String(count)}</p>
-                ))}
+      <main className="flex-1 overflow-y-auto">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {activeSection === 'dashboard' && (
+          <div className="space-y-6">
+            {/* Hero Stats Grid */}
+            {stats && (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 rounded-2xl shadow-xl p-6 text-white transform hover:scale-105 transition-all duration-300">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="text-5xl">🏫</div>
+                      <div className="bg-white/20 backdrop-blur-sm rounded-full p-3">
+                        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+                        </svg>
+                      </div>
+                    </div>
+                    <h3 className="text-sm font-medium opacity-90 mb-2">Total Schools</h3>
+                    <p className="text-4xl font-bold mb-4">{stats.total_schools}</p>
+                    <div className="space-y-1.5 pt-3 border-t border-white/20">
+                      {Object.entries(stats.schools_by_type).map(([type, count]) => (
+                        <div key={type} className="flex justify-between items-center text-sm">
+                          <span className="opacity-90">{type}</span>
+                          <span className="font-semibold bg-white/20 px-2 py-0.5 rounded-full">{String(count)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-emerald-500 via-emerald-600 to-emerald-700 rounded-2xl shadow-xl p-6 text-white transform hover:scale-105 transition-all duration-300">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="text-5xl">👨‍💼</div>
+                      <div className="bg-white/20 backdrop-blur-sm rounded-full p-3">
+                        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+                        </svg>
+                      </div>
+                    </div>
+                    <h3 className="text-sm font-medium opacity-90 mb-2">School Admins</h3>
+                    <p className="text-4xl font-bold mb-4">{stats.users_by_role?.school_admin || 0}</p>
+                    <div className="pt-3 border-t border-white/20">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="opacity-90">Total Users</span>
+                        <span className="font-semibold bg-white/20 px-2 py-0.5 rounded-full">{stats.total_users || 0}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-purple-500 via-purple-600 to-purple-700 rounded-2xl shadow-xl p-6 text-white transform hover:scale-105 transition-all duration-300">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="text-5xl">👨‍🎓</div>
+                      <div className="bg-white/20 backdrop-blur-sm rounded-full p-3">
+                        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" />
+                        </svg>
+                      </div>
+                    </div>
+                    <h3 className="text-sm font-medium opacity-90 mb-2">Total Students</h3>
+                    <p className="text-4xl font-bold mb-4">{stats.total_students}</p>
+                    <div className="pt-3 border-t border-white/20">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="opacity-90">Active Enrollments</span>
+                        <span className="font-semibold bg-white/20 px-2 py-0.5 rounded-full">{stats.total_students}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-amber-500 via-amber-600 to-amber-700 rounded-2xl shadow-xl p-6 text-white transform hover:scale-105 transition-all duration-300">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="text-5xl">📊</div>
+                      <div className="bg-white/20 backdrop-blur-sm rounded-full p-3">
+                        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
+                        </svg>
+                      </div>
+                    </div>
+                    <h3 className="text-sm font-medium opacity-90 mb-2">System Health</h3>
+                    <p className="text-4xl font-bold mb-4">{stats.health?.uptime_percent?.toFixed(1) || 0}%</p>
+                    <div className="pt-3 border-t border-white/20">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="opacity-90">{stats.health?.database || 'Database'}</span>
+                        <span className="font-semibold bg-white/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <div className={`w-2 h-2 rounded-full animate-pulse ${
+                            stats.health?.status === 'healthy' ? 'bg-green-300' : 'bg-red-300'
+                          }`}></div>
+                          {stats.health?.status || 'Unknown'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Secondary Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-rose-500">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600 mb-1">Teachers</p>
+                        <p className="text-3xl font-bold text-gray-900">{stats.users_by_role?.teacher || 0}</p>
+                      </div>
+                      <div className="text-4xl">👨‍🏫</div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-cyan-500">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600 mb-1">Librarians</p>
+                        <p className="text-3xl font-bold text-gray-900">{stats.users_by_role?.librarian || 0}</p>
+                      </div>
+                      <div className="text-4xl">📚</div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-pink-500">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600 mb-1">Nurses</p>
+                        <p className="text-3xl font-bold text-gray-900">{stats.users_by_role?.nurse || 0}</p>
+                      </div>
+                      <div className="text-4xl">⚕️</div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Recent Activity */}
+            <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+              <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-bold text-white flex items-center gap-3">
+                    <span className="text-2xl">⚡</span>
+                    Recent Activity
+                    <div className="w-2 h-2 bg-green-300 rounded-full animate-pulse"></div>
+                  </h3>
+                  <span className="text-sm text-white/80">Live Updates</span>
+                </div>
               </div>
-            </div>
-            <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-green-500">
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">Total Users</h3>
-              <p className="text-3xl font-bold text-green-600">{stats.total_users}</p>
-              <div className="mt-3 space-y-1">
-                {Object.entries(stats.users_by_role).map(([role, count]) => (
-                  <p key={role} className="text-sm text-gray-600">{role.replace('_', ' ')}: {String(count)}</p>
-                ))}
+              <div className="p-6">
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {recentActivity?.length > 0 ? (
+                    recentActivity.map((activity: any, index: number) => (
+                      <div key={index} className="flex items-start gap-4 p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl hover:from-blue-50 hover:to-purple-50 transition-all duration-200 border border-gray-200">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                          activity.action === 'CREATE' ? 'bg-green-100 text-green-600' :
+                          activity.action === 'UPDATE' ? 'bg-blue-100 text-blue-600' :
+                          activity.action === 'DELETE' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {activity.action === 'CREATE' ? '✨' :
+                           activity.action === 'UPDATE' ? '✏️' :
+                           activity.action === 'DELETE' ? '🗑️' : '📝'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                              activity.action === 'CREATE' ? 'bg-green-100 text-green-700' :
+                              activity.action === 'UPDATE' ? 'bg-blue-100 text-blue-700' :
+                              activity.action === 'DELETE' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
+                            }`}>
+                              {activity.action}
+                            </span>
+                            <span className="text-sm font-semibold text-gray-700">{activity.resource_type}</span>
+                          </div>
+                          {(activity.after?.name || activity.before?.name) && (
+                            <p className="text-sm font-medium text-gray-900 mb-1">
+                              📝 {activity.after?.name || activity.before?.name}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-3 text-xs text-gray-600">
+                            <span className="flex items-center gap-1">
+                              👤 {activity.user_name || 'Unknown User'}
+                            </span>
+                            {activity.school_name && (
+                              <span className="flex items-center gap-1">
+                                🏫 {activity.school_name}
+                              </span>
+                            )}
+                            <span className="flex items-center gap-1">
+                              🕒 {new Date(activity.timestamp).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-12">
+                      <div className="text-6xl mb-4">📊</div>
+                      <p className="text-gray-500 font-medium">No recent activity</p>
+                      <p className="text-sm text-gray-400 mt-2">Activity will appear here as users interact with the system</p>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-            <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-purple-500">
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">Total Students</h3>
-              <p className="text-3xl font-bold text-purple-600">{stats.total_students}</p>
-            </div>
-            <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-orange-500">
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">Active Schools</h3>
-              <p className="text-3xl font-bold text-orange-600">{stats.total_schools || 0}</p>
-              <p className="text-sm text-gray-600 mt-1">Total schools</p>
             </div>
           </div>
         )}
 
-        <div className="mb-6 flex gap-4 border-b border-gray-200">
-          <button onClick={() => setActiveTab('schools')} className={`px-6 py-3 font-semibold transition ${activeTab === 'schools' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}>
-            School Management
-          </button>
-          <button onClick={() => setActiveTab('users')} className={`px-6 py-3 font-semibold transition ${activeTab === 'users' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}>
-            User Management
-          </button>
-        </div>
-
-        {activeTab === 'schools' && (
+        {activeSection === 'schools' && (
           <div>
             <div className="flex justify-between items-center mb-6">
               <div>
@@ -299,200 +487,146 @@ export default function SystemAdminDashboard() {
                 <span className="text-xl">+</span> Add School
               </button>
             </div>
+            <div className="mb-4">
+              <input
+                type="text"
+                placeholder="Search schools..."
+                value={schoolsSearch}
+                onChange={(e) => { setSchoolsSearch(e.target.value); setSchoolsPage(1); }}
+                className="w-full max-w-md border-2 border-gray-300 rounded-lg px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              />
+            </div>
             {loadingSchools ? (
               <div className="flex items-center justify-center h-48 sm:h-64">
                 <div className="animate-spin rounded-full h-8 w-8 sm:h-12 sm:w-12 border-b-2 border-blue-600"></div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {schools?.map((school: any) => (
-                  <div key={school.id} className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100 hover:shadow-xl transition">
-                    <div className="bg-gradient-to-r from-blue-500 to-purple-500 h-2"></div>
-                    <div className="p-6">
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="flex-1">
-                          <h3 className="text-xl font-bold text-gray-800 mb-2">{school.name}</h3>
-                          <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">{school.type}</span>
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {schools?.schools?.map((school: any) => (
+                    <div key={school.id} className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100 hover:shadow-xl transition">
+                      <div className="bg-gradient-to-r from-blue-500 to-purple-500 h-2"></div>
+                      <div className="p-6">
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="flex-1">
+                            <h3 className="text-xl font-bold text-gray-800 mb-2">{school.name}</h3>
+                            <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">{school.type}</span>
+                          </div>
+                          {school.logo_url && (
+                            <img src={school.logo_url} alt="Logo" className="h-12 w-12 object-contain border rounded ml-4" />
+                          )}
                         </div>
-                        {school.logo_url && (
-                          <img src={school.logo_url} alt="Logo" className="h-12 w-12 object-contain border rounded ml-4" />
-                        )}
-                      </div>
-                      <div className="space-y-2 text-sm text-gray-600 mb-4">
-                        <p><span className="font-semibold">📍</span> {school.address || 'No address'}</p>
-                        <p><span className="font-semibold">✉️</span> {school.contact_email || 'No email'}</p>
-                        <p><span className="font-semibold">📞</span> {school.phone || 'No phone'}</p>
-                        {school.motto && <p className="italic">"<span className="font-semibold">🎯</span> {school.motto}"</p>}
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => { setEditingSchool(school); setSchoolType(school.type); setShowEditSchool(true); }} className="flex-1 bg-blue-100 text-blue-700 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-blue-200 transition">
-                          Edit
-                        </button>
-                        <button onClick={() => handleDeleteSchool(school.id)} className="flex-1 bg-red-100 text-red-700 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-red-200 transition">
-                          Delete
-                        </button>
+                        <div className="space-y-2 text-sm text-gray-600 mb-4">
+                          <p><span className="font-semibold">📍</span> {school.address || 'No address'}</p>
+                          <p><span className="font-semibold">✉️</span> {school.contact_email || 'No email'}</p>
+                          <p><span className="font-semibold">📞</span> {school.phone || 'No phone'}</p>
+                          {school.motto && <p className="italic">"<span className="font-semibold">🎯</span> {school.motto}"</p>}
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => { setEditingSchool(school); setSchoolType(school.type); setShowEditSchool(true); }} className="flex-1 bg-blue-100 text-blue-700 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-blue-200 transition">
+                            Edit
+                          </button>
+                          <button onClick={() => handleDeleteSchool(school.id)} className="flex-1 bg-red-100 text-red-700 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-red-200 transition">
+                            Delete
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+                {schools?.total > 0 && (
+                  <Pagination
+                    currentPage={schoolsPage}
+                    totalPages={Math.ceil(schools.total / (schools.limit || 9))}
+                    onPageChange={setSchoolsPage}
+                  />
+                )}
+              </>
             )}
           </div>
         )}
 
-        {activeTab === 'users' && (
+        {activeSection === 'admins' && (
           <div>
             <div className="flex justify-between items-center mb-6">
               <div>
-                <h2 className="text-2xl font-bold text-gray-800">Users</h2>
-                <p className="text-gray-600 mt-1">Manage system users</p>
+                <h2 className="text-2xl font-bold text-gray-800">School Admins</h2>
+                <p className="text-gray-600 mt-1">Manage school administrators</p>
               </div>
               <button onClick={() => setShowAddUser(true)} className="bg-gradient-to-r from-green-500 to-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-green-600 hover:to-green-700 transition shadow-md hover:shadow-lg flex items-center gap-2">
-                <span className="text-xl">+</span> Add User
+                <span className="text-xl">+</span> Add School Admin
               </button>
+            </div>
+            <div className="mb-4">
+              <input
+                type="text"
+                placeholder="Search users..."
+                value={usersSearch}
+                onChange={(e) => { setUsersSearch(e.target.value); setUsersPage(1); }}
+                className="w-full max-w-md border-2 border-gray-300 rounded-lg px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              />
             </div>
             {loadingUsers ? (
               <div className="flex items-center justify-center h-48 sm:h-64">
                 <div className="animate-spin rounded-full h-8 w-8 sm:h-12 sm:w-12 border-b-2 border-blue-600"></div>
               </div>
             ) : (
-              <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gradient-to-r from-blue-50 to-purple-50">
-                      <tr>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Name</th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Email</th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Role</th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">School</th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Status</th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {users?.map((u: any) => (
-                        <tr key={u.id} className="hover:bg-gray-50 transition">
-                          <td className="px-6 py-4 whitespace-nowrap font-semibold text-gray-900">{u.full_name}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-gray-600">{u.email}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                              u.role === 'system_admin' ? 'bg-red-100 text-red-800' :
-                              u.role === 'school_admin' ? 'bg-blue-100 text-blue-800' :
-                              'bg-green-100 text-green-800'
-                            }`}>
-                              {u.role.replace('_', ' ')}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-gray-600">
-                            {u.school?.name || 'No school assigned'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${u.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                              {u.is_active ? 'Active' : 'Inactive'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex gap-2">
-                              <button onClick={() => setEditingUser(u)} className="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-blue-200 transition">
-                                Edit
-                              </button>
-                              <button onClick={() => handleDeleteUser(u.id)} className="bg-red-100 text-red-700 px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-red-200 transition">
-                                Delete
-                              </button>
-                            </div>
-                          </td>
+              <>
+                <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gradient-to-r from-blue-50 to-purple-50">
+                        <tr>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Name</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Email</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">School</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Status</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {users?.users?.map((u: any) => (
+                          <tr key={u.id} className="hover:bg-gray-50 transition">
+                            <td className="px-6 py-4 whitespace-nowrap font-semibold text-gray-900">{u.full_name}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-gray-600">{u.email}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-gray-600">
+                              {u.school?.name || 'No school assigned'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${u.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                {u.is_active ? 'Active' : 'Inactive'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex gap-2">
+                                <button onClick={() => setEditingUser(u)} className="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-blue-200 transition">
+                                  Edit
+                                </button>
+                                <button onClick={() => handleDeleteUser(u.id)} className="bg-red-100 text-red-700 px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-red-200 transition">
+                                  Delete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
+                {users?.total > 0 && (
+                  <Pagination
+                    currentPage={usersPage}
+                    totalPages={Math.ceil(users.total / (users.limit || 10))}
+                    onPageChange={setUsersPage}
+                  />
+                )}
+              </>
             )}
-
-            {/* Detailed Stats and Recent Activity */}
-            <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {stats && (
-                <>
-                  <div className="bg-white rounded-xl shadow-lg p-6">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                      👥 Users by School
-                    </h3>
-                    <div className="space-y-2">
-                      {stats.users_by_school?.map((item: any, index: number) => (
-                        <div key={index} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
-                          <span className="text-gray-700 text-sm">{item.school_name ?? ''}</span>
-                          <span className="font-semibold text-blue-600">{item.user_count ?? ''}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="bg-white rounded-xl shadow-lg p-6">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                      🎓 Students by School
-                    </h3>
-                    <div className="space-y-2">
-                      {stats.students_by_school?.map((item: any, index: number) => (
-                        <div key={index} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
-                          <span className="text-gray-700 text-sm">{item.school_name ?? ''}</span>
-                          <span className="font-semibold text-purple-600">{item.student_count ?? ''}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-              
-              {/* Recent Activity */}
-              <div className="bg-white rounded-xl shadow-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                  ⚡ Recent Activity
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                </h3>
-                <div className="space-y-3 max-h-80 overflow-y-auto">
-                  {recentActivity?.length > 0 ? (
-                    recentActivity.map((activity: any, index: number) => (
-                      <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-150">
-                        <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
-                          activity.action === 'CREATE' ? 'bg-green-500' :
-                          activity.action === 'UPDATE' ? 'bg-blue-500' :
-                          activity.action === 'DELETE' ? 'bg-red-500' : 'bg-gray-500'
-                        }`}></div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">
-                            {activity.action} {activity.resource_type}
-                          </p>
-                          {(activity.after?.name || activity.before?.name) && (
-                            <p className="text-xs text-gray-700 font-medium mt-1 truncate">
-                              📝 {activity.after?.name || activity.before?.name}
-                            </p>
-                          )}
-                          <p className="text-xs text-gray-500 mt-1">
-                            👤 {activity.user_name || 'Unknown User'}
-                            {activity.school_name && ` (${activity.school_name})`}
-                          </p>
-                          {activity.ip && (
-                            <p className="text-xs text-gray-500">
-                              📍 IP: {activity.ip}
-                            </p>
-                          )}
-                          <p className="text-xs text-gray-400 mt-1">
-                            🕒 {new Date(activity.timestamp).toLocaleString()}
-                          </p>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8">
-                      <div className="text-4xl mb-2">📊</div>
-                      <p className="text-gray-500 text-sm">No recent activity</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
           </div>
         )}
+        </div>
       </main>
+      </div>
 
       {(showAddSchool || showEditSchool) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -589,16 +723,14 @@ export default function SystemAdminDashboard() {
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Role *</label>
                 <select name="role" defaultValue={editingUser?.role} required className="w-full border-2 border-gray-300 rounded-lg px-4 py-2.5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition">
-                  <option value="">Select role</option>
                   <option value="school_admin">School Admin</option>
-                  <option value="teacher">Teacher</option>
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">School *</label>
                 <select name="school_id" defaultValue={editingUser?.school_id} className="w-full border-2 border-gray-300 rounded-lg px-4 py-2.5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition">
                   <option value="">Select school</option>
-                  {schools?.map((school: any) => (
+                  {schools?.schools?.map((school: any) => (
                     <option key={school.id} value={school.id}>{school.name}</option>
                   ))}
                 </select>

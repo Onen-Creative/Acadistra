@@ -19,6 +19,7 @@ export default function ClassView() {
   const { data: students } = useQuery({
     queryKey: ['students', id],
     queryFn: () => studentsApi.list({ class_id: id }),
+    select: (data) => Array.isArray(data) ? data : data?.students || [],
   });
 
   const saveMutation = useMutation({
@@ -106,7 +107,7 @@ export default function ClassView() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {students?.map((student: Student) => (
+              {(students || []).map((student: Student) => (
                 <tr key={student.id}>
                   <td className="px-6 py-4 whitespace-nowrap">{student.admission_no}</td>
                   <td className="px-6 py-4 whitespace-nowrap">

@@ -49,6 +49,12 @@ api.interceptors.response.use(
       } catch (refreshError) {
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
+        localStorage.setItem('auth_error', JSON.stringify({
+          message: error.response?.data?.message || 'Session expired',
+          status: error.response?.status,
+          url: error.config?.url,
+          timestamp: new Date().toISOString()
+        }));
         window.location.href = '/login';
         return Promise.reject(refreshError);
       }
@@ -102,7 +108,7 @@ export const classesApi = {
 
 // Students API
 export const studentsApi = {
-  list: async (params?: { class_id?: string; class_level?: string; term?: string; year?: number }) => {
+  list: async (params?: { class_id?: string; class_level?: string; term?: string; year?: number; search?: string; page?: number; limit?: number }) => {
     const { data } = await api.get('/students', { params });
     return data;
   },
@@ -124,6 +130,11 @@ export const studentsApi = {
 
   delete: async (id: string) => {
     const { data } = await api.delete(`/students/${id}`);
+    return data;
+  },
+
+  promoteOrDemote: async (id: string, newClassLevel: string, year: number, term: string) => {
+    const { data } = await api.post(`/students/${id}/promote`, { new_class_level: newClassLevel, year, term });
     return data;
   },
 };
@@ -171,8 +182,8 @@ export const reportsApi = {
 
 // Users API
 export const usersApi = {
-  list: async () => {
-    const { data } = await api.get('/users');
+  list: async (params?: { search?: string; page?: number; limit?: number }) => {
+    const { data } = await api.get('/users', { params });
     return data;
   },
 
@@ -190,17 +201,43 @@ export const usersApi = {
     const { data } = await api.delete(`/users/${id}`);
     return data;
   },
+
+  // School admin user management
+  listSchoolUsers: async () => {
+    const { data } = await api.get('/school-users');
+    return data;
+  },
+
+  createSchoolUser: async (userData: any) => {
+    const { data } = await api.post('/school-users', userData);
+    return data;
+  },
+
+  updateSchoolUser: async (id: string, userData: any) => {
+    const { data } = await api.put(`/school-users/${id}`, userData);
+    return data;
+  },
+
+  deleteSchoolUser: async (id: string) => {
+    const { data } = await api.delete(`/school-users/${id}`);
+    return data;
+  },
 };
 
 // Schools API
 export const schoolsApi = {
-  list: async () => {
-    const { data } = await api.get('/schools');
+  list: async (params?: { search?: string; page?: number; limit?: number }) => {
+    const { data } = await api.get('/schools', { params });
     return data;
   },
 
   get: async (id: string) => {
     const { data } = await api.get(`/schools/${id}`);
+    return data;
+  },
+
+  getLevels: async () => {
+    const { data } = await api.get('/school/levels');
     return data;
   },
 
@@ -221,6 +258,12 @@ export const schoolsApi = {
 
   getStats: async () => {
     const { data } = await api.get('/stats');
+    return data;
+  },
+
+  // School admin dashboard summary
+  getSummary: async (params?: { term?: string; year?: string }) => {
+    const { data } = await api.get('/dashboard/summary', { params });
     return data;
   },
 };
@@ -270,6 +313,299 @@ export const resultsApi = {
 export const auditApi = {
   getRecentActivity: async (limit: number = 20) => {
     const { data } = await api.get('/audit/recent', { params: { limit } });
+    return data;
+  },
+};
+
+// Fees API
+export const feesApi = {
+  list: async (params?: { level?: string; term?: string; year?: number; search?: string; page?: number; limit?: number }) => {
+    const { data } = await api.get('/fees', { params });
+    return data;
+  },
+
+  createOrUpdate: async (feesData: any) => {
+    const { data } = await api.post('/fees', feesData);
+    return data;
+  },
+
+  get: async (id: string) => {
+    const { data } = await api.get(`/fees/${id}`);
+    return data;
+  },
+
+  delete: async (id: string) => {
+    const { data } = await api.delete(`/fees/${id}`);
+    return data;
+  },
+
+  recordPayment: async (paymentData: any) => {
+    const { data } = await api.post('/fees/payment', paymentData);
+    return data;
+  },
+
+  getReports: async (params: { type: string; term?: string; year?: string }) => {
+    const { data } = await api.get('/fees/reports', { params });
+    return data;
+  },
+};
+
+// Teachers API
+export const teachersApi = {
+  list: async (params?: { search?: string; page?: number; limit?: number }) => {
+    const { data } = await api.get('/teachers', { params });
+    return data;
+  },
+
+  get: async (id: string) => {
+    const { data } = await api.get(`/teachers/${id}`);
+    return data;
+  },
+
+  create: async (teacherData: any) => {
+    const { data } = await api.post('/teachers', teacherData);
+    return data;
+  },
+
+  update: async (id: string, teacherData: any) => {
+    const { data } = await api.put(`/teachers/${id}`, teacherData);
+    return data;
+  },
+
+  delete: async (id: string) => {
+    const { data } = await api.delete(`/teachers/${id}`);
+    return data;
+  },
+};
+
+// Library API
+export const libraryApi = {
+  // Books
+  listBooks: async (params?: { subject?: string; search?: string; page?: number; limit?: number }) => {
+    const { data } = await api.get('/library/books', { params });
+    return data;
+  },
+
+  createBook: async (bookData: any) => {
+    const { data } = await api.post('/library/books', bookData);
+    return data;
+  },
+
+  updateBook: async (id: string, bookData: any) => {
+    const { data } = await api.put(`/library/books/${id}`, bookData);
+    return data;
+  },
+
+  deleteBook: async (id: string) => {
+    const { data } = await api.delete(`/library/books/${id}`);
+    return data;
+  },
+
+  getAvailableCopies: async (id: string) => {
+    const { data } = await api.get(`/library/books/${id}/available-copies`);
+    return data;
+  },
+
+  getCopyHistory: async (id: string) => {
+    const { data } = await api.get(`/library/books/${id}/history`);
+    return data;
+  },
+
+  searchByCopyNumber: async (copyNumber: string) => {
+    const { data } = await api.get('/library/search-copy', { params: { copy_number: copyNumber } });
+    return data;
+  },
+
+  bulkIssueBooks: async (issueData: any) => {
+    const { data } = await api.post('/library/bulk-issue', issueData);
+    return data;
+  },
+
+  // Issues
+  listIssues: async (params?: { status?: string; student_id?: string; term?: string; year?: string; search?: string; page?: number; limit?: number }) => {
+    const { data } = await api.get('/library/issues', { params });
+    return data;
+  },
+
+  issueBook: async (issueData: any) => {
+    const { data } = await api.post('/library/issue', issueData);
+    return data;
+  },
+
+  returnBook: async (id: string, returnData: any) => {
+    const { data } = await api.put(`/library/return/${id}`, returnData);
+    return data;
+  },
+
+  getStats: async (params?: { term?: string; year?: number }) => {
+    const { data } = await api.get('/library/stats', { params });
+    return data;
+  },
+
+  getStatsBySubject: async (params?: { term?: string; year?: number }) => {
+    const { data } = await api.get('/library/stats/subjects', { params });
+    return data;
+  },
+
+  getReports: async (params: { type: string; term?: string; year?: string }) => {
+    const { data } = await api.get('/library/reports', { params });
+    return data;
+  },
+};
+
+// Clinic API
+export const clinicApi = {
+  // Visits (Nurse only)
+  listVisits: async (params?: { student_id?: string; page?: number; limit?: number }) => {
+    const { data } = await api.get('/clinic/visits', { params });
+    return data;
+  },
+
+  createVisit: async (visitData: any) => {
+    const { data } = await api.post('/clinic/visits', visitData);
+    return data;
+  },
+
+  getVisit: async (id: string) => {
+    const { data } = await api.get(`/clinic/visits/${id}`);
+    return data;
+  },
+
+  updateVisit: async (id: string, visitData: any) => {
+    const { data } = await api.put(`/clinic/visits/${id}`, visitData);
+    return data;
+  },
+  deleteVisit: async (id: string) => {
+    const { data } = await api.delete(`/clinic/visits/${id}`);
+    return data;
+  },
+
+
+  // Health Profiles (Nurse only)
+  createHealthProfile: async (profileData: any) => {
+    const { data } = await api.post('/clinic/health-profiles', profileData);
+    return data;
+  },
+
+  getHealthProfile: async (studentId: string) => {
+    const { data } = await api.get(`/clinic/health-profiles/${studentId}`);
+    return data;
+  },
+  getHealthProfileById: async (id: string) => {
+    const { data } = await api.get(`/clinic/health-profiles/detail/${id}`);
+    return data;
+  },
+
+
+  getStudentHealthData: async (studentId: string) => {
+    const { data } = await api.get(`/clinic/students/${studentId}/health-data`);
+    return data;
+  },
+
+  updateHealthProfile: async (id: string, profileData: any) => {
+    const { data } = await api.put(`/clinic/health-profiles/${id}`, profileData);
+    return data;
+  },
+
+  // Medical Tests (Nurse only)
+  createTest: async (testData: any) => {
+    const { data } = await api.post('/clinic/tests', testData);
+    return data;
+  },
+
+  listTests: async (params?: { visit_id?: string; student_id?: string; test_type?: string }) => {
+    const { data } = await api.get('/clinic/tests', { params });
+    return data;
+  },
+
+  // Medicine Inventory (Nurse only)
+  listMedicines: async (params?: { category?: string; low_stock?: boolean; search?: string; page?: number; limit?: number; year?: number; term?: string }) => {
+    const { data } = await api.get('/clinic/medicines', { params });
+    return data;
+  },
+
+  createMedicine: async (medicineData: any) => {
+    const { data } = await api.post('/clinic/medicines', medicineData);
+    return data;
+  },
+
+  updateMedicine: async (id: string, medicineData: any) => {
+    const { data } = await api.put(`/clinic/medicines/${id}`, medicineData);
+    return data;
+  },
+
+  deleteMedicine: async (id: string) => {
+    const { data } = await api.delete(`/clinic/medicines/${id}`);
+    return data;
+  },
+
+  // Medication Administration (Nurse only)
+  administerMedication: async (adminData: any) => {
+    const { data } = await api.post('/clinic/medication-admin', adminData);
+    return data;
+  },
+
+  getMedicationHistory: async (params?: { student_id?: string; visit_id?: string }) => {
+    const { data } = await api.get('/clinic/medication-history', { params });
+    return data;
+  },
+
+  // Consumables (Nurse only)
+  listConsumables: async (params?: { category?: string; low_stock?: boolean; search?: string; page?: number; limit?: number; year?: number; term?: string }) => {
+    const { data } = await api.get('/clinic/consumables', { params });
+    return data;
+  },
+
+  createConsumable: async (consumableData: any) => {
+    const { data } = await api.post('/clinic/consumables', consumableData);
+    return data;
+  },
+
+  updateConsumable: async (id: string, consumableData: any) => {
+    const { data } = await api.put(`/clinic/consumables/${id}`, consumableData);
+    return data;
+  },
+
+  deleteConsumable: async (id: string) => {
+    const { data } = await api.delete(`/clinic/consumables/${id}`);
+    return data;
+  },
+
+  // Consumable Usage
+  recordConsumableUsage: async (usageData: any) => {
+    const { data } = await api.post('/clinic/consumable-usage', usageData);
+    return data;
+  },
+
+  getConsumableUsage: async (params?: { consumable_id?: string; visit_id?: string; page?: number; limit?: number }) => {
+    const { data } = await api.get('/clinic/consumable-usage', { params });
+    return data;
+  },
+
+  deleteHealthProfile: async (id: string) => {
+    const { data } = await api.delete(`/clinic/health-profiles/${id}`);
+    return data;
+  },
+
+  // Emergency Incidents (Nurse only)
+  createIncident: async (incidentData: any) => {
+    const { data } = await api.post('/clinic/incidents', incidentData);
+    return data;
+  },
+
+  listIncidents: async (params?: { student_id?: string }) => {
+    const { data } = await api.get('/clinic/incidents', { params });
+    return data;
+  },
+
+  // Summary (Admin only - aggregated data)
+  getSummary: async (params?: { term?: string; year?: number; start_date?: string; end_date?: string }) => {
+    const { data } = await api.get('/clinic/summary', { params });
+    return data;
+  },
+
+  getReports: async (params: { type: string; term?: string; year?: string }) => {
+    const { data } = await api.get('/clinic/reports', { params });
     return data;
   },
 };

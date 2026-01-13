@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { authApi } from '@/services/api';
@@ -10,6 +10,19 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const authError = localStorage.getItem('auth_error');
+    if (authError) {
+      try {
+        const errorData = JSON.parse(authError);
+        setError(`${errorData.message} (${errorData.url || 'unknown endpoint'})`);
+        localStorage.removeItem('auth_error');
+      } catch {
+        setError('Session expired. Please login again.');
+      }
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

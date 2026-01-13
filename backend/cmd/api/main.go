@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -120,10 +121,16 @@ func main() {
 	schoolHandler := handlers.NewSchoolHandler(db)
 	classHandler := handlers.NewClassHandler(db)
 	studentHandler := handlers.NewStudentHandler(db)
+	guardianHandler := handlers.NewGuardianHandler(db)
+	registrationHandler := handlers.NewRegistrationHandler(db)
 	subjectHandler := handlers.NewSubjectHandler(db)
 	resultHandler := handlers.NewResultHandler(db)
 	uploadHandler := handlers.NewUploadHandler(db)
 	auditHandler := handlers.NewAuditHandler(db)
+	feesHandler := handlers.NewFeesHandler(db)
+	libraryHandler := handlers.NewLibraryHandler(db)
+	teacherHandler := handlers.NewTeacherHandler(db)
+	websocketHandler := handlers.NewWebSocketHandler(authService)
 
 	// Routes
 	v1 := r.Group("/api/v1")
@@ -138,6 +145,7 @@ func main() {
 		// Protected routes
 		protected := v1.Group("")
 		protected.Use(middleware.AuthMiddleware(authService))
+		protected.Use(middleware.AuditLogger(db))
 		protected.Use(middleware.TenantMiddleware())
 		{
 			// System Admin only routes
@@ -184,25 +192,177 @@ func main() {
 				})
 			}
 
+			// Shared routes for school_admin, teacher, librarian, nurse, and bursar
+			shared := protected.Group("")
+			shared.Use(func(c *gin.Context) {
+				userRole := c.GetString("user_role")
+				if userRole != "school_admin" && userRole != "teacher" && userRole != "librarian" && userRole != "nurse" && userRole != "bursar" && userRole != "system_admin" {
+					c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+					c.Abort()
+					return
+				}
+				c.Next()
+			})
+			{
+				shared.GET("/teachers", teacherHandler.List)
+				shared.GET("/students", studentHandler.List)
+			}
+
 			// School Admin routes
 			schoolAdmin := protected.Group("")
 			schoolAdmin.Use(middleware.RequireSchoolAdmin())
 			{
-				schoolAdmin.POST("/students", studentHandler.Create)
+				// User management - School admin can create all users except system_admin
+				schoolAdmin.POST("/school-users", userHandler.CreateSchoolUser)
+				schoolAdmin.GET("/school-users", userHandler.ListSchoolUsers)
+				schoolAdmin.PUT("/school-users/:id", userHandler.UpdateSchoolUser)
+				schoolAdmin.DELETE("/school-users/:id", userHandler.DeleteSchoolUser)
+				
+				// School dashboard summary
+				schoolAdmin.GET("/dashboard/summary", schoolHandler.GetSchoolSummary)
+				
+				// Student registration (comprehensive with guardians)
+				schoolAdmin.POST("/students", registrationHandler.RegisterStudent)
 				schoolAdmin.PUT("/students/:id", studentHandler.Update)
 				schoolAdmin.DELETE("/students/:id", studentHandler.Delete)
-				// Note: Subject creation/modification removed - only standard subjects allowed
+				schoolAdmin.POST("/students/:id/promote", studentHandler.PromoteOrDemote)
+				
+				// Guardian management
+				schoolAdmin.POST("/guardians", guardianHandler.Create)
+				schoolAdmin.GET("/guardians", guardianHandler.List)
+				schoolAdmin.GET("/guardians/:id", guardianHandler.Get)
+				schoolAdmin.PUT("/guardians/:id", guardianHandler.Update)
+				schoolAdmin.DELETE("/guardians/:id", guardianHandler.Delete)
+				
+				// Teacher management (admin only for create/update/delete)
+				schoolAdmin.POST("/teachers", teacherHandler.Create)
+				schoolAdmin.GET("/teachers/:id", teacherHandler.Get)
+				schoolAdmin.PUT("/teachers/:id", teacherHandler.Update)
+				schoolAdmin.DELETE("/teachers/:id", teacherHandler.Delete)
+				
+				// Results management
 				schoolAdmin.DELETE("/results/:id", resultHandler.Delete)
 			}
 
-			// Teacher routes (all authenticated users)
+			// Bursar routes
+			bursar := protected.Group("")
+			bursar.Use(func(c *gin.Context) {
+				userRole := c.GetString("user_role")
+				if userRole != "bursar" && userRole != "school_admin" && userRole != "system_admin" {
+					c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+					c.Abort()
+					return
+				}
+				c.Next()
+			})
+			{
+				bursar.GET("/fees", feesHandler.ListStudentFees)
+				bursar.POST("/fees", feesHandler.CreateOrUpdateStudentFees)
+				bursar.GET("/fees/:id", feesHandler.GetStudentFeesDetails)
+				bursar.DELETE("/fees/:id", feesHandler.DeleteStudentFees)
+				bursar.POST("/fees/payment", feesHandler.RecordPayment)
+				bursar.GET("/fees/reports", feesHandler.GetReportData)
+			}
+
+			// Librarian routes
+			librarian := protected.Group("")
+			librarian.Use(func(c *gin.Context) {
+				userRole := c.GetString("user_role")
+				if userRole != "librarian" && userRole != "school_admin" && userRole != "system_admin" {
+					c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+					c.Abort()
+					return
+				}
+				c.Next()
+			})
+			{
+				librarian.GET("/library/books", libraryHandler.ListBooks)
+				librarian.POST("/library/books", libraryHandler.CreateBook)
+				librarian.PUT("/library/books/:id", libraryHandler.UpdateBook)
+				librarian.DELETE("/library/books/:id", libraryHandler.DeleteBook)
+				librarian.GET("/library/books/:id/history", libraryHandler.GetCopyHistory)
+				librarian.GET("/library/books/:id/available-copies", libraryHandler.GetAvailableCopies)
+				librarian.GET("/library/search-copy", libraryHandler.SearchByCopyNumber)
+				librarian.GET("/library/issues", libraryHandler.ListIssues)
+				librarian.POST("/library/issue", libraryHandler.IssueBook)
+				librarian.POST("/library/bulk-issue", libraryHandler.BulkIssueBooks)
+				librarian.PUT("/library/return/:id", libraryHandler.ReturnBook)
+				librarian.GET("/library/stats", libraryHandler.GetStats)
+				librarian.GET("/library/stats/subjects", libraryHandler.GetStatsBySubject)
+				librarian.GET("/library/reports", libraryHandler.GetReportData)
+			}
+
+			// Nurse routes - FULL ACCESS (includes summary for their dashboard)
+			nurse := protected.Group("/clinic")
+			nurse.Use(func(c *gin.Context) {
+				userRole := c.GetString("user_role")
+				if userRole != "nurse" && userRole != "school_admin" && userRole != "system_admin" {
+					c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+					c.Abort()
+					return
+				}
+				c.Next()
+			})
+			{
+				clinicHandler := handlers.NewClinicHandler(db)
+				
+				// Health Profiles
+				nurse.POST("/health-profiles", clinicHandler.CreateHealthProfile)
+				nurse.GET("/health-profiles/:student_id", clinicHandler.GetHealthProfile)
+				nurse.GET("/students/:student_id/health-data", clinicHandler.GetStudentHealthData)
+				nurse.GET("/health-profiles/detail/:id", clinicHandler.GetHealthProfileByID)
+				nurse.PUT("/health-profiles/:id", clinicHandler.UpdateHealthProfile)
+				nurse.DELETE("/health-profiles/:id", clinicHandler.DeleteHealthProfile)
+				
+				// Clinic Visits
+				nurse.POST("/visits", clinicHandler.CreateVisit)
+				nurse.GET("/visits", clinicHandler.GetVisits)
+				nurse.GET("/visits/:id", clinicHandler.GetVisit)
+				nurse.PUT("/visits/:id", clinicHandler.UpdateVisit)
+				nurse.DELETE("/visits/:id", clinicHandler.DeleteVisit)
+				
+				// Medical Tests
+				nurse.POST("/tests", clinicHandler.CreateTest)
+				nurse.GET("/tests", clinicHandler.GetTests)
+				
+				// Medicines
+				nurse.POST("/medicines", clinicHandler.CreateMedicine)
+				nurse.GET("/medicines", clinicHandler.ListMedicines)
+				nurse.PUT("/medicines/:id", clinicHandler.UpdateMedicine)
+				nurse.DELETE("/medicines/:id", clinicHandler.DeleteMedicine)
+				
+				// Medication Administration
+				nurse.POST("/medication-admin", clinicHandler.AdministerMedication)
+				nurse.GET("/medication-history", clinicHandler.GetMedicationHistory)
+				
+				// Consumables
+				nurse.POST("/consumables", clinicHandler.CreateConsumable)
+				nurse.GET("/consumables", clinicHandler.ListConsumables)
+				nurse.PUT("/consumables/:id", clinicHandler.UpdateConsumable)
+				nurse.DELETE("/consumables/:id", clinicHandler.DeleteConsumable)
+				
+				// Consumable Usage
+				nurse.POST("/consumable-usage", clinicHandler.RecordConsumableUsage)
+				nurse.GET("/consumable-usage", clinicHandler.GetConsumableUsage)
+				
+				// Emergency Incidents
+				nurse.POST("/incidents", clinicHandler.CreateIncident)
+				nurse.GET("/incidents", clinicHandler.GetIncidents)
+				
+				// Summary (both nurse and admin can access)
+				nurse.GET("/summary", clinicHandler.GetAdminSummary)
+				nurse.GET("/reports", clinicHandler.GetReportData)
+			}
+
+			// WebSocket endpoint (no auth middleware needed as it handles auth internally)
+			v1.GET("/ws", websocketHandler.HandleWebSocket)
 			protected.GET("/schools", schoolHandler.List)
 			protected.GET("/schools/:id", schoolHandler.Get)
+			protected.GET("/school/levels", schoolHandler.GetSchoolLevels)
 			protected.GET("/classes", classHandler.List)
 			protected.GET("/classes/levels", classHandler.GetLevels)
 			protected.GET("/classes/:id", classHandler.Get)
 			protected.GET("/classes/:id/students", classHandler.GetStudents)
-			protected.GET("/students", studentHandler.List)
 			protected.GET("/students/:id", studentHandler.Get)
 			protected.GET("/students/:id/results", resultHandler.GetByStudent)
 			protected.GET("/subjects", subjectHandler.ListStandardSubjects)
@@ -325,6 +485,61 @@ func seedAdmin(db *gorm.DB, cfg *config.Config) {
 	}
 
 	log.Println("Teacher: teacher@school.ug / Teacher@123")
+
+	// Create bursar assigned to the school
+	bursar := &models.User{
+		SchoolID: &school.ID,
+		Email:    "bursar@school.ug",
+		FullName: "School Bursar",
+		Role:     "bursar",
+		IsActive: true,
+	}
+
+	if err := authService.CreateUser(bursar, "Bursar@123"); err != nil {
+		log.Fatal("Failed to create bursar:", err)
+	}
+
+	log.Println("Bursar: bursar@school.ug / Bursar@123")
+
+	// Create librarian assigned to the school
+	var existingLibrarian models.User
+	if err := db.Where("email = ?", "librarian@school.ug").First(&existingLibrarian).Error; err == nil {
+		log.Println("Librarian already exists")
+	} else {
+		librarian := &models.User{
+			SchoolID: &school.ID,
+			Email:    "librarian@school.ug",
+			FullName: "School Librarian",
+			Role:     "librarian",
+			IsActive: true,
+		}
+
+		if err := authService.CreateUser(librarian, "Librarian@123"); err != nil {
+			log.Fatal("Failed to create librarian:", err)
+		}
+
+		log.Println("Librarian: librarian@school.ug / Librarian@123")
+	}
+
+	// Create nurse assigned to the school
+	var existingNurse models.User
+	if err := db.Where("email = ?", "nurse@school.ug").First(&existingNurse).Error; err == nil {
+		log.Println("Nurse already exists")
+	} else {
+		nurse := &models.User{
+			SchoolID: &school.ID,
+			Email:    "nurse@school.ug",
+			FullName: "School Nurse",
+			Role:     "nurse",
+			IsActive: true,
+		}
+
+		if err := authService.CreateUser(nurse, "Nurse@123"); err != nil {
+			log.Fatal("Failed to create nurse:", err)
+		}
+
+		log.Println("Nurse: nurse@school.ug / Nurse@123")
+	}
 }
 
 func seedStandardSubjects(db *gorm.DB) {

@@ -36,6 +36,7 @@ export interface Student {
   last_name: string;
   dob: string;
   gender: 'Male' | 'Female' | 'Other';
+  lin?: string;
   photo_url?: string;
   home_address?: string;
   guardian_contact?: Record<string, unknown>;

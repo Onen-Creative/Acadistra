@@ -89,7 +89,7 @@ func (h *ClassHandler) GetStudents(c *gin.Context) {
 	term := c.Query("term")
 
 	var enrollments []models.Enrollment
-	query := h.db.Preload("Student").Where("class_id = ?", classID)
+	query := h.db.Preload("Student").Where("class_id = ? AND status = ?", classID, "active")
 	if year > 0 {
 		query = query.Where("year = ?", year)
 	}

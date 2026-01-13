@@ -2,10 +2,12 @@ import React, { useEffect, Suspense } from 'react'
 import ReactDOM from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RouterProvider } from 'react-router-dom'
+import { ToastContainer } from 'react-toastify'
 import { initOfflineDB, syncQueue } from '@/services/offline'
 import { marksApi } from '@/services/api'
 import { router, Loading } from './router'
 import './index.css'
+import 'react-toastify/dist/ReactToastify.css'
 
 // Suppress extension-related errors
 window.addEventListener('error', (e) => {
@@ -46,12 +48,11 @@ function AppProviders() {
       <Suspense fallback={<Loading />}>
         <RouterProvider router={router} />
       </Suspense>
+      <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} newestOnTop closeOnClick pauseOnHover />
     </QueryClientProvider>
   )
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <AppProviders />
-  </React.StrictMode>,
+  <AppProviders />
 )

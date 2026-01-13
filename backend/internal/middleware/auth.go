@@ -31,9 +31,10 @@ func AuthMiddleware(authService *services.AuthService) gin.HandlerFunc {
 			return
 		}
 
-		c.Set("user_id", claims.UserID)
+		c.Set("user_id", claims.UserID.String())
 		if claims.SchoolID != nil {
 			c.Set("school_id", claims.SchoolID.String())
+			c.Set("tenant_school_id", claims.SchoolID.String())
 		}
 		c.Set("user_role", claims.Role)
 		c.Set("role", claims.Role)

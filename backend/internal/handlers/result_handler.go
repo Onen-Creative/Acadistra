@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/school-system/backend/internal/grading"
 	"github.com/school-system/backend/internal/models"
 	"gorm.io/gorm"
 )
@@ -128,36 +129,81 @@ func (h *ResultHandler) CreateOrUpdate(c *gin.Context) {
 		return
 	}
 	
-	// Calculate grade from total marks
-	total := 0.0
+	// Get class level to determine grading system
+	var class models.Class
+	if err := h.db.First(&class, classID).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Class not found"})
+		return
+	}
+	
+	// Calculate total and grade using proper grading system
+	ca := 0.0
+	exam := 0.0
 	if req.RawMarks != nil {
-		if t, ok := req.RawMarks["total"].(float64); ok {
-			total = t
+		if c, ok := req.RawMarks["ca"].(float64); ok {
+			ca = c
+		}
+		if e, ok := req.RawMarks["exam"].(float64); ok {
+			exam = e
 		}
 	}
-	grade := ""
-	if total >= 80 {
-		grade = "A"
-	} else if total >= 65 {
-		grade = "B"
-	} else if total >= 50 {
-		grade = "C"
-	} else if total >= 35 {
-		grade = "D"
-	} else {
-		grade = "E"
+	
+	var gradeResult grading.GradeResult
+	var total float64
+	
+	// Apply appropriate grading system based on level
+	switch class.Level {
+	case "P4", "P5", "P6", "P7":
+		// Primary: CA out of 20 (40%), Exam out of 80 (60%)
+		grader := &grading.PrimaryGrader{}
+		gradeResult = grader.ComputeGrade(ca, exam, 20, 80)
+		total = ca + exam
+	case "S1", "S2", "S3", "S4":
+		// NCDC: School-Based out of 20 (20%), External out of 80 (80%)
+		grader := &grading.NCDCGrader{}
+		gradeResult = grader.ComputeGrade(ca, exam, 20, 80)
+		total = ca + exam
+	case "S5", "S6":
+		// UACE: Paper-based grading (not implemented for single CA/Exam entry)
+		// For now, use simple total
+		total = ca + exam
+		gradeResult.FinalGrade = "P" // Pending proper paper-based grading
+		gradeResult.ComputationReason = "UACE grading requires paper-based entry"
+	default:
+		// Fallback: simple total
+		total = ca + exam
+		if total >= 80 {
+			gradeResult.FinalGrade = "A"
+		} else if total >= 65 {
+			gradeResult.FinalGrade = "B"
+		} else if total >= 50 {
+			gradeResult.FinalGrade = "C"
+		} else if total >= 35 {
+			gradeResult.FinalGrade = "D"
+		} else {
+			gradeResult.FinalGrade = "E"
+		}
+		gradeResult.ComputationReason = "Simple total grading"
 	}
+	
+	// Store total in raw_marks
+	if req.RawMarks == nil {
+		req.RawMarks = make(models.JSONB)
+	}
+	req.RawMarks["total"] = total
 	
 	if err == gorm.ErrRecordNotFound {
 		result = models.SubjectResult{
-			StudentID:  studentID,
-			SubjectID:  subjectID,
-			ClassID:    classID,
-			Term:       req.Term,
-			Year:       req.Year,
-			SchoolID:   uuid.MustParse(schoolID),
-			FinalGrade: grade,
-			RawMarks:   req.RawMarks,
+			StudentID:         studentID,
+			SubjectID:         subjectID,
+			ClassID:           classID,
+			Term:              req.Term,
+			Year:              req.Year,
+			SchoolID:          uuid.MustParse(schoolID),
+			FinalGrade:        gradeResult.FinalGrade,
+			ComputationReason: gradeResult.ComputationReason,
+			RuleVersionHash:   gradeResult.RuleVersionHash,
+			RawMarks:          req.RawMarks,
 		}
 		if err := h.db.Create(&result).Error; err != nil {
 			log.Printf("Error creating result: %v", err)
@@ -169,7 +215,9 @@ func (h *ResultHandler) CreateOrUpdate(c *gin.Context) {
 		return
 	} else {
 		// Only school admins can update existing results
-		result.FinalGrade = grade
+		result.FinalGrade = gradeResult.FinalGrade
+		result.ComputationReason = gradeResult.ComputationReason
+		result.RuleVersionHash = gradeResult.RuleVersionHash
 		result.RawMarks = req.RawMarks
 		if err := h.db.Save(&result).Error; err != nil {
 			log.Printf("Error saving result: %v", err)
