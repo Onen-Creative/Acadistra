@@ -2,9 +2,13 @@
 .env
 .env.local
 .env.*.local
+.env.production
 
 # Backend
 backend/main
+backend/api
+backend/server
+backend/bin/
 backend/tmp/
 *.exe
 *.exe~
@@ -17,9 +21,11 @@ coverage.out
 
 # Frontend
 frontend/node_modules/
+frontend/.next/
 frontend/dist/
 frontend/.vite/
 frontend/coverage/
+frontend/out/
 
 # Worker
 worker/node_modules/
@@ -44,14 +50,31 @@ logs/
 *.db
 *.sqlite
 
-# Kubernetes
-kubeconfig
-*.kubeconfig
-
-# Terraform
-*.tfstate
-*.tfstate.*
-.terraform/
-
 # Docker
 docker-compose.override.yml
+
+# Backups
+backups/
+*.sql
+*.dump
+*.tar.gz
+
+# Temporary files
+tmp/
+temp/
+
+# Build artifacts
+build/
+dist/
+out/
+
+# Documentation (keep public docs, exclude internal)
+DEPLOYMENT_CHECKLIST.md
+FINAL_FIX_SUMMARY.md
+IMPLEMENTATION_SUMMARY.md
+LESSON_MONITORING_*.md
+TESTING_*.md
+BUDGET_REQUISITIONS_IMPLEMENTATION.md
+BUDGET_REQUISITIONS_COMPLETE.md
+INTEGRATION_SETUP.md
+MOBILE_MONEY_INTEGRATION.md

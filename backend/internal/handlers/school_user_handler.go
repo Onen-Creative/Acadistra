@@ -23,7 +23,7 @@ func NewSchoolUserHandler(db *gorm.DB) *SchoolUserHandler {
 
 // GetSchoolUsers returns all users for a specific school
 func (h *SchoolUserHandler) GetSchoolUsers(c *gin.Context) {
-	schoolIDStr := c.Param("schoolId")
+	schoolIDStr := c.Param("id")
 	schoolID, err := uuid.Parse(schoolIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid school ID"})
@@ -41,7 +41,7 @@ func (h *SchoolUserHandler) GetSchoolUsers(c *gin.Context) {
 
 // CreateTeacher creates a new teacher for a school
 func (h *SchoolUserHandler) CreateTeacher(c *gin.Context) {
-	schoolIDStr := c.Param("schoolId")
+	schoolIDStr := c.Param("id")
 	schoolID, err := uuid.Parse(schoolIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid school ID"})
@@ -120,4 +120,31 @@ func (h *SchoolUserHandler) UpdateUserRole(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "User role updated successfully"})
+}
+
+// CreateStoreKeeper creates a new store keeper for a school
+func (h *SchoolUserHandler) CreateStoreKeeper(c *gin.Context) {
+	schoolIDStr := c.Param("id")
+	schoolID, err := uuid.Parse(schoolIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid school ID"})
+		return
+	}
+
+	var req struct {
+		FullName string `json:"full_name" binding:"required"`
+		Email    string `json:"email" binding:"required,email"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	storeKeeper, err := h.userAssignmentService.CreateStoreKeeper(schoolID, req.FullName, req.Email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, storeKeeper)
 }

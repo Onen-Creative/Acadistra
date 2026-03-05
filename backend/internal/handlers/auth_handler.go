@@ -4,6 +4,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/school-system/backend/internal/models"
 	"github.com/school-system/backend/internal/services"
 )
 
@@ -16,7 +18,8 @@ func NewAuthHandler(authService *services.AuthService) *AuthHandler {
 }
 
 type LoginRequest struct {
-	Email    string `json:"email" binding:"required,email"`
+	Email    string `json:"email"`
+	Phone    string `json:"phone"`
 	Password string `json:"password" binding:"required"`
 }
 
@@ -38,11 +41,24 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	tokens, user, err := h.authService.Login(req.Email, req.Password)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+	if req.Email == "" && req.Phone == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Email or phone required"})
 		return
 	}
+
+	identifier := req.Email
+	if req.Phone != "" {
+		identifier = req.Phone
+	}
+
+	tokens, user, err := h.authService.Login(identifier, req.Password)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Log login action
+	h.authService.LogAudit(user.ID, "login", "auth", user.ID, nil, models.JSONB{"email": user.Email}, c.ClientIP())
 
 	userResponse := gin.H{
 		"id":        user.ID,
@@ -107,6 +123,16 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	// Get user ID from context
+	userID, exists := c.Get("user_id")
+	if exists {
+		if uid, ok := userID.(string); ok {
+			if parsedID, err := uuid.Parse(uid); err == nil {
+				h.authService.LogAudit(parsedID, "logout", "auth", parsedID, nil, nil, c.ClientIP())
+			}
+		}
 	}
 
 	if err := h.authService.RevokeToken(req.RefreshToken); err != nil {

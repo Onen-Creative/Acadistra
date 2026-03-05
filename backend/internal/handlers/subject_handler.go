@@ -32,14 +32,14 @@ func (h *SubjectHandler) List(c *gin.Context) {
 			return
 		}
 
-		// Convert to regular subject format for API compatibility
-		var subjects []models.Subject
+		// Convert to StandardSubject format for API compatibility
+		var subjects []models.StandardSubject
 		for _, std := range standardSubjects {
-			subjects = append(subjects, models.Subject{
+			subjects = append(subjects, models.StandardSubject{
 				BaseModel:    models.BaseModel{ID: std.ID},
 				Name:         std.Name,
 				Code:         std.Code,
-				Level:        std.Level,
+				Level:        level,
 				IsCompulsory: std.IsCompulsory,
 				Papers:       std.Papers,
 			})
@@ -55,10 +55,10 @@ func (h *SubjectHandler) List(c *gin.Context) {
 		return
 	}
 
-	// Convert to regular subject format for API compatibility
-	var subjects []models.Subject
+	// Convert to StandardSubject format for API compatibility
+	var subjects []models.StandardSubject
 	for _, std := range standardSubjects {
-		subjects = append(subjects, models.Subject{
+		subjects = append(subjects, models.StandardSubject{
 			BaseModel:    models.BaseModel{ID: std.ID},
 			Name:         std.Name,
 			Code:         std.Code,
@@ -100,7 +100,18 @@ func (h *SubjectHandler) GetLevels(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"levels": levels})
+	
+	// Expand Nursery to Baby, Middle, Top for ECCE
+	var expandedLevels []string
+	for _, level := range levels {
+		if level == "Nursery" {
+			expandedLevels = append(expandedLevels, "Baby", "Middle", "Top")
+		} else {
+			expandedLevels = append(expandedLevels, level)
+		}
+	}
+	
+	c.JSON(http.StatusOK, gin.H{"levels": expandedLevels})
 }
 
 func (h *SubjectHandler) CreateStandardSubject(c *gin.Context) {
@@ -171,3 +182,51 @@ func (h *SubjectHandler) ListStandardSubjects(c *gin.Context) {
 
 	c.JSON(http.StatusOK, standardSubjects)
 }
+
+func (h *SubjectHandler) GetSchoolSubjects(c *gin.Context) {
+	schoolID := c.GetString("tenant_school_id")
+	
+	var school models.School
+	if err := h.db.First(&school, "id = ?", schoolID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "School not found"})
+		return
+	}
+	
+	var levels []string
+	if school.Config != nil {
+		if configLevels, ok := school.Config["levels"].([]interface{}); ok {
+			for _, lvl := range configLevels {
+				if level, ok := lvl.(string); ok {
+					levels = append(levels, level)
+				}
+			}
+		}
+	}
+	
+	if len(levels) == 0 {
+		c.JSON(http.StatusOK, []models.StandardSubject{})
+		return
+	}
+	
+	var subjects []models.StandardSubject
+	if err := h.db.Where("level IN ?", levels).Find(&subjects).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	
+	// Get unique subject names
+	subjectMap := make(map[string]models.StandardSubject)
+	for _, subject := range subjects {
+		if _, exists := subjectMap[subject.Name]; !exists {
+			subjectMap[subject.Name] = subject
+		}
+	}
+	
+	var uniqueSubjects []models.StandardSubject
+	for _, subject := range subjectMap {
+		uniqueSubjects = append(uniqueSubjects, subject)
+	}
+	
+	c.JSON(http.StatusOK, uniqueSubjects)
+}
+

@@ -1,0 +1,19 @@
+# Main domain - Frontend
+acadistra.com, www.acadistra.com {
+    reverse_proxy frontend:3000
+}
+
+# API subdomain
+api.acadistra.com {
+    reverse_proxy backend:8080
+}
+
+# School subdomains - all route to same frontend
+school1.acadistra.com, school2.acadistra.com, school3.acadistra.com, school4.acadistra.com, school5.acadistra.com {
+    reverse_proxy frontend:3000
+}
+
+# MinIO console (optional, for admin access)
+storage.acadistra.com {
+    reverse_proxy minio:9001
+}

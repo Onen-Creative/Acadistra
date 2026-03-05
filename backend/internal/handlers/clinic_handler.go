@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"log"
 	"net/http"
 	"sort"
 	"strconv"
@@ -236,10 +235,26 @@ func (h *ClinicHandler) GetVisits(c *gin.Context) {
 	query.Model(&models.ClinicVisit{}).Count(&total)
 	
 	var visits []models.ClinicVisit
-	if err := query.Preload("Student.Enrollments.Class").Order("visit_date DESC").
+	if err := query.Preload("Student").Order("visit_date DESC").
 		Limit(limit).Offset((page-1)*limit).Find(&visits).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+	
+	// Load current class for each student via active enrollment
+	for i := range visits {
+		if visits[i].Student != nil {
+			var class models.Class
+			err := h.db.Table("classes").
+				Select("classes.*").
+				Joins("INNER JOIN enrollments ON enrollments.class_id = classes.id").
+				Where("enrollments.student_id = ? AND enrollments.status = ?", visits[i].Student.ID, "active").
+				Order("enrollments.year DESC, enrollments.term DESC").
+				First(&class).Error
+			if err == nil {
+				visits[i].Student.Class = &class
+			}
+		}
 	}
 	
 	c.JSON(http.StatusOK, gin.H{"visits": visits, "total": total})
@@ -634,7 +649,85 @@ func (h *ClinicHandler) GetIncidents(c *gin.Context) {
 		return
 	}
 	
+	// Load current class for each student
+	for i := range incidents {
+		if incidents[i].Student != nil {
+			var class models.Class
+			err := h.db.Table("classes").
+				Select("classes.*").
+				Joins("INNER JOIN enrollments ON enrollments.class_id = classes.id").
+				Where("enrollments.student_id = ? AND enrollments.status = ?", incidents[i].Student.ID, "active").
+				Order("enrollments.year DESC, enrollments.term DESC").
+				First(&class).Error
+			if err == nil {
+				incidents[i].Student.Class = &class
+			}
+		}
+	}
+	
 	c.JSON(http.StatusOK, gin.H{"incidents": incidents})
+}
+
+func (h *ClinicHandler) GetIncident(c *gin.Context) {
+	id := c.Param("id")
+	schoolID := c.GetString("tenant_school_id")
+	
+	var incident models.EmergencyIncident
+	if err := h.db.Preload("Student").Where("id = ? AND school_id = ?", id, schoolID).First(&incident).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Incident not found"})
+		return
+	}
+	
+	// Load student class
+	if incident.Student != nil {
+		var class models.Class
+		err := h.db.Table("classes").
+			Select("classes.*").
+			Joins("INNER JOIN enrollments ON enrollments.class_id = classes.id").
+			Where("enrollments.student_id = ? AND enrollments.status = ?", incident.Student.ID, "active").
+			Order("enrollments.year DESC, enrollments.term DESC").
+			First(&class).Error
+		if err == nil {
+			incident.Student.Class = &class
+		}
+	}
+	
+	c.JSON(http.StatusOK, incident)
+}
+
+func (h *ClinicHandler) UpdateIncident(c *gin.Context) {
+	id := c.Param("id")
+	schoolID := c.GetString("tenant_school_id")
+	
+	var incident models.EmergencyIncident
+	if err := h.db.Where("id = ? AND school_id = ?", id, schoolID).First(&incident).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Incident not found"})
+		return
+	}
+	
+	if err := c.ShouldBindJSON(&incident); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	
+	if err := h.db.Save(&incident).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update incident"})
+		return
+	}
+	
+	c.JSON(http.StatusOK, incident)
+}
+
+func (h *ClinicHandler) DeleteIncident(c *gin.Context) {
+	id := c.Param("id")
+	schoolID := c.GetString("tenant_school_id")
+	
+	if err := h.db.Where("id = ? AND school_id = ?", id, schoolID).Delete(&models.EmergencyIncident{}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete incident"})
+		return
+	}
+	
+	c.JSON(http.StatusOK, gin.H{"message": "Incident deleted successfully"})
 }
 
 // ============ CONSUMABLE USAGE ============
@@ -735,7 +828,6 @@ func (h *ClinicHandler) GetAdminSummary(c *gin.Context) {
 	startDate := c.Query("start_date")
 	
 	// Log parameters for debugging
-	log.Printf("GetAdminSummary - schoolID: %s, term: %s, year: %s, startDate: %s", schoolID, term, year, startDate)
 	
 	// Build base query with school, term, and year filters
 	baseQuery := h.db.Where("school_id = ?", schoolID)
@@ -835,7 +927,27 @@ func (h *ClinicHandler) GetAdminSummary(c *gin.Context) {
 	}
 	medicineQuery.Where("quantity < minimum_stock").Find(&lowStockMedicines)
 	
-	// Recent visits
+	// Expired medicines count
+	var expiredMedicines int64
+	expiredQuery := h.db.Where("school_id = ? AND expiry_date < ?", schoolID, time.Now()).Model(&models.Medicine{})
+	if term != "" {
+		expiredQuery = expiredQuery.Where("term = ?", term)
+	}
+	if year != "" {
+		expiredQuery = expiredQuery.Where("year = ?", year)
+	}
+	expiredQuery.Count(&expiredMedicines)
+	
+	// Total medicines count
+	var totalMedicines int64
+	h.db.Where("school_id = ?", schoolID).Model(&models.Medicine{}).Count(&totalMedicines)
+	
+	// Visits this week
+	var visitsThisWeek int64
+	weekStart := time.Now().AddDate(0, 0, -int(time.Now().Weekday()))
+	h.db.Where("school_id = ? AND visit_date >= ?", schoolID, weekStart).Model(&models.ClinicVisit{}).Count(&visitsThisWeek)
+	
+	// Recent visits with student class
 	var recentVisits []models.ClinicVisit
 	recentQuery := h.db.Where("school_id = ?", schoolID)
 	if term != "" {
@@ -846,14 +958,33 @@ func (h *ClinicHandler) GetAdminSummary(c *gin.Context) {
 	}
 	recentQuery.Preload("Student").Order("visit_date DESC").Limit(5).Find(&recentVisits)
 	
+	// Load current class for each student
+	for i := range recentVisits {
+		if recentVisits[i].Student != nil {
+			var class models.Class
+			err := h.db.Table("classes").
+				Select("classes.*").
+				Joins("INNER JOIN enrollments ON enrollments.class_id = classes.id").
+				Where("enrollments.student_id = ? AND enrollments.status = ?", recentVisits[i].Student.ID, "active").
+				Order("enrollments.year DESC, enrollments.term DESC").
+				First(&class).Error
+			if err == nil {
+				recentVisits[i].Student.Class = &class
+			}
+		}
+	}
+	
 	c.JSON(http.StatusOK, gin.H{
 		"total_visits":         totalVisits,
+		"visits_this_week":     visitsThisWeek,
+		"total_medicines":      totalMedicines,
 		"students_sent_home":   studentsSentHome,
 		"referrals":            referrals,
 		"emergencies":          emergencies,
 		"total_tests":          totalTests,
 		"total_incidents":      totalIncidents,
 		"low_stock_medicines":  len(lowStockMedicines),
+		"expired_medicines":    expiredMedicines,
 		"low_stock_items":      lowStockMedicines,
 		"recent_visits":        recentVisits,
 	})
@@ -894,7 +1025,7 @@ func (h *ClinicHandler) GetReportData(c *gin.Context) {
 		return
 	}
 
-	// Get clinic visits
+	// Get clinic visits with student class
 	var visits []models.ClinicVisit
 	visitQuery := h.db.Preload("Student").Where("clinic_visits.school_id = ?", schoolID)
 	if reportType == "daily" || reportType == "weekly" || reportType == "monthly" {
@@ -907,6 +1038,22 @@ func (h *ClinicHandler) GetReportData(c *gin.Context) {
 		visitQuery = visitQuery.Where("clinic_visits.year = ?", year)
 	}
 	visitQuery.Order("visit_date DESC").Find(&visits)
+	
+	// Load current class for each student
+	for i := range visits {
+		if visits[i].Student != nil {
+			var class models.Class
+			err := h.db.Table("classes").
+				Select("classes.*").
+				Joins("INNER JOIN enrollments ON enrollments.class_id = classes.id").
+				Where("enrollments.student_id = ? AND enrollments.status = ?", visits[i].Student.ID, "active").
+				Order("enrollments.year DESC, enrollments.term DESC").
+				First(&class).Error
+			if err == nil {
+				visits[i].Student.Class = &class
+			}
+		}
+	}
 
 	// Get medicines inventory
 	var medicines []models.Medicine
@@ -958,7 +1105,7 @@ func (h *ClinicHandler) GetReportData(c *gin.Context) {
 	}
 	visitsForSymptomsQuery.Find(&allVisits)
 
-	// Count individual symptoms
+	// Count individual symptoms (case-insensitive)
 	symptomCounts := make(map[string]int64)
 	for _, visit := range allVisits {
 		// Split by comma and trim whitespace
@@ -966,20 +1113,27 @@ func (h *ClinicHandler) GetReportData(c *gin.Context) {
 		for _, symptom := range symptoms {
 			symptom = strings.TrimSpace(symptom)
 			if symptom != "" {
-				symptomCounts[symptom]++
+				// Convert to lowercase for case-insensitive counting
+				symptomKey := strings.ToLower(symptom)
+				symptomCounts[symptomKey]++
 			}
 		}
 	}
 
-	// Convert map to sorted slice
+	// Convert map to sorted slice with proper capitalization
 	type SymptomCount struct {
 		Complaint string `json:"complaint"`
 		Count     int64  `json:"count"`
 	}
 	var visitsByComplaint []SymptomCount
 	for symptom, count := range symptomCounts {
+		// Capitalize first letter for display
+		displaySymptom := symptom
+		if len(symptom) > 0 {
+			displaySymptom = strings.ToUpper(symptom[:1]) + symptom[1:]
+		}
 		visitsByComplaint = append(visitsByComplaint, SymptomCount{
-			Complaint: symptom,
+			Complaint: displaySymptom,
 			Count:     count,
 		})
 	}

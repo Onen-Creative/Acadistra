@@ -39,6 +39,9 @@ func AuthMiddleware(authService *services.AuthService) gin.HandlerFunc {
 		c.Set("user_role", claims.Role)
 		c.Set("role", claims.Role)
 		c.Set("email", claims.Email)
+		if claims.GuardianPhone != "" {
+			c.Set("guardian_phone", claims.GuardianPhone)
+		}
 		c.Next()
 	}
 }

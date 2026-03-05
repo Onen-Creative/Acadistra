@@ -24,18 +24,25 @@ func (h *AuditHandler) GetRecentActivity(c *gin.Context) {
 		limit = 20
 	}
 
+	actionFilter := c.Query("action")
+
 	type ActivityWithUser struct {
 		models.AuditLog
 		UserName   string `json:"user_name"`
 		SchoolName string `json:"school_name,omitempty"`
 	}
 
-	var activities []ActivityWithUser
-	if err := h.db.Table("audit_logs").
+	query := h.db.Table("audit_logs").
 		Select("audit_logs.*, users.full_name as user_name, schools.name as school_name").
 		Joins("LEFT JOIN users ON audit_logs.actor_user_id = users.id").
-		Joins("LEFT JOIN schools ON users.school_id = schools.id").
-		Order("audit_logs.timestamp DESC").
+		Joins("LEFT JOIN schools ON users.school_id = schools.id")
+
+	if actionFilter != "" {
+		query = query.Where("audit_logs.action = ?", actionFilter)
+	}
+
+	var activities []ActivityWithUser
+	if err := query.Order("audit_logs.timestamp DESC").
 		Limit(limit).
 		Scan(&activities).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

@@ -82,7 +82,6 @@ func (h *Hub) Broadcast(event string, data interface{}, schoolID string) {
 
 func (c *Client) ReadPump() {
 	defer func() {
-		log.Printf("WebSocket client disconnecting from school %s", c.schoolID)
 		c.hub.unregister <- c
 		c.conn.Close()
 	}()
@@ -91,7 +90,6 @@ func (c *Client) ReadPump() {
 		_, _, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("WebSocket error: %v", err)
 			}
 			break
 		}
@@ -100,20 +98,17 @@ func (c *Client) ReadPump() {
 
 func (c *Client) WritePump() {
 	defer func() {
-		log.Printf("WebSocket write pump closing for school %s", c.schoolID)
 		c.conn.Close()
 	}()
 
 	for message := range c.send {
 		if err := c.conn.WriteMessage(websocket.TextMessage, message); err != nil {
-			log.Printf("WebSocket write error: %v", err)
 			return
 		}
 	}
 }
 
 func (h *Hub) ServeWs(conn *websocket.Conn, schoolID string) {
-	log.Printf("New WebSocket client connected for school: %s", schoolID)
 	client := &Client{
 		hub:      h,
 		conn:     conn,

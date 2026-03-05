@@ -1,0 +1,16 @@
+.env
+.env.local
+.env.*.local
+.git
+.gitignore
+*.md
+*.log
+tmp/
+bin/
+main
+api
+server
+*.test
+coverage.out
+.vscode
+.idea

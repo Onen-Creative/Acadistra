@@ -20,9 +20,10 @@ var (
 )
 
 type AuthService struct {
-	db     *gorm.DB
-	cfg    *config.Config
-	params *argon2id.Params
+	db           *gorm.DB
+	cfg          *config.Config
+	params       *argon2id.Params
+	auditService *AuditService
 }
 
 type TokenPair struct {
@@ -32,10 +33,11 @@ type TokenPair struct {
 }
 
 type Claims struct {
-	UserID   uuid.UUID  `json:"user_id"`
-	SchoolID *uuid.UUID `json:"school_id"`
-	Role     string     `json:"role"`
-	Email    string     `json:"email"`
+	UserID        uuid.UUID  `json:"user_id"`
+	SchoolID      *uuid.UUID `json:"school_id"`
+	Role          string     `json:"role"`
+	Email         string     `json:"email"`
+	GuardianPhone string     `json:"guardian_phone,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -49,9 +51,10 @@ func NewAuthService(db *gorm.DB, cfg *config.Config) *AuthService {
 	}
 
 	return &AuthService{
-		db:     db,
-		cfg:    cfg,
-		params: params,
+		db:           db,
+		cfg:          cfg,
+		params:       params,
+		auditService: NewAuditService(db),
 	}
 }
 
@@ -63,25 +66,89 @@ func (s *AuthService) VerifyPassword(hash, password string) (bool, error) {
 	return argon2id.ComparePasswordAndHash(password, hash)
 }
 
-func (s *AuthService) Login(email, password string) (*TokenPair, *models.User, error) {
+func (s *AuthService) Login(identifier, password string) (*TokenPair, *models.User, error) {
 	var user models.User
-	if err := s.db.Preload("School").Where("LOWER(email) = LOWER(?)", email).First(&user).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+	
+	// Try to find user by email first
+	err := s.db.Preload("School").Where("LOWER(email) = LOWER(?)", identifier).First(&user).Error
+	if err == nil {
+		// User found by email - verify password
+		if !user.IsActive {
+			return nil, nil, ErrUserNotActive
+		}
+
+		if user.Role != "system_admin" && user.Role != "parent" && user.School != nil && !user.School.IsActive {
+			return nil, nil, errors.New("school is inactive")
+		}
+
+		match, err := s.VerifyPassword(user.PasswordHash, password)
+		if err != nil || !match {
 			return nil, nil, ErrInvalidCredentials
 		}
+
+		tokens, err := s.GenerateTokenPair(&user)
+		if err != nil {
+			return nil, nil, err
+		}
+		return tokens, &user, nil
+	}
+
+	// Email not found - check if it's a parent login with phone
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil, err
 	}
+
+	// Try guardian phone lookup
+	var guardian models.Guardian
+	if err := s.db.Preload("Student.School").Where("phone = ?", identifier).First(&guardian).Error; err != nil {
+		return nil, nil, ErrInvalidCredentials
+	}
+
+	// Create or get parent user account
+	var parentUser models.User
+	if err := s.db.Where("email = ? AND role = 'parent'", guardian.Email).First(&parentUser).Error; err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil, err
+		}
+		// Create parent user
+		hash, _ := s.HashPassword(password)
+		schoolIDPtr := &guardian.Student.SchoolID
+		parentUser = models.User{
+			Email:        guardian.Email,
+			FullName:     guardian.FullName,
+			Role:         "parent",
+			SchoolID:     schoolIDPtr,
+			PasswordHash: hash,
+			IsActive:     true,
+		}
+		if err := s.db.Create(&parentUser).Error; err != nil {
+			return nil, nil, err
+		}
+	}
+
+	user = parentUser
+	s.db.Preload("School").First(&user, user.ID)
 
 	if !user.IsActive {
 		return nil, nil, ErrUserNotActive
 	}
 
-	match, err := s.VerifyPassword(user.PasswordHash, password)
-	if err != nil || !match {
-		return nil, nil, ErrInvalidCredentials
+	// For parents, verify password or allow first-time login
+	if user.PasswordHash == "" {
+		hash, err := s.HashPassword(password)
+		if err != nil {
+			return nil, nil, err
+		}
+		user.PasswordHash = hash
+		s.db.Save(&user)
+	} else {
+		match, err := s.VerifyPassword(user.PasswordHash, password)
+		if err != nil || !match {
+			return nil, nil, ErrInvalidCredentials
+		}
 	}
 
-	tokens, err := s.GenerateTokenPair(&user)
+	tokens, err := s.GenerateTokenPairWithPhone(&user, guardian.Phone)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -89,13 +156,78 @@ func (s *AuthService) Login(email, password string) (*TokenPair, *models.User, e
 	return tokens, &user, nil
 }
 
-func (s *AuthService) GenerateTokenPair(user *models.User) (*TokenPair, error) {
+func (s *AuthService) GenerateTokenPairWithPhone(user *models.User, guardianPhone string) (*TokenPair, error) {
 	// Access token
 	accessClaims := &Claims{
-		UserID:   user.ID,
-		SchoolID: user.SchoolID,
-		Role:     user.Role,
-		Email:    user.Email,
+		UserID:        user.ID,
+		SchoolID:      user.SchoolID,
+		Role:          user.Role,
+		Email:         user.Email,
+		GuardianPhone: guardianPhone,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.cfg.JWT.AccessExpiry)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Subject:   user.ID.String(),
+		},
+	}
+
+	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
+	accessTokenString, err := accessToken.SignedString([]byte(s.cfg.JWT.Secret))
+	if err != nil {
+		return nil, err
+	}
+
+	// Refresh token
+	refreshClaims := &Claims{
+		UserID: user.ID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.cfg.JWT.RefreshExpiry)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Subject:   user.ID.String(),
+		},
+	}
+
+	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
+	refreshTokenString, err := refreshToken.SignedString([]byte(s.cfg.JWT.Secret))
+	if err != nil {
+		return nil, err
+	}
+
+	// Store refresh token
+	rt := &models.RefreshToken{
+		UserID:    user.ID,
+		Token:     refreshTokenString,
+		ExpiresAt: time.Now().Add(s.cfg.JWT.RefreshExpiry),
+		Revoked:   false,
+	}
+	if err := s.db.Create(rt).Error; err != nil {
+		return nil, err
+	}
+
+	return &TokenPair{
+		AccessToken:  accessTokenString,
+		RefreshToken: refreshTokenString,
+		ExpiresIn:    int64(s.cfg.JWT.AccessExpiry.Seconds()),
+	}, nil
+}
+
+func (s *AuthService) GenerateTokenPair(user *models.User) (*TokenPair, error) {
+	// For parent users, get guardian phone
+	guardianPhone := ""
+	if user.Role == "parent" {
+		var guardian models.Guardian
+		if err := s.db.Where("email = ?", user.Email).First(&guardian).Error; err == nil {
+			guardianPhone = guardian.Phone
+		}
+	}
+	
+	// Access token
+	accessClaims := &Claims{
+		UserID:        user.ID,
+		SchoolID:      user.SchoolID,
+		Role:          user.Role,
+		Email:         user.Email,
+		GuardianPhone: guardianPhone,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.cfg.JWT.AccessExpiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -210,4 +342,8 @@ func (s *AuthService) CreateUser(user *models.User, password string) error {
 
 	user.PasswordHash = hash
 	return s.db.Create(user).Error
+}
+
+func (s *AuthService) LogAudit(userID uuid.UUID, action, resourceType string, resourceID uuid.UUID, before, after models.JSONB, ip string) {
+	s.auditService.Log(userID, action, resourceType, resourceID, before, after, ip)
 }

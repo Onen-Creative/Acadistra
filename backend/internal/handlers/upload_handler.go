@@ -23,13 +23,19 @@ func (h *UploadHandler) UploadLogo(c *gin.Context) {
 		return
 	}
 
+	// Get file extension
+	ext := ".png"
+	if len(file.Filename) > 4 {
+		ext = file.Filename[len(file.Filename)-4:]
+	}
+
 	// Save to public/logos directory
-	filename := uuid.New().String() + ".png"
+	filename := uuid.New().String() + ext
 	path := "public/logos/" + filename
 	if err := c.SaveUploadedFile(file, path); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"url": "/logos/" + filename})
+	c.JSON(http.StatusOK, gin.H{"logo_url": "/logos/" + filename})
 }

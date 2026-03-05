@@ -1,66 +1,59 @@
-# School Management & Report Card System
+# Acadistra
 
-Production-ready system for Ugandan schools (ECCE → S6) with UNEB/NCDC grading.
+Production-ready school management system for Ugandan schools (ECCE → S6) with UNEB/NCDC grading.
+
+## 🚀 Quick Deploy
+
+```bash
+git clone https://github.com/yourusername/acadistra.git
+cd acadistra
+./deploy.sh
+```
+
+Access at http://localhost:3000 with `sysadmin@school.ug` / `Admin@123`
+
+📖 **[Full Quick Start Guide](QUICKSTART.md)** | 📋 **[Deployment Checklist](DEPLOYMENT_CHECKLIST_CLEAN.md)**
 
 ## Prerequisites
 
-- Go 1.21+
-- Node.js 18+
-- PostgreSQL 14+
-- Redis 7+
-- MinIO (or S3-compatible storage)
-
-## Quick Start
-
-```bash
-# 1. Install MySQL, Redis, and MinIO locally
-# PostgreSQL: https://www.postgresql.org/download/
-# Redis: https://redis.io/download
-# MinIO: https://min.io/download
-
-# 2. Create database
-psql -U postgres -c "CREATE DATABASE school_system;"
-
-# 3. Configure backend/.env with your database credentials
-
-# 4. Run migrations
-cd backend
-go run cmd/api/main.go migrate
-
-# 5. Create admin
-go run cmd/api/main.go seed-admin
-
-# 6. Setup standardized subjects
-./setup-standard-subjects.sh
-
-# 7. Load sample data (optional)
-psql -U postgres -d school_system -f ../seed/sample_data.sql
-```
-
-## Access
-
-- **Frontend**: http://localhost:5173
-- **Backend**: http://localhost:8080
-- **Login**: admin@school.ug / Admin@123
-
-## Stack
-
-- Backend: Go + Gin + GORM + MySQL
-- Frontend: React + TypeScript + Vite + Tailwind
-- Worker: Node.js + Puppeteer
-- Queue: Redis + Asynq
-- Storage: S3-compatible
+- Docker & Docker Compose
+- 2GB+ RAM server
+- Ubuntu 22.04 (recommended)
 
 ## Features
 
 ✅ Multi-section support (ECCE, P1-P7, S1-S6)
 ✅ **Standardized curriculum subjects** - All schools use the same subjects per level
-✅ Role-based access (Admin, Teacher)
+✅ Role-based access (Admin, Teacher, Bursar, Librarian, Nurse, Parent)
 ✅ Offline-first marks entry
 ✅ UNEB & NCDC grading engines
 ✅ PDF report generation
+✅ **Payroll management** - Salary structures, monthly processing, payment tracking
+✅ **Automatic finance integration** - Payroll payments auto-create expenditure records
+✅ **Budget & Requisitions** - Budget planning, purchase requests, approval workflow
+✅ Attendance tracking with holidays & term dates
+✅ Library management with book issues
+✅ Clinic management with health profiles
+✅ Finance & inventory management
+✅ **Parent portal** - View children's progress, fees, attendance
 ✅ Audit logging
 ✅ JWT authentication
+
+## Stack
+
+- **Backend**: Go + Gin + GORM + PostgreSQL
+- **Frontend**: React 19 + Next.js 16 + TypeScript + Mantine UI
+- **Queue**: Redis + Asynq
+- **Storage**: MinIO (S3-compatible)
+- **Proxy**: Caddy (auto SSL)
+
+## Architecture
+
+**Multi-Tenant**: Single shared database with `school_id` isolation
+- 1 PostgreSQL database for all schools
+- Data isolated by `school_id` column
+- Subdomain routing: `school1.acadistra.com` → filters by `school_id`
+- Cost-effective: €1-2 per school/month
 
 ## Development
 
@@ -74,20 +67,103 @@ cd frontend
 npm install
 npm run dev
 
-# Terminal 3 - Worker
-cd worker
-npm install
-npm run dev
-
 # Tests
 cd backend && go test ./... -v
 cd frontend && npm test
 ```
 
-## Deployment
+## Production Deployment
 
-See `docs/DEPLOYMENT.md` for production deployment guide.
+### Option 1: Automated Script (Recommended)
+```bash
+./deploy.sh
+```
+
+### Option 2: Manual
+```bash
+# 1. Configure environment
+cp .env.production.example .env.production
+nano .env.production  # Set secure passwords
+
+# 2. Start services
+docker compose -f docker-compose.prod.yml up -d
+
+# 3. Run migrations
+docker exec acadistra_backend ./main migrate
+
+# 4. Create admin
+docker exec acadistra_backend ./main seed-admin
+
+# 5. Seed subjects
+docker exec acadistra_backend ./main seed-standard-subjects
+```
+
+## Configuration
+
+### DNS Setup
+Point these A records to your server:
+- `acadistra.com` → `YOUR_SERVER_IP`
+- `*.acadistra.com` → `YOUR_SERVER_IP` (wildcard)
+- `api.acadistra.com` → `YOUR_SERVER_IP`
+
+### SSL/HTTPS
+Caddy automatically provisions SSL certificates via Let's Encrypt.
+
+### Backup
+```bash
+# Manual backup
+./scripts/backup.sh
+
+# Automated (add to crontab)
+0 2 * * * /path/to/acadistra/scripts/backup.sh
+```
 
 ## API Documentation
 
-OpenAPI spec: `docs/openapi.yaml`
+OpenAPI/Swagger: http://localhost:8080/swagger/index.html
+
+## Monitoring
+
+```bash
+# View logs
+docker compose -f docker-compose.prod.yml logs -f
+
+# Check status
+docker compose -f docker-compose.prod.yml ps
+
+# Resource usage
+docker stats
+```
+
+## Cost Breakdown
+
+**Recommended**: Hetzner Cloud CPX31
+- 2 vCPU, 4GB RAM: €10/month
+- Handles 5-10 schools
+- **Per school**: €1-2/month
+
+## Security
+
+- ✅ JWT authentication
+- ✅ Role-based access control
+- ✅ Audit logging
+- ✅ Secure password hashing (Argon2)
+- ✅ SQL injection protection (GORM)
+- ✅ CORS configuration
+- ✅ Rate limiting
+- ✅ Auto SSL via Caddy
+
+## Support
+
+- 📖 [Quick Start Guide](QUICKSTART.md)
+- 📋 [Deployment Guide](DEPLOYMENT.md)
+- 🏗️ [System Architecture](SYSTEM_ARCHITECTURE.md)
+- 📝 [API Documentation](http://localhost:8080/swagger/index.html)
+
+## License
+
+MIT License - See LICENSE file
+
+---
+
+**Built for Ugandan Schools** 🇺🇬 | ECCE → S6 | UNEB & NCDC Compliant

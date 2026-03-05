@@ -198,13 +198,18 @@ func (h *LibraryHandler) GetAvailableCopies(c *gin.Context) {
 	var issuedCopies []string
 	h.db.Model(&models.BookIssue{}).Where("book_id = ? AND status = ?", id, "issued").Pluck("copy_number", &issuedCopies)
 
+	// Get lost and damaged copy numbers
+	var lostCopies []string
+	h.db.Model(&models.BookIssue{}).Where("book_id = ? AND status IN ?", id, []string{"lost", "damaged"}).Pluck("copy_number", &lostCopies)
+
 	c.JSON(http.StatusOK, gin.H{
-		"available_copies": book.AvailableCopies,
-		"total_copies":     book.TotalCopies,
-		"issued_copies":    book.IssuedCopies,
-		"lost_copies":      book.LostCopies,
-		"damaged_copies":   book.DamagedCopies,
-		"issued_copy_numbers": issuedCopies,
+		"available_copies":      book.AvailableCopies,
+		"total_copies":          book.TotalCopies,
+		"issued_copies":         book.IssuedCopies,
+		"lost_copies":           book.LostCopies,
+		"damaged_copies":        book.DamagedCopies,
+		"issued_copy_numbers":   issuedCopies,
+		"unavailable_copy_numbers": append(issuedCopies, lostCopies...),
 	})
 }
 
@@ -262,7 +267,11 @@ func (h *LibraryHandler) IssueBook(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Student not found"})
 			return
 		}
-		borrowerName = student.FirstName + " " + student.LastName
+		borrowerName = student.FirstName
+		if student.MiddleName != "" {
+			borrowerName += " " + student.MiddleName
+		}
+		borrowerName += " " + student.LastName
 		
 		// Try to get class from enrollment, fallback to extracting from admission number
 		var enrollment models.Enrollment
@@ -278,15 +287,19 @@ func (h *LibraryHandler) IssueBook(c *gin.Context) {
 			}
 		}
 	} else {
-		var teacher models.Teacher
-		if err := h.db.Where("id = ? AND school_id = ?", req.BorrowerID, schoolID).First(&teacher).Error; err != nil {
+		var staff models.Staff
+		if err := h.db.Where("id = ? AND school_id = ? AND role = ?", req.BorrowerID, schoolID, "Teacher").First(&staff).Error; err != nil {
 			fmt.Printf("[DEBUG] Teacher not found: %v\n", err)
 			c.JSON(http.StatusNotFound, gin.H{"error": "Teacher not found"})
 			return
 		}
-		borrowerName = teacher.FirstName + " " + teacher.LastName
-		if teacher.Specialization != "" {
-			borrowerClass = "Teacher - " + teacher.Specialization
+		borrowerName = staff.FirstName
+		if staff.MiddleName != "" {
+			borrowerName += " " + staff.MiddleName
+		}
+		borrowerName += " " + staff.LastName
+		if staff.Specialization != "" {
+			borrowerClass = "Teacher - " + staff.Specialization
 		} else {
 			borrowerClass = "Teacher"
 		}
@@ -306,7 +319,7 @@ func (h *LibraryHandler) IssueBook(c *gin.Context) {
 	}
 	term := req.Term
 	if term == "" {
-		term = "1"
+		term = "Term 1"
 	}
 
 	// Parse UUIDs safely
@@ -495,7 +508,11 @@ func (h *LibraryHandler) BulkIssueBooks(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Student not found"})
 			return
 		}
-		borrowerName = student.FirstName + " " + student.LastName
+		borrowerName = student.FirstName
+		if student.MiddleName != "" {
+			borrowerName += " " + student.MiddleName
+		}
+		borrowerName += " " + student.LastName
 		
 		// Try to get class from enrollment, fallback to extracting from admission number
 		var enrollment models.Enrollment
@@ -511,14 +528,18 @@ func (h *LibraryHandler) BulkIssueBooks(c *gin.Context) {
 			}
 		}
 	} else {
-		var teacher models.Teacher
-		if err := h.db.Where("id = ?", req.BorrowerID).Where("school_id = ?", schoolID).First(&teacher).Error; err != nil {
+		var staff models.Staff
+		if err := h.db.Where("id = ?", req.BorrowerID).Where("school_id = ? AND role = ?", schoolID, "Teacher").First(&staff).Error; err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Teacher not found"})
 			return
 		}
-		borrowerName = teacher.FirstName + " " + teacher.LastName
-		if teacher.Specialization != "" {
-			borrowerClass = "Teacher - " + teacher.Specialization
+		borrowerName = staff.FirstName
+		if staff.MiddleName != "" {
+			borrowerName += " " + staff.MiddleName
+		}
+		borrowerName += " " + staff.LastName
+		if staff.Specialization != "" {
+			borrowerClass = "Teacher - " + staff.Specialization
 		} else {
 			borrowerClass = "Teacher"
 		}

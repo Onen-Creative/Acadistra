@@ -78,7 +78,7 @@ func Load() (*Config, error) {
 		dbPort := getEnv("DB_PORT", "5432")
 		dbUser := getEnv("DB_USER", "postgres")
 		dbPass := getEnv("DB_PASSWORD", "")
-		dbName := getEnv("DB_NAME", "school_system")
+		dbName := getEnv("DB_NAME", "school_system_db")
 
 		dsn = fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=prefer",
 			dbHost, dbUser, dbPass, dbName, dbPort)
@@ -106,7 +106,7 @@ func Load() (*Config, error) {
 			KeyLength:   uint32(getEnvInt("ARGON2_KEY_LENGTH", 32)),
 		},
 		CORS: CORSConfig{
-			Origins: []string{getEnv("CORS_ORIGINS", "http://localhost:5173")},
+			Origins: []string{getEnv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000")},
 		},
 		Monitoring: MonitoringConfig{
 			PrometheusEnabled: getEnv("PROMETHEUS_ENABLED", "true") == "true",

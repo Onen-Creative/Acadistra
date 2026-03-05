@@ -21,34 +21,8 @@ func (s *StandardSubjectService) GetSubjectsForLevel(level string) ([]models.Sta
 	return subjects, err
 }
 
-// CreateSchoolSubjectsFromStandard creates school-specific subjects based on standard subjects
+// CreateSchoolSubjectsFromStandard is deprecated - system uses standard_subjects directly
 func (s *StandardSubjectService) CreateSchoolSubjectsFromStandard(schoolID uuid.UUID, levels []string) error {
-	for _, level := range levels {
-		standardSubjects, err := s.GetSubjectsForLevel(level)
-		if err != nil {
-			return err
-		}
-
-		for _, std := range standardSubjects {
-			subject := models.Subject{
-				SchoolID:     schoolID,
-				Name:         std.Name,
-				Code:         std.Code,
-				Level:        std.Level,
-				IsCompulsory: std.IsCompulsory,
-				Papers:       std.Papers,
-			}
-			
-			// Check if subject already exists for this school and level
-			var existing models.Subject
-			err := s.db.Where("school_id = ? AND name = ? AND level = ?", schoolID, std.Name, std.Level).First(&existing).Error
-			if err == gorm.ErrRecordNotFound {
-				if err := s.db.Create(&subject).Error; err != nil {
-					return err
-				}
-			}
-		}
-	}
 	return nil
 }
 

@@ -7,9 +7,11 @@ import (
 )
 
 const (
-	RuleVersionPrimary   = "PRIMARY_V1"
-	RuleVersionNCDC      = "NCDC_V1"
-	RuleVersionUACE      = "UACE_V1"
+	RuleVersionNursery      = "NURSERY_V1"
+	RuleVersionPrimaryLower = "PRIMARY_LOWER_V1"
+	RuleVersionPrimaryUpper = "PRIMARY_UPPER_V1"
+	RuleVersionNCDC         = "NCDC_V1"
+	RuleVersionUACE         = "UACE_V1"
 )
 
 // GradeResult holds computed grade information
@@ -20,39 +22,118 @@ type GradeResult struct {
 	PaperCodes        map[string]int // For UACE
 }
 
-// PrimaryGrader implements P4-P7 grading
-type PrimaryGrader struct{}
+// NurseryGrader implements Nursery descriptive grading
+type NurseryGrader struct{}
 
-func (g *PrimaryGrader) ComputeGrade(caMarks, examMarks, caMax, examMax float64) GradeResult {
-	caPercent := (caMarks / caMax) * 40
-	examPercent := (examMarks / examMax) * 60
-	total := caPercent + examPercent
+func (g *NurseryGrader) ComputeGrade(caMarks, examMarks, caMax, examMax float64) GradeResult {
+	// Both CA and Exams are out of 100, final is average
+	final := (caMarks + examMarks) / 2
 
 	grade := ""
 	switch {
-	case total >= 80:
-		grade = "A"
-	case total >= 65:
-		grade = "B"
-	case total >= 50:
-		grade = "C"
-	case total >= 35:
-		grade = "D"
+	case final >= 90:
+		grade = "Mastering"
+	case final >= 75:
+		grade = "Secure"
+	case final >= 60:
+		grade = "Developing"
+	case final >= 40:
+		grade = "Emerging"
 	default:
-		grade = "E"
+		grade = "Not Yet"
 	}
 
-	reason := fmt.Sprintf("CA: %.2f/%.0f (40%%) = %.2f, Exam: %.2f/%.0f (60%%) = %.2f, Total: %.2f → Grade %s",
-		caMarks, caMax, caPercent, examMarks, examMax, examPercent, total, grade)
+	reason := fmt.Sprintf("CA: %.2f/100, Exam: %.2f/100, Average: %.2f → %s",
+		caMarks, examMarks, final, grade)
 
 	return GradeResult{
 		FinalGrade:        grade,
 		ComputationReason: reason,
-		RuleVersionHash:   hashRuleVersion(RuleVersionPrimary),
+		RuleVersionHash:   hashRuleVersion(RuleVersionNursery),
 	}
 }
 
-// NCDCGrader implements Lower Secondary grading
+// PrimaryLowerGrader implements P1-P3 grading (position-based, no points)
+type PrimaryLowerGrader struct{}
+
+func (g *PrimaryLowerGrader) ComputeGrade(caMarks, examMarks, caMax, examMax float64) GradeResult {
+	caPercent := (caMarks / 40) * 40
+	examPercent := (examMarks / 60) * 60
+	total := caPercent + examPercent
+
+	grade := ""
+	switch {
+	case total >= 90:
+		grade = "D1"
+	case total >= 80:
+		grade = "D2"
+	case total >= 70:
+		grade = "C3"
+	case total >= 60:
+		grade = "C4"
+	case total >= 55:
+		grade = "C5"
+	case total >= 50:
+		grade = "C6"
+	case total >= 45:
+		grade = "P7"
+	case total >= 40:
+		grade = "P8"
+	default:
+		grade = "F9"
+	}
+
+	reason := fmt.Sprintf("CA: %.2f/40 (40%%) = %.2f, Exam: %.2f/60 (60%%) = %.2f, Total: %.2f → Grade %s (Position-based)",
+		caMarks, caPercent, examMarks, examPercent, total, grade)
+
+	return GradeResult{
+		FinalGrade:        grade,
+		ComputationReason: reason,
+		RuleVersionHash:   hashRuleVersion(RuleVersionPrimaryLower),
+	}
+}
+
+// PrimaryUpperGrader implements P4-P7 grading with aggregate
+type PrimaryUpperGrader struct{}
+
+func (g *PrimaryUpperGrader) ComputeGrade(caMarks, examMarks, caMax, examMax float64) GradeResult {
+	caPercent := (caMarks / caMax) * 40
+	examPercent := (examMarks / examMax) * 60
+	total := caPercent + examPercent
+
+	grade, points := "", 0
+	switch {
+	case total >= 90:
+		grade, points = "D1", 1
+	case total >= 80:
+		grade, points = "D2", 2
+	case total >= 70:
+		grade, points = "C3", 3
+	case total >= 60:
+		grade, points = "C4", 4
+	case total >= 55:
+		grade, points = "C5", 5
+	case total >= 50:
+		grade, points = "C6", 6
+	case total >= 45:
+		grade, points = "P7", 7
+	case total >= 40:
+		grade, points = "P8", 8
+	default:
+		grade, points = "F9", 9
+	}
+
+	reason := fmt.Sprintf("CA: %.2f/%.0f (40%%) = %.2f, Exam: %.2f/%.0f (60%%) = %.2f, Total: %.2f → Grade %s (Points: %d)",
+		caMarks, caMax, caPercent, examMarks, examMax, examPercent, total, grade, points)
+
+	return GradeResult{
+		FinalGrade:        grade,
+		ComputationReason: reason,
+		RuleVersionHash:   hashRuleVersion(RuleVersionPrimaryUpper),
+	}
+}
+
+// NCDCGrader implements S1-S4 competency-based grading
 type NCDCGrader struct{}
 
 func (g *NCDCGrader) ComputeGrade(schoolBasedMarks, externalMarks, schoolBasedMax, externalMax float64) GradeResult {
@@ -84,30 +165,30 @@ func (g *NCDCGrader) ComputeGrade(schoolBasedMarks, externalMarks, schoolBasedMa
 	}
 }
 
-// UACEGrader implements UACE/UNEB grading
+// UACEGrader implements S5-S6 UACE/UNEB paper-based grading
 type UACEGrader struct{}
 
 // MapMarkToCode converts 0-100 marks to UNEB code 1-9
 func (g *UACEGrader) MapMarkToCode(marks float64) int {
 	switch {
+	case marks >= 85:
+		return 1 // D1
+	case marks >= 80:
+		return 2 // D2
 	case marks >= 75:
-		return 1
+		return 3 // C3
 	case marks >= 70:
-		return 2
+		return 4 // C4
 	case marks >= 65:
-		return 3
+		return 5 // C5
 	case marks >= 60:
-		return 4
-	case marks >= 55:
-		return 5
+		return 6 // C6
 	case marks >= 50:
-		return 6
-	case marks >= 45:
-		return 7
+		return 7 // P7
 	case marks >= 40:
-		return 8
+		return 8 // P8
 	default:
-		return 9
+		return 9 // F9
 	}
 }
 
@@ -157,65 +238,66 @@ func (g *UACEGrader) ComputeGradeFromPapers(paperMarks []float64) GradeResult {
 
 func (g *UACEGrader) compute2Papers(codes []int) (string, string) {
 	sum := codes[0] + codes[1]
+	both := codes[0] <= 2 && codes[1] <= 2
 	
 	switch {
-	case sum <= 6:
-		return "A", fmt.Sprintf("Sum %d ≤ 6", sum)
-	case sum <= 10:
-		return "B", fmt.Sprintf("Sum %d ≤ 10", sum)
-	case sum <= 12:
-		return "C", fmt.Sprintf("Sum %d ≤ 12", sum)
-	case sum <= 15:
-		return "D", fmt.Sprintf("Sum %d ≤ 15", sum)
-	case sum <= 18:
-		return "E", fmt.Sprintf("Sum %d ≤ 18", sum)
+	case both:
+		return "A", fmt.Sprintf("Both papers ≤2: (%d,%d)", codes[0], codes[1])
+	case (codes[0] == 3 || codes[1] == 3) && codes[0] <= 3 && codes[1] <= 3:
+		return "B", fmt.Sprintf("One paper =3, other ≤3: (%d,%d)", codes[0], codes[1])
+	case (codes[0] == 4 || codes[1] == 4) && codes[0] <= 4 && codes[1] <= 4:
+		return "C", fmt.Sprintf("One paper =4, other ≤4: (%d,%d)", codes[0], codes[1])
+	case (codes[0] == 5 || codes[1] == 5) && codes[0] <= 5 && codes[1] <= 5:
+		return "D", fmt.Sprintf("One paper =5, other ≤5: (%d,%d)", codes[0], codes[1])
+	case (codes[0] == 6 || codes[1] == 6) || sum <= 12:
+		return "E", fmt.Sprintf("One paper =6 or sum ≤12: (%d,%d) sum=%d", codes[0], codes[1], sum)
+	case sum <= 16 || (codes[0] <= 6 && codes[1] == 9) || (codes[0] == 9 && codes[1] <= 6):
+		return "O", fmt.Sprintf("Sum ≤16 or one ≤6 and other =9: (%d,%d) sum=%d", codes[0], codes[1], sum)
 	default:
-		return "O", fmt.Sprintf("Sum %d > 18", sum)
+		return "F", fmt.Sprintf("(8,9) or (9,9): (%d,%d)", codes[0], codes[1])
 	}
 }
 
 func (g *UACEGrader) compute3Papers(codes []int) (string, string) {
-	// Best 2 papers
-	best2Sum := codes[0] + codes[1]
-	
-	// Science exception: if best 2 sum is (9,9,X) where X≤7, grade is E not O
-	if codes[0] == 9 && codes[1] == 9 && codes[2] <= 7 {
-		return "E", fmt.Sprintf("Science exception: codes %v, best 2 sum %d but third ≤7", codes, best2Sum)
+	// Science exception: (9,9,7) → Fail
+	if codes[0] == 7 && codes[1] == 9 && codes[2] == 9 {
+		return "F", fmt.Sprintf("Science exception (9,9,7): %v", codes)
 	}
 	
 	switch {
-	case best2Sum <= 6:
-		return "A", fmt.Sprintf("Best 2 sum %d ≤ 6", best2Sum)
-	case best2Sum <= 10:
-		return "B", fmt.Sprintf("Best 2 sum %d ≤ 10", best2Sum)
-	case best2Sum <= 12:
-		return "C", fmt.Sprintf("Best 2 sum %d ≤ 12", best2Sum)
-	case best2Sum <= 15:
-		return "D", fmt.Sprintf("Best 2 sum %d ≤ 15", best2Sum)
-	case best2Sum <= 18:
-		return "E", fmt.Sprintf("Best 2 sum %d ≤ 18", best2Sum)
+	case codes[2] == 3 && codes[0] <= 2 && codes[1] <= 2:
+		return "A", fmt.Sprintf("One =3, others ≤2: %v", codes)
+	case codes[2] == 4 && codes[0] <= 4 && codes[1] <= 4:
+		return "B", fmt.Sprintf("One =4, others ≤4: %v", codes)
+	case codes[2] == 5 && codes[0] <= 5 && codes[1] <= 5:
+		return "C", fmt.Sprintf("One =5, others ≤5: %v", codes)
+	case codes[2] == 6 && codes[0] <= 6 && codes[1] <= 6:
+		return "D", fmt.Sprintf("One =6, others ≤6: %v", codes)
+	case (codes[2] == 7 && codes[0] <= 6 && codes[1] <= 6) || (codes[2] == 8 && ((codes[0] <= 6 && codes[1] > 6) || (codes[0] > 6 && codes[1] <= 6) || (codes[0] <= 6 && codes[1] <= 6))):
+		return "E", fmt.Sprintf("One =7 and others ≤6, OR one =8 and ≤1 of others =6: %v", codes)
+	case (codes[0] == 7 && codes[1] == 7 && codes[2] == 7) || (codes[0] == 8 && codes[1] == 8 && codes[2] == 8) || (codes[2] == 9 && codes[0] <= 8 && codes[1] <= 8) || (codes[1] == 9 && codes[2] == 9 && codes[0] <= 7):
+		return "O", fmt.Sprintf("(7,7,7), (8,8,8), one F9 with others ≤8, or two F9 with one ≤7: %v", codes)
 	default:
-		return "O", fmt.Sprintf("Best 2 sum %d > 18", best2Sum)
+		return "F", fmt.Sprintf("(9,9,8) or (9,9,9): %v", codes)
 	}
 }
 
 func (g *UACEGrader) compute4Papers(codes []int) (string, string) {
-	// Best 2 papers
-	best2Sum := codes[0] + codes[1]
-	
 	switch {
-	case best2Sum <= 6:
-		return "A", fmt.Sprintf("Best 2 sum %d ≤ 6", best2Sum)
-	case best2Sum <= 10:
-		return "B", fmt.Sprintf("Best 2 sum %d ≤ 10", best2Sum)
-	case best2Sum <= 12:
-		return "C", fmt.Sprintf("Best 2 sum %d ≤ 12", best2Sum)
-	case best2Sum <= 15:
-		return "D", fmt.Sprintf("Best 2 sum %d ≤ 15", best2Sum)
-	case best2Sum <= 18:
-		return "E", fmt.Sprintf("Best 2 sum %d ≤ 18", best2Sum)
+	case codes[3] == 3 && codes[0] <= 2 && codes[1] <= 2 && codes[2] <= 2:
+		return "A", fmt.Sprintf("One =3, others ≤2: %v", codes)
+	case codes[3] == 4 && codes[0] <= 4 && codes[1] <= 4 && codes[2] <= 4:
+		return "B", fmt.Sprintf("One =4, others ≤4: %v", codes)
+	case codes[3] == 5 && codes[0] <= 5 && codes[1] <= 5 && codes[2] <= 5:
+		return "C", fmt.Sprintf("One =5, others ≤5: %v", codes)
+	case codes[3] == 6 && codes[0] <= 6 && codes[1] <= 6 && codes[2] <= 6:
+		return "D", fmt.Sprintf("One =6, others ≤6: %v", codes)
+	case (codes[3] == 7 && codes[0] <= 6 && codes[1] <= 6 && codes[2] <= 6) || (codes[3] == 8 && ((codes[0] <= 6 && codes[1] <= 6) || (codes[0] <= 6 && codes[2] <= 6) || (codes[1] <= 6 && codes[2] <= 6))):
+		return "E", fmt.Sprintf("One =7 and others ≤6, or one =8 and ≤2 of others =6: %v", codes)
+	case (codes[0] == 7 && codes[1] == 7 && codes[2] == 7 && codes[3] == 7) || (codes[0] == 8 && codes[1] == 8 && codes[2] == 8 && codes[3] == 8) || ((codes[2] == 9 || codes[3] == 9) && codes[0] <= 8 && codes[1] <= 8):
+		return "O", fmt.Sprintf("(7,7,7,7), (8,8,8,8), one/two F9 with others ≤8: %v", codes)
 	default:
-		return "O", fmt.Sprintf("Best 2 sum %d > 18", best2Sum)
+		return "F", fmt.Sprintf("(9,9,8,8) or (9,9,9,9): %v", codes)
 	}
 }
 
@@ -227,8 +309,12 @@ func hashRuleVersion(version string) string {
 // GetGrader returns appropriate grader for level
 func GetGrader(level string) interface{} {
 	switch level {
+	case "Baby Class", "Middle Class", "Top Class", "Baby", "Middle", "Top", "Nursery":
+		return &NurseryGrader{}
+	case "P1", "P2", "P3":
+		return &PrimaryLowerGrader{}
 	case "P4", "P5", "P6", "P7":
-		return &PrimaryGrader{}
+		return &PrimaryUpperGrader{}
 	case "S1", "S2", "S3", "S4":
 		return &NCDCGrader{}
 	case "S5", "S6":

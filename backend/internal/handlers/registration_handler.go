@@ -3,6 +3,8 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -56,6 +58,7 @@ type ComprehensiveRegistrationRequest struct {
 
 	// Academic Info
 	ClassLevel     string `json:"class_level" binding:"required"`
+	ClassID        string `json:"class_id"`
 	Term           string `json:"term" binding:"required"`
 	Year           int    `json:"year" binding:"required"`
 	ResidenceType  string `json:"residence_type"`
@@ -136,22 +139,31 @@ func (h *RegistrationHandler) RegisterStudent(c *gin.Context) {
 
 	// Find or create class
 	var class models.Class
-	if err := h.db.Where("school_id = ? AND level = ? AND term = ? AND year = ?", school.ID, req.ClassLevel, req.Term, req.Year).First(&class).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			class = models.Class{
-				SchoolID: school.ID,
-				Name:     req.ClassLevel,
-				Level:    req.ClassLevel,
-				Year:     req.Year,
-				Term:     req.Term,
-			}
-			if err := h.db.Create(&class).Error; err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create class: " + err.Error()})
+	if req.ClassID != "" {
+		// Use provided class_id
+		if err := h.db.Where("id = ? AND school_id = ?", req.ClassID, school.ID).First(&class).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Class not found"})
+			return
+		}
+	} else {
+		// Find or create class by level
+		if err := h.db.Where("school_id = ? AND level = ? AND term = ? AND year = ?", school.ID, req.ClassLevel, req.Term, req.Year).First(&class).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				class = models.Class{
+					SchoolID: school.ID,
+					Name:     req.ClassLevel,
+					Level:    req.ClassLevel,
+					Year:     req.Year,
+					Term:     req.Term,
+				}
+				if err := h.db.Create(&class).Error; err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create class: " + err.Error()})
+					return
+				}
+			} else {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error: " + err.Error()})
 				return
 			}
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error: " + err.Error()})
-			return
 		}
 	}
 
@@ -163,23 +175,29 @@ func (h *RegistrationHandler) RegisterStudent(c *gin.Context) {
 		}
 	}()
 
-	// Generate admission number
-	var count int64
-	tx.Table("students").Joins("JOIN enrollments ON students.id = enrollments.student_id").
-		Where("enrollments.class_id = ?", class.ID).Count(&count)
-
-	schoolInitial := string(school.Name[0])
-	var schoolType string
-	switch school.Type {
-	case "Nursery":
-		schoolType = "NS"
-	case "Primary":
-		schoolType = "PS"
-	default:
-		schoolType = "SS"
+	// Generate admission number using first letters of school name
+	var schoolInitials string
+	for _, word := range strings.Fields(school.Name) {
+		if len(word) > 0 {
+			schoolInitials += strings.ToUpper(string(word[0]))
+		}
 	}
-	sequence := int(count) + 1
-	admissionNo := fmt.Sprintf("%s%s/%s/%d/%03d", schoolInitial, schoolType, class.Level, req.Year, sequence)
+
+	// Find last admission number
+	var lastStudent models.Student
+	var sequence int = 0
+	pattern := fmt.Sprintf("%s/%s/%d/%%", schoolInitials, class.Name, req.Year)
+	if err := tx.Where("school_id = ? AND admission_no LIKE ?", school.ID, pattern).
+		Order("admission_no DESC").First(&lastStudent).Error; err == nil {
+		parts := strings.Split(lastStudent.AdmissionNo, "/")
+		if len(parts) == 4 {
+			if num, err := strconv.Atoi(parts[3]); err == nil {
+				sequence = num
+			}
+		}
+	}
+	sequence++
+	admissionNo := fmt.Sprintf("%s/%s/%d/%03d", schoolInitials, class.Name, req.Year, sequence)
 
 	// Set defaults
 	nationality := req.Nationality
@@ -206,11 +224,11 @@ func (h *RegistrationHandler) RegisterStudent(c *gin.Context) {
 		SchoolID:         school.ID,
 		AdmissionNo:      admissionNo,
 		LIN:              req.LIN,
-		FirstName:        req.FirstName,
-		MiddleName:       req.MiddleName,
-		LastName:         req.LastName,
+		FirstName:        strings.Title(strings.ToLower(req.FirstName)),
+		MiddleName:       strings.Title(strings.ToLower(req.MiddleName)),
+		LastName:         strings.Title(strings.ToLower(req.LastName)),
 		DateOfBirth:      dateOfBirth,
-		Gender:           req.Gender,
+		Gender:           strings.Title(strings.ToLower(req.Gender)),
 		Nationality:      nationality,
 		Religion:         req.Religion,
 		Email:            req.Email,

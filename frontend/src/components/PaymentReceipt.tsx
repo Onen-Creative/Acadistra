@@ -1,43 +1,53 @@
-import { useQuery } from '@tanstack/react-query';
-import { schoolsApi } from '@/services/api';
+'use client'
+
+import { useEffect, useState } from 'react'
+import { api } from '@/services/api'
 
 interface PaymentReceiptProps {
   payment: {
-    id: string;
-    amount: number;
-    payment_date: string;
-    payment_method: string;
-    receipt_no: string;
-    notes?: string;
-  };
+    id?: string
+    amount: number
+    payment_date: string
+    payment_method: string
+    receipt_no: string
+    notes?: string
+  }
   studentFees: {
     student: {
-      first_name: string;
-      last_name: string;
-      admission_no: string;
-      lin?: string;
-    };
-    term: string;
-    year: number;
-    total_fees: number;
-    amount_paid: number;
-    outstanding: number;
-  };
-  onClose: () => void;
+      first_name: string
+      last_name: string
+      admission_no: string
+      lin?: string
+      class_name?: string
+    }
+    term: string
+    year: number
+    total_fees: number
+    amount_paid: number
+    outstanding: number
+  }
+  onClose: () => void
 }
 
 export default function PaymentReceipt({ payment, studentFees, onClose }: PaymentReceiptProps) {
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-  
-  const { data: school } = useQuery({
-    queryKey: ['school', user.school_id],
-    queryFn: () => schoolsApi.get(user.school_id),
-    enabled: !!user.school_id,
-  });
+  const [school, setSchool] = useState<any>(null)
+
+  useEffect(() => {
+    loadSchool()
+  }, [])
+
+  const loadSchool = async () => {
+    try {
+      const response = await api.get('/school')
+      setSchool(response.data)
+    } catch (error) {
+      console.error('Failed to load school:', error)
+    }
+  }
 
   const handlePrint = () => {
-    window.print();
-  };
+    window.print()
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -67,11 +77,15 @@ export default function PaymentReceipt({ payment, studentFees, onClose }: Paymen
           <div className="text-center border-b-2 border-black pb-4 mb-6">
             {school?.logo_url && (
               <div className="flex justify-center mb-2">
-                <img src={school.logo_url} alt="School Logo" className="h-12 w-12 object-contain" />
+                <img 
+                  src={school.logo_url.startsWith('http') ? school.logo_url : `http://localhost:8080${school.logo_url}`} 
+                  alt="School Logo" 
+                  className="h-12 w-12 object-contain" 
+                />
               </div>
             )}
             <h1 className="text-lg font-bold uppercase text-black mb-1">{school?.name || 'School Name'}</h1>
-            <p className="text-xs text-gray-700 italic mb-1">"{school?.motto || 'School Motto'}"</p>
+            <p className="text-xs text-gray-700 italic mb-1">&quot;{school?.motto || 'School Motto'}&quot;</p>
             <p className="text-xs text-gray-700">{school?.address}</p>
             <p className="text-xs text-gray-700">Tel: {school?.phone} | Email: {school?.contact_email}</p>
             <div className="mt-3 bg-black text-white py-1 px-3 inline-block">
@@ -106,6 +120,7 @@ export default function PaymentReceipt({ payment, studentFees, onClose }: Paymen
                 <p><span className="font-medium">Admission Number:</span> {studentFees.student.admission_no}</p>
               </div>
               <div>
+                <p><span className="font-medium">Class:</span> {studentFees.student.class_name || 'N/A'}</p>
                 <p><span className="font-medium">LIN:</span> {studentFees.student.lin || 'N/A'}</p>
                 <p><span className="font-medium">Academic Period:</span> {studentFees.term} {studentFees.year}</p>
               </div>
@@ -181,7 +196,7 @@ export default function PaymentReceipt({ payment, studentFees, onClose }: Paymen
         </div>
       </div>
 
-      <style>{`
+      <style jsx>{`
         @media print {
           @page { 
             margin: 0.5in; 
@@ -213,51 +228,51 @@ export default function PaymentReceipt({ payment, studentFees, onClose }: Paymen
         }
       `}</style>
     </div>
-  );
+  )
 }
 
 // Helper function to convert numbers to words (simplified)
 function numberToWords(num: number): string {
-  const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
-  const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
-  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-  const thousands = ['', 'Thousand', 'Million', 'Billion'];
+  const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine']
+  const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen']
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety']
+  const thousands = ['', 'Thousand', 'Million', 'Billion']
 
-  if (num === 0) return 'Zero';
+  if (num === 0) return 'Zero'
 
   function convertHundreds(n: number): string {
-    let result = '';
+    let result = ''
     
     if (n >= 100) {
-      result += ones[Math.floor(n / 100)] + ' Hundred ';
-      n %= 100;
+      result += ones[Math.floor(n / 100)] + ' Hundred '
+      n %= 100
     }
     
     if (n >= 20) {
-      result += tens[Math.floor(n / 10)] + ' ';
-      n %= 10;
+      result += tens[Math.floor(n / 10)] + ' '
+      n %= 10
     } else if (n >= 10) {
-      result += teens[n - 10] + ' ';
-      return result;
+      result += teens[n - 10] + ' '
+      return result
     }
     
     if (n > 0) {
-      result += ones[n] + ' ';
+      result += ones[n] + ' '
     }
     
-    return result;
+    return result
   }
 
-  let result = '';
-  let thousandIndex = 0;
+  let result = ''
+  let thousandIndex = 0
   
   while (num > 0) {
     if (num % 1000 !== 0) {
-      result = convertHundreds(num % 1000) + thousands[thousandIndex] + ' ' + result;
+      result = convertHundreds(num % 1000) + thousands[thousandIndex] + ' ' + result
     }
-    num = Math.floor(num / 1000);
-    thousandIndex++;
+    num = Math.floor(num / 1000)
+    thousandIndex++
   }
   
-  return result.trim();
+  return result.trim()
 }

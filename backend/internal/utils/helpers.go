@@ -1,6 +1,9 @@
 package utils
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 func Atoi(s string) int {
 	var i int
@@ -14,4 +17,8 @@ func Atoi(s string) int {
 
 func Contains(s, substr string) bool {
 	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
+}
+
+func GenerateID(prefix string, number int) string {
+	return fmt.Sprintf("%s%04d", prefix, number)
 }

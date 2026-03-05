@@ -1,8 +1,10 @@
 package handlers
 
 import (
-	"log"
+	"fmt"
+	"math"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -23,6 +25,7 @@ func (h *ResultHandler) GetByStudent(c *gin.Context) {
 	studentID := c.Param("id")
 	term := c.Query("term")
 	year := c.Query("year")
+	examType := c.Query("exam_type")
 	schoolID := c.GetString("tenant_school_id")
 	
 	// Verify student belongs to the same school
@@ -36,6 +39,7 @@ func (h *ResultHandler) GetByStudent(c *gin.Context) {
 		models.SubjectResult
 		SubjectName string `json:"subject_name"`
 		SubjectCode string `json:"subject_code"`
+		Position    string `json:"position"`
 	}
 	
 	var results []ResultWithSubject
@@ -51,13 +55,146 @@ func (h *ResultHandler) GetByStudent(c *gin.Context) {
 	if year != "" {
 		query = query.Where("subject_results.year = ?", year)
 	}
+	if examType != "" {
+		query = query.Where("subject_results.exam_type = ?", examType)
+	}
 	
 	if err := query.Scan(&results).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	
-	c.JSON(http.StatusOK, results)
+	// Get student's class level to check if S1-S4
+	var enrollment models.Enrollment
+	var classLevel string
+	if err := h.db.Where("student_id = ?", studentID).Order("created_at DESC").First(&enrollment).Error; err == nil {
+		var class models.Class
+		if err := h.db.First(&class, enrollment.ClassID).Error; err == nil {
+			classLevel = class.Level
+		}
+	}
+	
+	// For S1-S4, fetch AOI marks and update CA in results
+	if classLevel == "S1" || classLevel == "S2" || classLevel == "S3" || classLevel == "S4" {
+		for i := range results {
+			var aoiActivity models.IntegrationActivity
+			if err := h.db.Where("student_id = ? AND subject_id = ? AND term = ? AND year = ?",
+				studentID, results[i].SubjectID, results[i].Term, results[i].Year).First(&aoiActivity).Error; err == nil {
+				// Calculate AOI out of 20
+				if aoiActivity.Marks != nil {
+					activities := []float64{}
+					for j := 1; j <= 5; j++ {
+						key := fmt.Sprintf("activity%d", j)
+						if val, ok := aoiActivity.Marks[key].(float64); ok {
+							activities = append(activities, val)
+						}
+					}
+					if len(activities) > 0 {
+						avg := 0.0
+						for _, v := range activities {
+							avg += v
+						}
+						avg = avg / float64(len(activities))
+						aoiCA := math.Round((avg / 3.0) * 20.0)
+						
+						// Update CA in raw_marks
+						if results[i].RawMarks == nil {
+							results[i].RawMarks = make(models.JSONB)
+						}
+						results[i].RawMarks["ca"] = aoiCA
+						
+						// Recalculate total
+						exam := 0.0
+						if e, ok := results[i].RawMarks["exam"].(float64); ok {
+							exam = e
+						}
+						results[i].RawMarks["total"] = aoiCA + exam
+					}
+				}
+			}
+		}
+	}
+	
+	// Fix grades for subsidiary subjects
+	for i := range results {
+		if results[i].SubjectName == "ICT" || results[i].SubjectName == "General Paper" ||
+			strings.Contains(strings.ToLower(results[i].SubjectName), "ict") ||
+			strings.Contains(strings.ToLower(results[i].SubjectName), "general paper") ||
+			strings.Contains(strings.ToLower(results[i].SubjectName), "subsidiary") {
+			// Recalculate grade for subsidiary subjects
+			if results[i].RawMarks != nil {
+				ca := 0.0
+				exam := 0.0
+				if c, ok := results[i].RawMarks["ca"].(float64); ok {
+					ca = c
+				}
+				if e, ok := results[i].RawMarks["exam"].(float64); ok {
+					exam = e
+				}
+				total := ca + exam
+				if total >= 50 {
+					results[i].FinalGrade = "O"
+				} else if total > 0 {
+					results[i].FinalGrade = "F"
+				}
+			}
+		}
+	}
+	
+	// Calculate position if we have results
+	position := "N/A"
+	if len(results) > 0 && term != "" && year != "" && examType != "" {
+		// Get student's class
+		var enrollment models.Enrollment
+		if err := h.db.Where("student_id = ?", studentID).Order("created_at DESC").First(&enrollment).Error; err == nil {
+			// Calculate total marks for all students in the class
+			type StudentTotal struct {
+				StudentID string
+				Total     float64
+			}
+			
+			var studentTotals []StudentTotal
+			h.db.Raw(`
+				SELECT 
+					sr.student_id,
+					SUM(COALESCE((sr.raw_marks->>'ca')::float, 0) + COALESCE((sr.raw_marks->>'exam')::float, 0)) as total
+				FROM subject_results sr
+				JOIN enrollments e ON sr.student_id = e.student_id
+				WHERE e.class_id = ?
+					AND sr.term = ?
+					AND sr.year = ?
+					AND sr.exam_type = ?
+					AND sr.school_id = ?
+				GROUP BY sr.student_id
+				ORDER BY total DESC
+			`, enrollment.ClassID, term, year, examType, schoolID).Scan(&studentTotals)
+			
+			if len(studentTotals) > 0 {
+				for i, st := range studentTotals {
+					if st.StudentID == studentID {
+						position = fmt.Sprintf("%d out of %d", i+1, len(studentTotals))
+						break
+					}
+				}
+			}
+		}
+	}
+	
+	// Add position to all results
+	for i := range results {
+		results[i].Position = position
+	}
+	
+	// Get outstanding fees balance for the student, term, and year
+	var outstandingFees float64
+	if term != "" && year != "" {
+		var studentFees models.StudentFees
+		if err := h.db.Where("student_id = ? AND term = ? AND year = ?", studentID, term, year).First(&studentFees).Error; err == nil {
+			outstandingFees = studentFees.Outstanding
+		}
+	}
+	
+	c.JSON(http.StatusOK, gin.H{"results": results, "outstanding_fees": outstandingFees})
 }
 
 func (h *ResultHandler) CreateOrUpdate(c *gin.Context) {
@@ -69,6 +206,7 @@ func (h *ResultHandler) CreateOrUpdate(c *gin.Context) {
 		ClassID     string                 `json:"class_id"`
 		Term        string                 `json:"term" binding:"required"`
 		Year        int                    `json:"year" binding:"required"`
+		ExamType    string                 `json:"exam_type"`
 		FinalGrade  string                 `json:"final_grade"`
 		RawMarks    models.JSONB           `json:"raw_marks"`
 	}
@@ -120,12 +258,20 @@ func (h *ResultHandler) CreateOrUpdate(c *gin.Context) {
 	
 	// Check if result already exists
 	var result models.SubjectResult
-	err = h.db.Where("student_id = ? AND subject_id = ? AND term = ? AND year = ?",
-		studentID, subjectID, req.Term, req.Year).First(&result).Error
+	paperNum := 0
+	if req.RawMarks != nil {
+		if p, ok := req.RawMarks["paper"].(float64); ok {
+			paperNum = int(p)
+		}
+	}
+	err = h.db.Where("student_id = ? AND subject_id = ? AND term = ? AND year = ? AND exam_type = ? AND paper = ?",
+		studentID, subjectID, req.Term, req.Year, req.ExamType, paperNum).First(&result).Error
 	
-	// Teachers can only create new results, not edit existing ones
+	// Teachers can add marks for new exam types, but cannot edit existing exam type marks
+	// School admins can edit all marks
 	if userRole == "teacher" && err != gorm.ErrRecordNotFound {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Teachers cannot edit existing marks"})
+		// Teachers cannot edit existing marks at all
+		c.JSON(http.StatusForbidden, gin.H{"error": "Teachers cannot edit existing marks. Contact school admin."})
 		return
 	}
 	
@@ -136,15 +282,36 @@ func (h *ResultHandler) CreateOrUpdate(c *gin.Context) {
 		return
 	}
 	
-	// Calculate total and grade using proper grading system
-	ca := 0.0
-	exam := 0.0
+	// Validate marks for nursery and primary levels
 	if req.RawMarks != nil {
+		ca := 0.0
+		exam := 0.0
 		if c, ok := req.RawMarks["ca"].(float64); ok {
 			ca = c
 		}
 		if e, ok := req.RawMarks["exam"].(float64); ok {
 			exam = e
+		}
+		
+		switch class.Level {
+		case "Baby", "Middle", "Top", "Nursery":
+			if ca > 100 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "CA mark cannot exceed 100 for nursery levels"})
+				return
+			}
+			if exam > 100 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Exam mark cannot exceed 100 for nursery levels"})
+				return
+			}
+		case "P1", "P2", "P3", "P4", "P5", "P6", "P7":
+			if ca > 40 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "CA mark cannot exceed 40 for primary levels"})
+				return
+			}
+			if exam > 60 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Exam mark cannot exceed 60 for primary levels"})
+				return
+			}
 		}
 	}
 	
@@ -153,37 +320,197 @@ func (h *ResultHandler) CreateOrUpdate(c *gin.Context) {
 	
 	// Apply appropriate grading system based on level
 	switch class.Level {
-	case "P4", "P5", "P6", "P7":
-		// Primary: CA out of 20 (40%), Exam out of 80 (60%)
-		grader := &grading.PrimaryGrader{}
-		gradeResult = grader.ComputeGrade(ca, exam, 20, 80)
-		total = ca + exam
-	case "S1", "S2", "S3", "S4":
-		// NCDC: School-Based out of 20 (20%), External out of 80 (80%)
-		grader := &grading.NCDCGrader{}
-		gradeResult = grader.ComputeGrade(ca, exam, 20, 80)
-		total = ca + exam
 	case "S5", "S6":
-		// UACE: Paper-based grading (not implemented for single CA/Exam entry)
-		// For now, use simple total
-		total = ca + exam
-		gradeResult.FinalGrade = "P" // Pending proper paper-based grading
-		gradeResult.ComputationReason = "UACE grading requires paper-based entry"
-	default:
-		// Fallback: simple total
-		total = ca + exam
-		if total >= 80 {
-			gradeResult.FinalGrade = "A"
-		} else if total >= 65 {
-			gradeResult.FinalGrade = "B"
-		} else if total >= 50 {
-			gradeResult.FinalGrade = "C"
-		} else if total >= 35 {
-			gradeResult.FinalGrade = "D"
+		// UACE: Paper-based grading - each paper out of 100
+		if req.RawMarks != nil {
+			// For Advanced level, marks are stored directly as "mark" out of 100
+			mark := 0.0
+			if m, ok := req.RawMarks["mark"].(float64); ok {
+				mark = m
+			} else if e, ok := req.RawMarks["exam"].(float64); ok {
+				// Fallback for old format
+				mark = e
+			}
+			
+			if mark > 100 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Mark cannot exceed 100 for Advanced level"})
+				return
+			}
+			
+			total = mark
+			
+			// For grading, fetch all papers for this student+subject+exam_type
+			var allPapers []models.SubjectResult
+			h.db.Where("student_id = ? AND subject_id = ? AND term = ? AND year = ? AND exam_type = ? AND deleted_at IS NULL",
+				studentID, subjectID, req.Term, req.Year, req.ExamType).Find(&allPapers)
+			
+			paperMarks := []float64{}
+			// Always add current paper first
+			if mark > 0 {
+				paperMarks = append(paperMarks, mark)
+			}
+			
+			// Then add other existing papers
+			for _, p := range allPapers {
+				if p.Paper != paperNum && p.RawMarks != nil {
+					// Get mark from existing paper
+					pmark := 0.0
+					if m, ok := p.RawMarks["mark"].(float64); ok {
+						pmark = m
+					} else if t, ok := p.RawMarks["total"].(float64); ok {
+						pmark = t
+					} else if e, ok := p.RawMarks["exam"].(float64); ok {
+						// Fallback for old format
+						pca := 0.0
+						if c, ok := p.RawMarks["ca"].(float64); ok {
+							pca = c
+						}
+						pmark = pca + e
+					}
+					if pmark > 0 {
+						paperMarks = append(paperMarks, pmark)
+					}
+				}
+			}
+			
+			if len(paperMarks) >= 2 {
+				grader := &grading.UACEGrader{}
+				gradeResult = grader.ComputeGradeFromPapers(paperMarks)
+				
+				// Update grade for all papers of this subject
+				for _, p := range allPapers {
+					if p.ID != result.ID {
+						h.db.Model(&models.SubjectResult{}).Where("id = ?", p.ID).Updates(map[string]interface{}{
+							"final_grade":        gradeResult.FinalGrade,
+							"computation_reason": gradeResult.ComputationReason,
+							"rule_version_hash":  gradeResult.RuleVersionHash,
+						})
+					}
+				}
+			} else if len(paperMarks) == 1 {
+				// Check if this is a subsidiary subject
+				isSubsidiary := standardSubject.Name == "ICT" || 
+					standardSubject.Name == "General Paper" ||
+					strings.Contains(strings.ToLower(standardSubject.Name), "ict") ||
+					strings.Contains(strings.ToLower(standardSubject.Name), "general paper") ||
+					strings.Contains(strings.ToLower(standardSubject.Name), "subsidiary")
+				
+				if isSubsidiary {
+					// Subsidiary subjects use O/F grading
+					if mark >= 50 {
+						gradeResult.FinalGrade = "O"
+					} else {
+						gradeResult.FinalGrade = "F"
+					}
+					gradeResult.ComputationReason = fmt.Sprintf("Subsidiary: Paper mark %.2f/100 → Grade %s", mark, gradeResult.FinalGrade)
+					gradeResult.RuleVersionHash = "UACE_SUBSIDIARY_V1"
+				} else {
+					// Principal subjects need multiple papers - but show individual paper grade
+					grader := &grading.UACEGrader{}
+					code := grader.MapMarkToCode(mark)
+					gradeResult.FinalGrade = fmt.Sprintf("%d", code)
+					gradeResult.ComputationReason = fmt.Sprintf("Single paper: %.2f/100 → Code %d (awaiting other papers)", mark, code)
+				}
+			} else {
+				gradeResult.FinalGrade = ""
+				gradeResult.ComputationReason = "No marks entered"
+			}
 		} else {
-			gradeResult.FinalGrade = "E"
+			gradeResult.FinalGrade = ""
+			gradeResult.ComputationReason = "UACE requires paper-based entry"
 		}
-		gradeResult.ComputationReason = "Simple total grading"
+	default:
+		// For all other levels: extract ca and exam from root
+		ca := 0.0
+		exam := 0.0
+		if req.RawMarks != nil {
+			if c, ok := req.RawMarks["ca"].(float64); ok {
+				ca = c
+			}
+			if e, ok := req.RawMarks["exam"].(float64); ok {
+				exam = e
+			}
+		}
+		total = ca + exam
+		
+		switch class.Level {
+		case "Baby", "Middle", "Top", "Nursery":
+			// Nursery: CA out of 100, Exam out of 100
+			grader := &grading.NurseryGrader{}
+			gradeResult = grader.ComputeGrade(ca, exam, 100, 100)
+		case "P1", "P2", "P3":
+			// Lower Primary: CA out of 40, Exam out of 60
+			grader := &grading.PrimaryLowerGrader{}
+			gradeResult = grader.ComputeGrade(ca, exam, 40, 60)
+		case "P4", "P5", "P6", "P7":
+			// Upper Primary: CA out of 20 (40%), Exam out of 80 (60%)
+			grader := &grading.PrimaryUpperGrader{}
+			gradeResult = grader.ComputeGrade(ca, exam, 20, 80)
+		case "S1", "S2", "S3", "S4":
+			// NCDC: School-Based out of 20 (20%), External out of 80 (80%)
+			// CA comes from AOI marks (out of 20)
+			aoiCA := 0.0
+			var aoiActivity models.IntegrationActivity
+			if err := h.db.Where("student_id = ? AND subject_id = ? AND term = ? AND year = ?",
+				studentID, subjectID, req.Term, req.Year).First(&aoiActivity).Error; err == nil {
+				// Calculate AOI out of 20
+				if aoiActivity.Marks != nil {
+					activities := []float64{}
+					for i := 1; i <= 5; i++ {
+						key := fmt.Sprintf("activity%d", i)
+						if val, ok := aoiActivity.Marks[key].(float64); ok {
+							activities = append(activities, val)
+						}
+					}
+					if len(activities) > 0 {
+						avg := 0.0
+						for _, v := range activities {
+							avg += v
+						}
+						avg = avg / float64(len(activities))
+						aoiCA = (avg / 3.0) * 20.0
+					}
+				}
+			}
+			// Use AOI CA if available, otherwise use provided CA
+			if aoiCA > 0 {
+				ca = aoiCA
+				req.RawMarks["ca"] = aoiCA
+			} else {
+				// No AOI marks, set CA to 0
+				ca = 0
+				req.RawMarks["ca"] = 0
+			}
+			
+			// Calculate total based on what's available
+			if ca > 0 && exam > 0 {
+				// Both CA and Exam provided
+				total = ca + exam
+			} else if ca > 0 {
+				// Only CA (AOI) provided
+				total = ca
+			} else if exam > 0 {
+				// Only Exam provided
+				total = exam
+			}
+			
+			grader := &grading.NCDCGrader{}
+			gradeResult = grader.ComputeGrade(ca, exam, 20, 80)
+		default:
+			// Fallback: simple total
+			if total >= 80 {
+				gradeResult.FinalGrade = "A"
+			} else if total >= 65 {
+				gradeResult.FinalGrade = "B"
+			} else if total >= 50 {
+				gradeResult.FinalGrade = "C"
+			} else if total >= 35 {
+				gradeResult.FinalGrade = "D"
+			} else {
+				gradeResult.FinalGrade = "E"
+			}
+			gradeResult.ComputationReason = "Simple total grading"
+		}
 	}
 	
 	// Store total in raw_marks
@@ -199,6 +526,8 @@ func (h *ResultHandler) CreateOrUpdate(c *gin.Context) {
 			ClassID:           classID,
 			Term:              req.Term,
 			Year:              req.Year,
+			ExamType:          req.ExamType,
+			Paper:             paperNum,
 			SchoolID:          uuid.MustParse(schoolID),
 			FinalGrade:        gradeResult.FinalGrade,
 			ComputationReason: gradeResult.ComputationReason,
@@ -206,7 +535,6 @@ func (h *ResultHandler) CreateOrUpdate(c *gin.Context) {
 			RawMarks:          req.RawMarks,
 		}
 		if err := h.db.Create(&result).Error; err != nil {
-			log.Printf("Error creating result: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -214,13 +542,18 @@ func (h *ResultHandler) CreateOrUpdate(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	} else {
-		// Only school admins can update existing results
+		// Merge raw_marks - preserve existing exam types
+		if result.RawMarks == nil {
+			result.RawMarks = make(models.JSONB)
+		}
+		for k, v := range req.RawMarks {
+			result.RawMarks[k] = v
+		}
+		result.Paper = paperNum
 		result.FinalGrade = gradeResult.FinalGrade
 		result.ComputationReason = gradeResult.ComputationReason
 		result.RuleVersionHash = gradeResult.RuleVersionHash
-		result.RawMarks = req.RawMarks
 		if err := h.db.Save(&result).Error; err != nil {
-			log.Printf("Error saving result: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -236,4 +569,156 @@ func (h *ResultHandler) Delete(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Result deleted"})
+}
+
+// GetPerformanceSummary returns comprehensive performance summary with all subjects per class
+func (h *ResultHandler) GetPerformanceSummary(c *gin.Context) {
+	schoolID := c.GetString("tenant_school_id")
+	term := c.Query("term")
+	year := c.Query("year")
+	
+	if term == "" || year == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "term and year are required"})
+		return
+	}
+	
+	// Get all classes
+	var classes []models.Class
+	h.db.Where("school_id = ? AND year = ? AND term = ?", schoolID, year, term).Find(&classes)
+	
+	type SubjectMark struct {
+		SubjectName string  `json:"subject_name"`
+		CA          float64 `json:"ca"`
+		Exam        float64 `json:"exam"`
+		Total       float64 `json:"total"`
+		Grade       string  `json:"grade"`
+	}
+	
+	type StudentPerformance struct {
+		StudentID   string        `json:"student_id"`
+		StudentName string        `json:"student_name"`
+		AdmissionNo string        `json:"admission_no"`
+		ClassName   string        `json:"class_name"`
+		Subjects    []SubjectMark `json:"subjects"`
+		TotalMarks  float64       `json:"total_marks"`
+		Average     float64       `json:"average"`
+		Grade       string        `json:"grade"`
+		Position    int           `json:"position"`
+		Division    string        `json:"division"`
+	}
+	
+	var allPerformance []StudentPerformance
+	
+	for _, class := range classes {
+		// Get all students in this class
+		var students []models.Student
+		h.db.Raw(`
+			SELECT DISTINCT s.*
+			FROM students s
+			JOIN enrollments e ON s.id = e.student_id
+			WHERE e.class_id = ? AND e.status = 'active' AND s.school_id = ?
+		`, class.ID, schoolID).Scan(&students)
+		
+		var classPerformance []StudentPerformance
+		
+		for _, student := range students {
+			// Get all subject results for this student
+			var results []struct {
+				SubjectName string
+				CA          float64
+				Exam        float64
+				Total       float64
+				Grade       string
+			}
+			
+			h.db.Raw(`
+				SELECT 
+					ss.name as subject_name,
+					COALESCE((sr.raw_marks->>'ca')::float, 0) as ca,
+					COALESCE((sr.raw_marks->>'exam')::float, 0) as exam,
+					COALESCE((sr.raw_marks->>'total')::float, 0) as total,
+					COALESCE(sr.final_grade, '') as grade
+				FROM subject_results sr
+				JOIN standard_subjects ss ON sr.subject_id = ss.id
+				WHERE sr.student_id = ?
+					AND sr.term = ?
+					AND sr.year = ?
+					AND sr.school_id = ?
+				ORDER BY ss.name
+			`, student.ID, term, year, schoolID).Scan(&results)
+			
+			subjects := []SubjectMark{}
+			totalMarks := 0.0
+			
+			for _, r := range results {
+				subjects = append(subjects, SubjectMark{
+					SubjectName: r.SubjectName,
+					CA:          r.CA,
+					Exam:        r.Exam,
+					Total:       r.Total,
+					Grade:       r.Grade,
+				})
+				totalMarks += r.Total
+			}
+			
+			average := 0.0
+			if len(subjects) > 0 {
+				average = totalMarks / float64(len(subjects))
+			}
+			
+			grade := ""
+			division := ""
+			if average >= 80 {
+				grade = "A"
+				division = "I"
+			} else if average >= 65 {
+				grade = "B"
+				division = "II"
+			} else if average >= 50 {
+				grade = "C"
+				division = "III"
+			} else if average >= 35 {
+				grade = "D"
+				division = "IV"
+			} else {
+				grade = "E"
+				division = "U"
+			}
+			
+			studentName := student.FirstName
+			if student.MiddleName != "" {
+				studentName += " " + student.MiddleName
+			}
+			studentName += " " + student.LastName
+			
+			classPerformance = append(classPerformance, StudentPerformance{
+				StudentID:   student.ID.String(),
+				StudentName: studentName,
+				AdmissionNo: student.AdmissionNo,
+				ClassName:   class.Name,
+				Subjects:    subjects,
+				TotalMarks:  totalMarks,
+				Average:     average,
+				Grade:       grade,
+				Division:    division,
+			})
+		}
+		
+		// Sort by total marks descending and assign positions
+		for i := 0; i < len(classPerformance); i++ {
+			for j := i + 1; j < len(classPerformance); j++ {
+				if classPerformance[j].TotalMarks > classPerformance[i].TotalMarks {
+					classPerformance[i], classPerformance[j] = classPerformance[j], classPerformance[i]
+				}
+			}
+		}
+		
+		for i := range classPerformance {
+			classPerformance[i].Position = i + 1
+		}
+		
+		allPerformance = append(allPerformance, classPerformance...)
+	}
+	
+	c.JSON(http.StatusOK, gin.H{"results": allPerformance})
 }

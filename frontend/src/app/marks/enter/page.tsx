@@ -1,0 +1,702 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { notifications } from '@mantine/notifications'
+import { DashboardLayout } from '@/components/DashboardLayout'
+import { PageHeader } from '@/components/ui/BeautifulComponents'
+import { FormSelect } from '@/components/ui/FormComponents'
+import { resultsApi, studentsApi, classesApi, subjectsApi } from '@/services/api'
+import api from '@/services/api'
+import Link from 'next/link'
+import { Download, Upload, CheckCircle, XCircle, Clock } from 'lucide-react'
+import toast from 'react-hot-toast'
+
+export default function MarksEntryPage() {
+  const [year, setYear] = useState('2026')
+  const [term, setTerm] = useState('Term 1')
+  const [classId, setClassId] = useState('')
+  const [examType, setExamType] = useState('')
+  const [subjectId, setSubjectId] = useState('')
+  const [paperNumber, setPaperNumber] = useState('1')
+  const [marks, setMarks] = useState<Record<string, { ca?: number; exam?: number; mark?: number }>>({})
+  const [existingMarks, setExistingMarks] = useState<Record<string, any>>({})
+  const [userRole, setUserRole] = useState('')
+  const [showBulkImport, setShowBulkImport] = useState(false)
+  const [file, setFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [imports, setImports] = useState<any[]>([])
+  const queryClient = useQueryClient()
+
+  useEffect(() => {
+    const role = localStorage.getItem('user_role') || ''
+    setUserRole(role)
+    fetchImports()
+  }, [])
+
+  const { data: classesData } = useQuery({
+    queryKey: ['classes'],
+    queryFn: async () => {
+      const res = await classesApi.list()
+      return Array.isArray(res) ? { classes: res } : res
+    }
+  })
+
+  const selectedClass = classesData?.classes?.find((c: any) => c.id === classId)
+  const classLevel = selectedClass?.level || ''
+
+  const { data: subjectsData } = useQuery({
+    queryKey: ['subjects', classLevel],
+    queryFn: async () => {
+      if (!classLevel) return { subjects: [] }
+      const res = await subjectsApi.list({ level: classLevel })
+      return Array.isArray(res) ? { subjects: res } : res
+    },
+    enabled: !!classLevel
+  })
+
+  const isAdvanced = ['S5', 'S6'].includes(classLevel)
+  const selectedSubject = subjectsData?.subjects?.find((s: any) => s.id === subjectId)
+
+  const { data: studentsData } = useQuery({
+    queryKey: ['students', classId],
+    queryFn: async () => {
+      if (!classId) return { students: [] }
+      const res = await studentsApi.list({ class_id: classId })
+      return Array.isArray(res) ? { students: res } : res
+    },
+    enabled: !!classId
+  })
+
+  // Fetch existing marks when filters are set
+  useEffect(() => {
+    if (classId && examType && subjectId && studentsData?.students && (!isAdvanced || paperNumber)) {
+      const fetchExistingMarks = async () => {
+        const marksMap: Record<string, any> = {}
+        const marksData: Record<string, { ca: number; exam: number }> = {}
+        
+        for (const student of studentsData.students) {
+          try {
+            const res = await resultsApi.getByStudent(student.id, { year, term, exam_type: examType })
+            const result = res.results?.find((r: any) => {
+              if (isAdvanced) {
+                return r.subject_id === subjectId && r.raw_marks?.paper === parseInt(paperNumber)
+              }
+              return r.subject_id === subjectId
+            })
+            if (result && result.raw_marks) {
+              marksMap[student.id] = result
+              if (isAdvanced) {
+                marksData[student.id] = {
+                  mark: result.raw_marks.mark || result.raw_marks.total || 0
+                } as any
+              } else {
+                marksData[student.id] = {
+                  ca: result.raw_marks.ca || 0,
+                  exam: result.raw_marks.exam || 0
+                }
+              }
+            }
+          } catch (error) {
+            // Student has no marks yet
+          }
+        }
+        setExistingMarks(marksMap)
+        setMarks(marksData)
+      }
+      fetchExistingMarks()
+    }
+  }, [classId, examType, subjectId, year, term, studentsData, isAdvanced, paperNumber])
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const promises = Object.entries(marks).map(([studentId, studentMarks]) => {
+        let rawMarks: any
+        if (isAdvanced) {
+          rawMarks = { mark: studentMarks.mark || 0, paper: parseInt(paperNumber) }
+        } else {
+          rawMarks = { ca: studentMarks.ca || 0, exam: studentMarks.exam || 0 }
+        }
+        return resultsApi.createOrUpdate({
+          student_id: studentId,
+          subject_id: subjectId,
+          class_id: classId,
+          term,
+          year: parseInt(year),
+          exam_type: examType,
+          raw_marks: rawMarks
+        })
+      })
+      return Promise.all(promises)
+    },
+    onSuccess: () => {
+      notifications.show({ title: 'Success', message: `Saved marks for ${Object.keys(marks).length} students`, color: 'green' })
+      queryClient.invalidateQueries({ queryKey: ['results'] })
+    },
+    onError: (error: any) => {
+      notifications.show({ title: 'Error', message: error.response?.data?.error || 'Failed to save marks', color: 'red' })
+    }
+  })
+
+  const getMaxMarks = () => {
+    if (isAdvanced) return { mark: 100 } // Advanced level: single mark out of 100
+    if (['Baby', 'Middle', 'Top'].includes(classLevel)) return { ca: 100, exam: 100 }
+    if (['S1', 'S2', 'S3', 'S4'].includes(classLevel)) return { exam: 80 } // CA from AOI
+    return { ca: 40, exam: 60 }
+  }
+
+  const getLabels = () => {
+    if (isAdvanced) return { mark: 'Mark (out of 100)' }
+    if (['S1', 'S2', 'S3', 'S4'].includes(classLevel)) {
+      return { exam: 'Exam (out of 80)' } // CA from AOI
+    }
+    return { ca: 'CA', exam: 'Exam' }
+  }
+
+  const maxMarks = getMaxMarks()
+  const labels = getLabels()
+  const canSave = classId && examType && subjectId && (!isAdvanced || paperNumber) && Object.keys(marks).length > 0
+  const isAdmin = userRole === 'school_admin' || userRole === 'system_admin'
+
+  const fetchImports = async () => {
+    try {
+      const res = await api.get('/marks/imports')
+      setImports(res.data.imports || [])
+    } catch (error) {
+      console.error('Failed to fetch imports', error)
+      setImports([]) // Set empty array on error
+    }
+  }
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const token = localStorage.getItem('access_token')
+      const url = classId 
+        ? `http://localhost:8080/api/v1/marks/import-template?class_id=${classId}`
+        : 'http://localhost:8080/api/v1/marks/import-template'
+      
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      
+      const blob = await response.blob()
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = downloadUrl
+      a.download = 'marks_template.xlsx'
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(downloadUrl)
+      document.body.removeChild(a)
+      
+      toast.success('Template downloaded')
+    } catch (error) {
+      toast.error('Failed to download template')
+    }
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0])
+    }
+  }
+
+  const handleBulkUpload = async () => {
+    if (!file || !classId || !subjectId) {
+      toast.error('Please select class, subject, and file')
+      return
+    }
+
+    setUploading(true)
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('class_id', classId)
+    formData.append('subject_id', subjectId)
+    formData.append('term', term)
+    formData.append('year', year)
+    formData.append('exam_type', examType)
+
+    try {
+      const res = await api.post('/marks/bulk-import', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+      
+      toast.success(res.data.message)
+      setFile(null)
+      setShowBulkImport(false)
+      fetchImports()
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Import failed')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleApprove = async (importId: string) => {
+    try {
+      await api.post(`/marks/imports/${importId}/approve`)
+      toast.success('Import approved and processed')
+      fetchImports()
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to approve')
+    }
+  }
+
+  const handleReject = async (importId: string) => {
+    const reason = prompt('Enter rejection reason:')
+    if (!reason) return
+
+    try {
+      await api.post(`/marks/imports/${importId}/reject`, { reason })
+      toast.success('Import rejected')
+      fetchImports()
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to reject')
+    }
+  }
+
+  return (
+    <DashboardLayout>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <PageHeader
+          title="📝 Marks Entry"
+          subtitle="Enter marks for students or bulk import from Excel"
+          action={
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+              <Link href="/marks/aoi">
+                <button className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold bg-purple-500 text-white hover:bg-purple-600 transition-all text-sm sm:text-base">
+                  📝 AOI Marks
+                </button>
+              </Link>
+              <button
+                onClick={() => setShowBulkImport(!showBulkImport)}
+                className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold bg-blue-500 text-white hover:bg-blue-600 transition-all text-sm sm:text-base"
+              >
+                {showBulkImport ? '✏️ Manual' : '📤 Bulk'}
+              </button>
+              <Link href="/results">
+                <button className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all text-sm sm:text-base">
+                  ← Back
+                </button>
+              </Link>
+            </div>
+          }
+        />
+
+        {/* Step 1: Filters */}
+        <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
+          <h3 className="text-lg font-bold text-gray-800 mb-4">📋 Step 1: Select Filters</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <FormSelect
+              value={year}
+              onChange={(e) => setYear(e.target.value)}
+              label="Year"
+              options={[
+                { value: '2024', label: '2024' },
+                { value: '2025', label: '2025' },
+                { value: '2026', label: '2026' },
+                { value: '2027', label: '2027' }
+              ]}
+            />
+            <FormSelect
+              value={term}
+              onChange={(e) => setTerm(e.target.value)}
+              label="Term"
+              options={[
+                { value: 'Term 1', label: 'Term 1' },
+                { value: 'Term 2', label: 'Term 2' },
+                { value: 'Term 3', label: 'Term 3' }
+              ]}
+            />
+            <FormSelect
+              value={classId}
+              onChange={(e) => {
+                setClassId(e.target.value)
+                setSubjectId('')
+                setMarks({})
+                setExistingMarks({})
+              }}
+              label="Class"
+              options={[
+                { value: '', label: 'Select Class' },
+                ...(classesData?.classes?.map((c: any) => ({ value: c.id, label: c.name })) || [])
+              ]}
+            />
+            <FormSelect
+              value={examType}
+              onChange={(e) => {
+                setExamType(e.target.value)
+                setMarks({})
+                setExistingMarks({})
+              }}
+              label="Exam Type"
+              disabled={!classId}
+              options={[
+                { value: '', label: 'Select Exam' },
+                { value: 'BOT', label: 'BOT' },
+                { value: 'MOT', label: 'MOT' },
+                { value: 'EOT', label: 'EOT' },
+                { value: 'Mock', label: 'Mock' },
+              ]}
+            />
+            <FormSelect
+              value={subjectId}
+              onChange={(e) => {
+                setSubjectId(e.target.value)
+                setPaperNumber('1')
+                setMarks({})
+                setExistingMarks({})
+              }}
+              label="Subject"
+              disabled={!examType}
+              options={[
+                { value: '', label: 'Select Subject' },
+                ...(subjectsData?.subjects?.map((s: any) => ({ value: s.id, label: s.name })) || [])
+              ]}
+            />
+            {isAdvanced && subjectId && selectedSubject && selectedSubject.papers > 1 && (
+              <FormSelect
+                value={paperNumber}
+                onChange={(e) => {
+                  setPaperNumber(e.target.value)
+                  setMarks({})
+                  setExistingMarks({})
+                }}
+                label="Paper"
+                options={[
+                  ...Array.from({ length: selectedSubject.papers }, (_, i) => ({
+                    value: String(i + 1),
+                    label: `Paper ${i + 1}`
+                  }))
+                ]}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Step 2: Enter Marks */}
+        {!showBulkImport && classId && subjectId && examType && (!isAdvanced || paperNumber) && (
+          <div className="bg-white rounded-2xl shadow-xl p-6">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-gray-800">✍️ Step 2: Enter Marks</h3>
+                <p className="text-xs sm:text-sm text-gray-600">
+                  {selectedClass?.name} • {selectedSubject?.name} {isAdvanced && selectedSubject?.papers > 1 ? `(Paper ${paperNumber})` : ''} • {examType}
+                </p>
+              </div>
+              <button
+                onClick={() => saveMutation.mutate()}
+                disabled={!canSave || saveMutation.isPending}
+                className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold bg-gradient-to-r from-green-500 to-green-700 text-white hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+              >
+                {saveMutation.isPending ? '⏳ Saving...' : `💾 Save ${Object.keys(marks).length}`}
+              </button>
+            </div>
+
+            <div className="bg-blue-50 p-3 rounded-lg mb-4">
+              <p className="text-sm text-blue-900">
+                <strong>Grading:</strong> {isAdvanced ? `${labels.mark}` : (['S1', 'S2', 'S3', 'S4'].includes(classLevel) ? `${labels.exam} (CA from AOI)` : `${labels.ca} (Max: ${maxMarks.ca}) + ${labels.exam} (Max: ${maxMarks.exam})`)}
+                {!isAdmin && Object.keys(existingMarks).length > 0 && (
+                  <span className="ml-4 text-amber-700">⚠️ Only admins can edit existing marks</span>
+                )}
+              </p>
+            </div>
+
+            <div className="overflow-x-auto -mx-6 sm:mx-0">
+              <table className="w-full min-w-[640px]">
+                <thead>
+                  <tr className="border-b-2 border-gray-200">
+                    <th className="text-left py-3 px-2 sm:px-4 font-semibold text-gray-700 w-8 sm:w-12 text-xs sm:text-sm">#</th>
+                    <th className="text-left py-3 px-2 sm:px-4 font-semibold text-gray-700 text-xs sm:text-sm">Student Name</th>
+                    {isAdvanced ? (
+                      <th className="text-center py-3 px-2 sm:px-4 font-semibold text-gray-700 w-32 sm:w-48 text-xs sm:text-sm">{labels.mark}</th>
+                    ) : ['S1', 'S2', 'S3', 'S4'].includes(classLevel) ? (
+                      <th className="text-center py-3 px-2 sm:px-4 font-semibold text-gray-700 w-32 sm:w-48 text-xs sm:text-sm">{labels.exam}</th>
+                    ) : (
+                      <>
+                        <th className="text-center py-3 px-2 sm:px-4 font-semibold text-gray-700 w-24 sm:w-32 text-xs sm:text-sm">{labels.ca}</th>
+                        <th className="text-center py-3 px-2 sm:px-4 font-semibold text-gray-700 w-24 sm:w-32 text-xs sm:text-sm">{labels.exam}</th>
+                        <th className="text-center py-3 px-2 sm:px-4 font-semibold text-gray-700 w-20 sm:w-24 text-xs sm:text-sm">Total</th>
+                      </>
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {studentsData?.students?.map((student: any, index: number) => {
+                    const studentMarks = marks[student.id] || (isAdvanced ? { mark: 0 } : (['S1', 'S2', 'S3', 'S4'].includes(classLevel) ? { exam: 0 } : { ca: 0, exam: 0 }))
+                    const total = isAdvanced ? (studentMarks.mark || 0) : (['S1', 'S2', 'S3', 'S4'].includes(classLevel) ? (studentMarks.exam || 0) : ((studentMarks.ca || 0) + (studentMarks.exam || 0)))
+                    const hasExisting = !!existingMarks[student.id]
+                    const canEdit = isAdmin || !hasExisting
+                    
+                    return (
+                      <tr key={student.id} className={`border-b border-gray-100 ${hasExisting ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
+                        <td className="py-3 px-2 sm:px-4 text-gray-600 text-xs sm:text-sm">{index + 1}</td>
+                        <td className="py-3 px-2 sm:px-4 font-medium text-xs sm:text-sm">
+                          <span className="hidden sm:inline">{student.first_name} {student.middle_name ? student.middle_name + ' ' : ''}{student.last_name}</span>
+                          <span className="sm:hidden">{student.first_name} {student.last_name}</span>
+                          {hasExisting && <span className="ml-1 sm:ml-2 text-xs text-amber-600">✓</span>}
+                        </td>
+                        {isAdvanced ? (
+                          <td className="py-3 px-2 sm:px-4">
+                            <input
+                              type="number"
+                              min="0"
+                              max={100}
+                              step="0.1"
+                              value={studentMarks.mark || ''}
+                              onChange={(e) => {
+                                const value = parseFloat(e.target.value) || 0
+                                if (value <= 100) {
+                                  setMarks(prev => ({
+                                    ...prev,
+                                    [student.id]: { mark: value }
+                                  }))
+                                }
+                              }}
+                              disabled={!canEdit}
+                              className={`w-full px-2 sm:px-3 py-1 sm:py-2 border-2 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none text-center text-sm ${
+                                canEdit ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100 cursor-not-allowed'
+                              }`}
+                              placeholder="0"
+                            />
+                          </td>
+                        ) : ['S1', 'S2', 'S3', 'S4'].includes(classLevel) ? (
+                          <td className="py-3 px-2 sm:px-4">
+                            <input
+                              type="number"
+                              min="0"
+                              max={80}
+                              step="0.1"
+                              value={studentMarks.exam || ''}
+                              onChange={(e) => {
+                                const value = parseFloat(e.target.value) || 0
+                                if (value <= 80) {
+                                  setMarks(prev => ({
+                                    ...prev,
+                                    [student.id]: { exam: value }
+                                  }))
+                                }
+                              }}
+                              disabled={!canEdit}
+                              className={`w-full px-2 sm:px-3 py-1 sm:py-2 border-2 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none text-center text-sm ${
+                                canEdit ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100 cursor-not-allowed'
+                              }`}
+                              placeholder="0"
+                            />
+                          </td>
+                        ) : (
+                          <>
+                            <td className="py-3 px-2 sm:px-4">
+                              <input
+                                type="number"
+                                min="0"
+                                max={maxMarks.ca}
+                                step="0.1"
+                                value={studentMarks.ca || ''}
+                                onChange={(e) => {
+                                  const value = parseFloat(e.target.value) || 0
+                                  if (value <= maxMarks.ca!) {
+                                    setMarks(prev => ({
+                                      ...prev,
+                                      [student.id]: { ...prev[student.id], ca: value }
+                                    }))
+                                  }
+                                }}
+                                disabled={!canEdit}
+                                className={`w-full px-2 sm:px-3 py-1 sm:py-2 border-2 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none text-center text-sm ${
+                                  canEdit ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100 cursor-not-allowed'
+                                }`}
+                                placeholder="0"
+                              />
+                            </td>
+                            <td className="py-3 px-2 sm:px-4">
+                              <input
+                                type="number"
+                                min="0"
+                                max={maxMarks.exam}
+                                step="0.1"
+                                value={studentMarks.exam || ''}
+                                onChange={(e) => {
+                                  const value = parseFloat(e.target.value) || 0
+                                  if (value <= maxMarks.exam!) {
+                                    setMarks(prev => ({
+                                      ...prev,
+                                      [student.id]: { ...prev[student.id], exam: value }
+                                    }))
+                                  }
+                                }}
+                                disabled={!canEdit}
+                                className={`w-full px-2 sm:px-3 py-1 sm:py-2 border-2 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none text-center text-sm ${
+                                  canEdit ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100 cursor-not-allowed'
+                                }`}
+                                placeholder="0"
+                              />
+                            </td>
+                            <td className="py-3 px-2 sm:px-4 text-center font-bold text-sm sm:text-lg">
+                              {total.toFixed(1)}
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Bulk Import Section */}
+        {showBulkImport && (
+          <>
+            <div className="bg-white rounded-2xl shadow-xl p-6">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">📥 Bulk Import from Excel</h3>
+              
+              <div className="space-y-4">
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <p className="text-sm text-blue-900 mb-2">
+                    <strong>Instructions:</strong>
+                  </p>
+                  <ol className="list-decimal list-inside text-sm text-blue-800 space-y-1">
+                    <li>Select filters above (Year, Term, Class, Exam Type, Subject)</li>
+                    <li>Download the Excel template</li>
+                    <li>Fill in CA and Exam marks for each student</li>
+                    <li>Upload the completed file</li>
+                    {!isAdmin && <li className="text-amber-700">Your import will require admin approval</li>}
+                  </ol>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                  <button
+                    onClick={handleDownloadTemplate}
+                    disabled={!classId}
+                    className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+                  >
+                    <Download className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span className="hidden sm:inline">Download Template</span>
+                    <span className="sm:hidden">Template</span>
+                  </button>
+                </div>
+
+                <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center">
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls"
+                    onChange={handleFileChange}
+                    className="hidden"
+                    id="file-upload"
+                  />
+                  <label
+                    htmlFor="file-upload"
+                    className="cursor-pointer inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold bg-green-500 text-white hover:bg-green-600 text-sm sm:text-base"
+                  >
+                    <Upload className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span className="hidden sm:inline">Select Excel File</span>
+                    <span className="sm:hidden">Select File</span>
+                  </label>
+                  {file && (
+                    <p className="mt-4 text-sm text-gray-600">
+                      Selected: <span className="font-semibold">{file.name}</span>
+                    </p>
+                  )}
+                </div>
+
+                {file && classId && subjectId && (
+                  <button
+                    onClick={handleBulkUpload}
+                    disabled={uploading}
+                    className="w-full px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold bg-purple-500 text-white hover:bg-purple-600 disabled:opacity-50 text-sm sm:text-base"
+                  >
+                    {uploading ? '⏳ Uploading...' : '🚀 Upload Marks'}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Import History */}
+            {imports.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-xl p-6">
+                <h3 className="text-lg font-bold text-gray-800 mb-4">📊 Import History</h3>
+                
+                <div className="overflow-x-auto -mx-6 sm:mx-0">
+                  <table className="w-full min-w-[800px]">
+                    <thead>
+                      <tr className="border-b-2 border-gray-200">
+                        <th className="text-left py-3 px-2 sm:px-4 text-xs sm:text-sm">Class</th>
+                        <th className="text-left py-3 px-2 sm:px-4 text-xs sm:text-sm">Subject</th>
+                        <th className="text-left py-3 px-2 sm:px-4 text-xs sm:text-sm">Term/Year</th>
+                        <th className="text-left py-3 px-2 sm:px-4 text-xs sm:text-sm">Exam</th>
+                        <th className="text-center py-3 px-2 sm:px-4 text-xs sm:text-sm">Valid</th>
+                        <th className="text-center py-3 px-2 sm:px-4 text-xs sm:text-sm">Invalid</th>
+                        <th className="text-center py-3 px-2 sm:px-4 text-xs sm:text-sm">Status</th>
+                        {isAdmin && <th className="text-center py-3 px-2 sm:px-4 text-xs sm:text-sm">Actions</th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {imports.map((imp) => (
+                        <tr key={imp.id} className="border-b border-gray-100">
+                          <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm">{imp.class?.name}</td>
+                          <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm">{imp.subject?.name}</td>
+                          <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm">{imp.term} {imp.year}</td>
+                          <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm">{imp.exam_type}</td>
+                          <td className="py-3 px-2 sm:px-4 text-center text-green-600 text-xs sm:text-sm">{imp.valid_rows}</td>
+                          <td className="py-3 px-2 sm:px-4 text-center text-red-600 text-xs sm:text-sm">{imp.invalid_rows}</td>
+                          <td className="py-3 px-2 sm:px-4 text-center">
+                            {imp.status === 'pending' && (
+                              <span className="px-3 py-1 rounded-full bg-yellow-100 text-yellow-800 text-sm">
+                                <Clock className="w-4 h-4 inline mr-1" />
+                                Pending
+                              </span>
+                            )}
+                            {imp.status === 'approved' && (
+                              <span className="px-3 py-1 rounded-full bg-green-100 text-green-800 text-sm">
+                                <CheckCircle className="w-4 h-4 inline mr-1" />
+                                Approved
+                              </span>
+                            )}
+                            {imp.status === 'rejected' && (
+                              <span className="px-3 py-1 rounded-full bg-red-100 text-red-800 text-sm">
+                                <XCircle className="w-4 h-4 inline mr-1" />
+                                Rejected
+                              </span>
+                            )}
+                          </td>
+                          {isAdmin && (
+                            <td className="py-3 px-2 sm:px-4 text-center">
+                              {imp.status === 'pending' && (
+                                <div className="flex flex-col sm:flex-row gap-1 sm:gap-2 justify-center">
+                                  <button
+                                    onClick={() => handleApprove(imp.id)}
+                                    className="px-2 sm:px-3 py-1 rounded bg-green-500 text-white text-xs sm:text-sm hover:bg-green-600"
+                                  >
+                                    Approve
+                                  </button>
+                                  <button
+                                    onClick={() => handleReject(imp.id)}
+                                    className="px-2 sm:px-3 py-1 rounded bg-red-500 text-white text-xs sm:text-sm hover:bg-red-600"
+                                  >
+                                    Reject
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {!classId && !showBulkImport && (
+          <div className="bg-gray-50 rounded-2xl p-12 text-center">
+            <p className="text-gray-500 text-lg">👆 Select filters above to start entering marks</p>
+          </div>
+        )}
+      </div>
+    </DashboardLayout>
+  )
+}

@@ -67,7 +67,7 @@ func (s *UserAssignmentService) AssignTeacherToClass(teacherID, classID uuid.UUI
 	}
 
 	// Update class with teacher assignment
-	class.TeacherID = &teacherID
+	class.TeacherProfileID = &teacherID
 	if err := s.db.Save(&class).Error; err != nil {
 		return fmt.Errorf("failed to assign teacher to class: %w", err)
 	}
@@ -114,7 +114,7 @@ func (s *UserAssignmentService) GetSchoolUsers(schoolID uuid.UUID) ([]models.Use
 
 // UpdateUserRole updates a user's role within the school
 func (s *UserAssignmentService) UpdateUserRole(userID uuid.UUID, newRole string) error {
-	validRoles := []string{"school_admin", "teacher"}
+	validRoles := []string{"school_admin", "teacher", "librarian", "nurse", "bursar", "store_keeper"}
 	isValid := false
 	for _, role := range validRoles {
 		if role == newRole {
@@ -131,6 +131,34 @@ func (s *UserAssignmentService) UpdateUserRole(userID uuid.UUID, newRole string)
 	}
 
 	return nil
+}
+
+// CreateStoreKeeper creates a new store keeper for a school
+func (s *UserAssignmentService) CreateStoreKeeper(schoolID uuid.UUID, fullName, email string) (*models.User, error) {
+	password := "StoreKeeper@123"
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	storeKeeper := &models.User{
+		SchoolID:     &schoolID,
+		Email:        email,
+		PasswordHash: string(hashedPassword),
+		Role:         "store_keeper",
+		FullName:     fullName,
+		IsActive:     true,
+		Meta: models.JSONB{
+			"default_password": password,
+			"must_change_password": true,
+		},
+	}
+
+	if err := s.db.Create(storeKeeper).Error; err != nil {
+		return nil, fmt.Errorf("failed to create store keeper: %w", err)
+	}
+
+	return storeKeeper, nil
 }
 
 func generateSlug(name string) string {

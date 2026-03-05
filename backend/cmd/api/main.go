@@ -14,6 +14,7 @@ import (
 	"github.com/school-system/backend/internal/middleware"
 	"github.com/school-system/backend/internal/models"
 	"github.com/school-system/backend/internal/services"
+	"github.com/school-system/backend/internal/socketio"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"gorm.io/gorm"
@@ -43,6 +44,14 @@ func main() {
 		log.Fatal("Failed to connect to database:", err)
 	}
 
+	// Initialize Socket.IO
+	socketServer, err := socketio.InitSocketIO()
+	if err != nil {
+		log.Fatal("Failed to initialize Socket.IO:", err)
+	}
+	go socketServer.Serve()
+	defer socketServer.Close()
+
 	if cfg.Server.Env == "development" {
 		gin.SetMode(gin.DebugMode)
 	} else {
@@ -56,13 +65,8 @@ func main() {
 	// CORS
 	r.Use(func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
-		allowedOrigins := []string{"http://localhost:5173", "http://localhost:5174", "https://report-card-system.netlify.app"}
-		for _, allowedOrigin := range allowedOrigins {
-			if origin == allowedOrigin {
-				c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
-				break
-			}
-		}
+		// Allow localhost and local network IPs
+		c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
@@ -112,6 +116,10 @@ func main() {
 	// Swagger
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
+	// Socket.IO endpoint (must be before other routes)
+	r.GET("/socket.io/*any", gin.WrapH(socketServer))
+	r.POST("/socket.io/*any", gin.WrapH(socketServer))
+
 	// Services
 	authService := services.NewAuthService(db, cfg)
 
@@ -129,8 +137,37 @@ func main() {
 	auditHandler := handlers.NewAuditHandler(db)
 	feesHandler := handlers.NewFeesHandler(db)
 	libraryHandler := handlers.NewLibraryHandler(db)
-	teacherHandler := handlers.NewTeacherHandler(db)
+	staffHandler := handlers.NewStaffHandler(db)
 	websocketHandler := handlers.NewWebSocketHandler(authService)
+	attendanceHandler := handlers.NewAttendanceHandler(db)
+	termDatesHandler := handlers.NewTermDatesHandler(db)
+	bulkImportXLSXHandler := handlers.NewBulkImportXLSXHandler(db)
+	financeHandler := handlers.NewFinanceHandler(db)
+	inventoryHandler := handlers.NewInventoryHandler(db)
+	payrollService := services.NewPayrollService(db)
+	payrollHandler := handlers.NewPayrollHandler(payrollService)
+	marksExportHandler := handlers.NewMarksExportHandler(db)
+	systemReportsHandler := handlers.NewSystemReportsHandler(db)
+	settingsHandler := handlers.NewSettingsHandler(db)
+	notificationHandler := handlers.NewNotificationHandler(db)
+	integrationActivityHandler := handlers.NewIntegrationActivityHandler(db)
+	
+	// Initialize SMS and Email services
+	smsService := services.NewSMSService(
+		os.Getenv("AFRICASTALKING_API_KEY"),
+		os.Getenv("AFRICASTALKING_USERNAME"),
+		os.Getenv("AFRICASTALKING_SENDER_ID"),
+	)
+	emailService := services.NewEmailService(
+		os.Getenv("SMTP_HOST"),
+		587,
+		os.Getenv("SMTP_USERNAME"),
+		os.Getenv("SMTP_PASSWORD"),
+		os.Getenv("SMTP_FROM"),
+	)
+	notificationService := services.NewNotificationService(db, smsService, emailService)
+	_ = notificationService // Will be used for creating notifications
+	parentHandler := handlers.NewParentHandler(db)
 
 	// Routes
 	v1 := r.Group("/api/v1")
@@ -159,7 +196,10 @@ func main() {
 				sysAdmin.DELETE("/users/:id", userHandler.Delete)
 
 				sysAdmin.POST("/schools", schoolHandler.Create)
+				sysAdmin.GET("/schools", schoolHandler.List)
+				sysAdmin.GET("/schools/:id", schoolHandler.Get)
 				sysAdmin.PUT("/schools/:id", schoolHandler.Update)
+				sysAdmin.PATCH("/schools/:id/toggle-active", schoolHandler.ToggleActive)
 				sysAdmin.DELETE("/schools/:id", schoolHandler.Delete)
 				sysAdmin.GET("/stats", schoolHandler.GetStats)
 
@@ -171,6 +211,32 @@ func main() {
 
 				// Audit logs
 				sysAdmin.GET("/audit/recent", auditHandler.GetRecentActivity)
+				sysAdmin.GET("/audit-logs", func(c *gin.Context) {
+					_ = c.DefaultQuery("page", "1")
+					actionFilter := c.Query("action")
+					
+					type ActivityWithUser struct {
+						models.AuditLog
+						UserEmail string `json:"user_email"`
+					}
+
+					var activities []ActivityWithUser
+					query := db.Table("audit_logs").
+						Select("audit_logs.*, users.email as user_email").
+						Joins("LEFT JOIN users ON audit_logs.actor_user_id = users.id").
+						Order("audit_logs.timestamp DESC")
+					
+					if actionFilter != "" {
+						query = query.Where("audit_logs.action = ?", actionFilter)
+					}
+					
+					if err := query.Limit(50).Scan(&activities).Error; err != nil {
+						c.JSON(500, gin.H{"error": err.Error()})
+						return
+					}
+					
+					c.JSON(200, gin.H{"logs": activities})
+				})
 
 				// Migration and seeding endpoints
 				sysAdmin.POST("/migrate", func(c *gin.Context) {
@@ -190,13 +256,24 @@ func main() {
 					seedStandardSubjects(db)
 					c.JSON(200, gin.H{"message": "Standard subjects seeded successfully"})
 				})
+
+				// System settings
+				sysAdmin.GET("/settings", settingsHandler.GetSettings)
+				sysAdmin.PUT("/settings", settingsHandler.UpdateSettings)
+				
+				// System reports
+				sysAdmin.GET("/reports/system/schools", systemReportsHandler.GenerateSchoolsReport)
+				sysAdmin.GET("/reports/system/users", systemReportsHandler.GenerateUsersReport)
+				sysAdmin.GET("/reports/system/students", systemReportsHandler.GenerateStudentsReport)
+				sysAdmin.GET("/reports/system/activity", systemReportsHandler.GenerateActivityReport)
+				sysAdmin.GET("/reports/system/performance", systemReportsHandler.GeneratePerformanceReport)
 			}
 
-			// Shared routes for school_admin, teacher, librarian, nurse, and bursar
+			// Shared routes for school_admin, teacher, librarian, nurse, bursar, and parent
 			shared := protected.Group("")
 			shared.Use(func(c *gin.Context) {
 				userRole := c.GetString("user_role")
-				if userRole != "school_admin" && userRole != "teacher" && userRole != "librarian" && userRole != "nurse" && userRole != "bursar" && userRole != "system_admin" {
+				if userRole != "school_admin" && userRole != "teacher" && userRole != "librarian" && userRole != "nurse" && userRole != "bursar" && userRole != "parent" && userRole != "system_admin" {
 					c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 					c.Abort()
 					return
@@ -204,22 +281,83 @@ func main() {
 				c.Next()
 			})
 			{
-				shared.GET("/teachers", teacherHandler.List)
 				shared.GET("/students", studentHandler.List)
+				shared.GET("/staff", staffHandler.GetAllStaff)
+				shared.GET("/school", schoolHandler.GetMySchool)
 			}
 
+			// Parent-only routes
+			parent := protected.Group("/parent")
+			parent.Use(func(c *gin.Context) {
+				userRole := c.GetString("user_role")
+				if userRole != "parent" {
+					c.JSON(http.StatusForbidden, gin.H{"error": "Parent access only"})
+					c.Abort()
+					return
+				}
+				c.Next()
+			})
+			{
+				parent.GET("/dashboard", parentHandler.GetDashboardSummary)
+				parent.GET("/children/:student_id", parentHandler.GetChildDetails)
+				parent.GET("/children/:student_id/attendance", parentHandler.GetChildAttendance)
+				parent.GET("/children/:student_id/results", parentHandler.GetChildResults)
+				parent.GET("/children/:student_id/fees", parentHandler.GetChildFees)
+				parent.GET("/children/:student_id/health", parentHandler.GetChildHealth)
+				parent.GET("/children/:student_id/report-card", parentHandler.GetChildReportCard)
+				parent.GET("/children/:student_id/timetable", parentHandler.GetChildTimetable)
+			}
+
+			// Payment routes
+			paymentHandler := handlers.NewPaymentHandler(db, 
+				services.NewMobileMoneyService(db),
+				notificationService,
+			)
+			payments := v1.Group("/payments")
+			{
+				payments.POST("/mobile-money", middleware.AuthMiddleware(authService), paymentHandler.InitiateMobileMoneyPayment)
+				payments.GET("/:id/verify", middleware.AuthMiddleware(authService), paymentHandler.VerifyPayment)
+				payments.GET("/student/:student_id/history", middleware.AuthMiddleware(authService), paymentHandler.GetPaymentHistory)
+				payments.GET("/stats", middleware.AuthMiddleware(authService), paymentHandler.GetPaymentStats)
+				payments.POST("/webhook", paymentHandler.WebhookCallback) // No auth for webhooks
+			}
+
+			// Notifications endpoint - All authenticated users
+			protected.GET("/notifications", notificationHandler.GetNotifications)
+			protected.GET("/notifications/unread-count", notificationHandler.GetUnreadCount)
+			protected.GET("/notifications/preferences", notificationHandler.GetPreferences)
+			protected.PUT("/notifications/preferences", notificationHandler.UpdatePreferences)
+			protected.PUT("/notifications/:id/read", notificationHandler.MarkAsRead)
+			protected.PUT("/notifications/mark-all-read", notificationHandler.MarkAllAsRead)
+			protected.DELETE("/notifications/:id", notificationHandler.DeleteNotification)
 			// School Admin routes
 			schoolAdmin := protected.Group("")
 			schoolAdmin.Use(middleware.RequireSchoolAdmin())
 			{
+				// Marks import approval
+				bulkMarksHandler := handlers.NewBulkMarksImportHandler(db)
+				schoolAdmin.POST("/marks/imports/:id/approve", bulkMarksHandler.ApproveImport)
+				schoolAdmin.POST("/marks/imports/:id/reject", bulkMarksHandler.RejectImport)
+				
 				// User management - School admin can create all users except system_admin
 				schoolAdmin.POST("/school-users", userHandler.CreateSchoolUser)
 				schoolAdmin.GET("/school-users", userHandler.ListSchoolUsers)
+				schoolAdmin.GET("/school-users/:id", userHandler.GetSchoolUser)
 				schoolAdmin.PUT("/school-users/:id", userHandler.UpdateSchoolUser)
 				schoolAdmin.DELETE("/school-users/:id", userHandler.DeleteSchoolUser)
 				
+				// Create specific user roles
+				schoolUserHandler := handlers.NewSchoolUserHandler(db)
+				schoolAdmin.POST("/schools/:id/teachers", schoolUserHandler.CreateTeacher)
+				schoolAdmin.POST("/schools/:id/store-keepers", schoolUserHandler.CreateStoreKeeper)
+				schoolAdmin.GET("/schools/:id/users", schoolUserHandler.GetSchoolUsers)
+				
 				// School dashboard summary
 				schoolAdmin.GET("/dashboard/summary", schoolHandler.GetSchoolSummary)
+				
+				// School settings
+				schoolAdmin.GET("/school-settings", settingsHandler.GetSchoolSettings)
+				schoolAdmin.PUT("/school-settings", settingsHandler.UpdateSchoolSettings)
 				
 				// Student registration (comprehensive with guardians)
 				schoolAdmin.POST("/students", registrationHandler.RegisterStudent)
@@ -234,21 +372,102 @@ func main() {
 				schoolAdmin.PUT("/guardians/:id", guardianHandler.Update)
 				schoolAdmin.DELETE("/guardians/:id", guardianHandler.Delete)
 				
-				// Teacher management (admin only for create/update/delete)
-				schoolAdmin.POST("/teachers", teacherHandler.Create)
-				schoolAdmin.GET("/teachers/:id", teacherHandler.Get)
-				schoolAdmin.PUT("/teachers/:id", teacherHandler.Update)
-				schoolAdmin.DELETE("/teachers/:id", teacherHandler.Delete)
+				// Staff management (includes teachers)
+				schoolAdmin.POST("/staff", staffHandler.CreateStaff)
+				schoolAdmin.GET("/staff/:id", staffHandler.GetStaffByID)
+				schoolAdmin.PUT("/staff/:id", staffHandler.UpdateStaff)
+				schoolAdmin.DELETE("/staff/:id", staffHandler.DeleteStaff)
+				schoolAdmin.GET("/staff/stats", staffHandler.GetStaffStats)
+				schoolAdmin.POST("/staff/leave", staffHandler.CreateLeaveRequest)
+				schoolAdmin.GET("/staff/leave", staffHandler.GetLeaveRequests)
+				schoolAdmin.PUT("/staff/leave/:id/approve", staffHandler.ApproveLeave)
+				schoolAdmin.POST("/staff/attendance", staffHandler.MarkStaffAttendance)
+				schoolAdmin.GET("/staff/attendance", staffHandler.GetStaffAttendance)
+				schoolAdmin.POST("/staff/:id/documents", staffHandler.UploadStaffDocument)
+				schoolAdmin.GET("/staff/:id/documents", staffHandler.GetStaffDocuments)
+				
+				// Payroll management
+				schoolAdmin.POST("/payroll/salary-structures", payrollHandler.CreateSalaryStructure)
+				schoolAdmin.PUT("/payroll/salary-structures/:id", payrollHandler.UpdateSalaryStructure)
+				schoolAdmin.DELETE("/payroll/salary-structures/:id", payrollHandler.DeleteSalaryStructure)
+				schoolAdmin.GET("/payroll/salary-structures", payrollHandler.ListSalaryStructures)
+				schoolAdmin.GET("/payroll/salary-structures/user/:user_id", payrollHandler.GetSalaryStructure)
+				schoolAdmin.POST("/payroll/process", payrollHandler.ProcessPayroll)
+				schoolAdmin.GET("/payroll/runs", payrollHandler.ListPayrollRuns)
+				schoolAdmin.GET("/payroll/runs/:id", payrollHandler.GetPayrollRun)
+				schoolAdmin.POST("/payroll/payments/:id/mark-paid", payrollHandler.MarkPaymentPaid)
+				schoolAdmin.GET("/payroll/payslip/:payment_id", payrollHandler.GetPayslip)
+				schoolAdmin.GET("/payroll/summary/:year", payrollHandler.GetPayrollSummary)
 				
 				// Results management
 				schoolAdmin.DELETE("/results/:id", resultHandler.Delete)
+				
+				// Lesson Monitoring - School Admin only
+				lessonHandler := handlers.NewLessonHandler(db)
+				schoolAdmin.POST("/lessons", lessonHandler.CreateLesson)
+				schoolAdmin.GET("/lessons", lessonHandler.ListLessons)
+				schoolAdmin.GET("/lessons/:id", lessonHandler.GetLesson)
+				schoolAdmin.PUT("/lessons/:id", lessonHandler.UpdateLesson)
+				schoolAdmin.DELETE("/lessons/:id", lessonHandler.DeleteLesson)
+				schoolAdmin.GET("/lessons/stats", lessonHandler.GetStats)
+				schoolAdmin.GET("/lessons/export", lessonHandler.ExportReport)
+				schoolAdmin.GET("/lessons/subjects", lessonHandler.GetSchoolSubjects)
+				schoolAdmin.GET("/lessons/teachers", lessonHandler.GetSchoolTeachers)
+				
+				// Student import - School Admin only
+				schoolAdmin.POST("/import/students/upload", bulkImportXLSXHandler.UploadStudents)
+				
+				// Import management - School Admin only
+				schoolAdmin.GET("/import/list", bulkImportXLSXHandler.ListImports)
+				schoolAdmin.GET("/import/:id", bulkImportXLSXHandler.GetImportDetails)
+				schoolAdmin.POST("/import/:id/approve", bulkImportXLSXHandler.ApproveImport)
+				schoolAdmin.POST("/import/:id/reject", bulkImportXLSXHandler.RejectImport)
+			}
+			
+			// Template downloads - School Admin and Teachers (with query token support)
+			templateDL := v1.Group("/import/templates")
+			templateDL.Use(middleware.AllowQueryToken())
+			templateDL.Use(middleware.AuthMiddleware(authService))
+			templateDL.Use(middleware.TenantMiddleware())
+			templateDL.Use(func(c *gin.Context) {
+				userRole := c.GetString("user_role")
+				if userRole != "teacher" && userRole != "school_admin" && userRole != "system_admin" {
+					c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+					c.Abort()
+					return
+				}
+				c.Next()
+			})
+			{
+				templateDL.GET("/students", bulkImportXLSXHandler.DownloadStudentTemplate)
+				templateDL.GET("/marks", bulkImportXLSXHandler.DownloadMarksTemplate)
+			}
+			
+			// Marks import - Teachers and School Admins
+			teacherOrAdmin := protected.Group("")
+			teacherOrAdmin.Use(func(c *gin.Context) {
+				userRole := c.GetString("user_role")
+				if userRole != "teacher" && userRole != "school_admin" && userRole != "system_admin" {
+					c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+					c.Abort()
+					return
+				}
+				c.Next()
+			})
+			{
+				bulkMarksHandler := handlers.NewBulkMarksImportHandler(db)
+				teacherOrAdmin.POST("/marks/bulk-import", bulkMarksHandler.UploadMarksForApproval)
+				teacherOrAdmin.GET("/marks/imports", bulkMarksHandler.ListImports)
+				teacherOrAdmin.GET("/marks/imports/:id", bulkMarksHandler.GetImportDetails)
+				teacherOrAdmin.GET("/marks/import-template", bulkMarksHandler.DownloadTemplate)
+				teacherOrAdmin.GET("/export/marks", marksExportHandler.ExportClassMarks)
 			}
 
-			// Bursar routes
+			// Bursar routes (including parent read-only access to fees)
 			bursar := protected.Group("")
 			bursar.Use(func(c *gin.Context) {
 				userRole := c.GetString("user_role")
-				if userRole != "bursar" && userRole != "school_admin" && userRole != "system_admin" {
+				if userRole != "bursar" && userRole != "school_admin" && userRole != "parent" && userRole != "system_admin" {
 					c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 					c.Abort()
 					return
@@ -262,6 +481,94 @@ func main() {
 				bursar.DELETE("/fees/:id", feesHandler.DeleteStudentFees)
 				bursar.POST("/fees/payment", feesHandler.RecordPayment)
 				bursar.GET("/fees/reports", feesHandler.GetReportData)
+				
+				// Finance routes
+				bursar.POST("/finance/income", financeHandler.CreateIncome)
+				bursar.GET("/finance/income", financeHandler.ListIncome)
+				bursar.GET("/finance/income/:id", financeHandler.GetIncome)
+				bursar.PUT("/finance/income/:id", financeHandler.UpdateIncome)
+				bursar.DELETE("/finance/income/:id", financeHandler.DeleteIncome)
+				bursar.POST("/finance/expenditure", financeHandler.CreateExpenditure)
+				bursar.GET("/finance/expenditure", financeHandler.ListExpenditure)
+				bursar.GET("/finance/expenditure/:id", financeHandler.GetExpenditure)
+				bursar.PUT("/finance/expenditure/:id", financeHandler.UpdateExpenditure)
+				bursar.DELETE("/finance/expenditure/:id", financeHandler.DeleteExpenditure)
+				bursar.GET("/finance/summary", financeHandler.GetFinancialSummary)
+				bursar.GET("/finance/export", financeHandler.ExportFinanceReport)
+				bursar.GET("/fees/export", financeHandler.ExportFeesReport)
+			}
+
+			// Budget & Requisitions routes (bursar and school_admin)
+			budget := protected.Group("")
+			budget.Use(func(c *gin.Context) {
+				userRole := c.GetString("user_role")
+				if userRole != "bursar" && userRole != "school_admin" && userRole != "system_admin" {
+					c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+					c.Abort()
+					return
+				}
+				c.Next()
+			})
+			{
+				budgetHandler := handlers.NewBudgetHandler(db)
+				requisitionHandler := handlers.NewRequisitionHandler(db)
+				
+				// Budget routes
+				budget.POST("/budgets", budgetHandler.CreateBudget)
+				budget.GET("/budgets", budgetHandler.ListBudgets)
+				budget.GET("/budgets/:id", budgetHandler.GetBudget)
+				budget.GET("/budgets/summary", budgetHandler.GetBudgetSummary)
+				budget.PUT("/budgets/:id", budgetHandler.UpdateBudget)
+				budget.DELETE("/budgets/:id", budgetHandler.DeleteBudget)
+				
+				// Requisition approval/payment routes (bursar/admin only)
+				budget.POST("/requisitions/:id/approve", requisitionHandler.ApproveRequisition)
+				budget.POST("/requisitions/:id/reject", requisitionHandler.RejectRequisition)
+				budget.POST("/requisitions/:id/mark-paid", requisitionHandler.MarkRequisitionPaid)
+			}
+
+			// Requisition routes (all staff can create/view)
+			requisitions := protected.Group("")
+			requisitions.Use(func(c *gin.Context) {
+				userRole := c.GetString("user_role")
+				if userRole != "bursar" && userRole != "school_admin" && userRole != "teacher" && userRole != "librarian" && userRole != "nurse" && userRole != "system_admin" {
+					c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+					c.Abort()
+					return
+				}
+				c.Next()
+			})
+			{
+				requisitionHandler := handlers.NewRequisitionHandler(db)
+				requisitions.POST("/requisitions", requisitionHandler.CreateRequisition)
+				requisitions.GET("/requisitions", requisitionHandler.ListRequisitions)
+				requisitions.GET("/requisitions/:id", requisitionHandler.GetRequisition)
+				requisitions.GET("/requisitions/stats", requisitionHandler.GetRequisitionStats)
+				requisitions.PUT("/requisitions/:id", requisitionHandler.UpdateRequisition)
+				requisitions.DELETE("/requisitions/:id", requisitionHandler.DeleteRequisition)
+			}
+
+			// Inventory routes (school admin, bursar, store keeper, and system admin)
+			inventory := protected.Group("/inventory")
+			inventory.Use(func(c *gin.Context) {
+				userRole := c.GetString("user_role")
+				if userRole != "school_admin" && userRole != "bursar" && userRole != "storekeeper" && userRole != "system_admin" {
+					c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+					c.Abort()
+					return
+				}
+				c.Next()
+			})
+			{
+				inventory.GET("/categories", inventoryHandler.ListCategories)
+				inventory.GET("/items", inventoryHandler.ListItems)
+				inventory.POST("/items", inventoryHandler.CreateItem)
+				inventory.PUT("/items/:id", inventoryHandler.UpdateItem)
+				inventory.DELETE("/items/:id", inventoryHandler.DeleteItem)
+				inventory.POST("/transactions", inventoryHandler.RecordTransaction)
+				inventory.GET("/transactions", inventoryHandler.ListTransactions)
+				inventory.GET("/transactions/:id/receipt", inventoryHandler.GetPurchaseReceipt)
+				inventory.GET("/stats", inventoryHandler.GetStats)
 			}
 
 			// Librarian routes
@@ -292,11 +599,11 @@ func main() {
 				librarian.GET("/library/reports", libraryHandler.GetReportData)
 			}
 
-			// Nurse routes - FULL ACCESS (includes summary for their dashboard)
+			// Nurse routes (including parent read-only access to health profiles)
 			nurse := protected.Group("/clinic")
 			nurse.Use(func(c *gin.Context) {
 				userRole := c.GetString("user_role")
-				if userRole != "nurse" && userRole != "school_admin" && userRole != "system_admin" {
+				if userRole != "nurse" && userRole != "school_admin" && userRole != "parent" && userRole != "system_admin" {
 					c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 					c.Abort()
 					return
@@ -356,18 +663,48 @@ func main() {
 
 			// WebSocket endpoint (no auth middleware needed as it handles auth internally)
 			v1.GET("/ws", websocketHandler.HandleWebSocket)
-			protected.GET("/schools", schoolHandler.List)
-			protected.GET("/schools/:id", schoolHandler.Get)
+			
+			// Attendance routes (teachers and admins)
+			protected.POST("/attendance", attendanceHandler.MarkAttendance)
+			protected.POST("/attendance/bulk", attendanceHandler.BulkMarkAttendance)
+			protected.GET("/attendance", attendanceHandler.GetAttendance)
+			protected.GET("/attendance/by-date", attendanceHandler.GetAttendanceByDate)
+			protected.GET("/attendance/stats", attendanceHandler.GetAttendanceStats)
+			protected.GET("/attendance/summary", attendanceHandler.GetClassAttendanceSummary)
+			protected.GET("/attendance/class-summary", attendanceHandler.GetClassAttendanceSummary)
+			protected.GET("/attendance/report", attendanceHandler.GetAttendanceReport)
+			protected.GET("/attendance/student/:student_id/history", attendanceHandler.GetStudentAttendanceHistory)
+			protected.DELETE("/attendance/:id", attendanceHandler.DeleteAttendance)
+			
+			// Calendar management (holidays/non-school days) - School Admin only
+			schoolAdmin.POST("/calendar/holidays", attendanceHandler.AddHoliday)
+			schoolAdmin.DELETE("/calendar/holidays/:id", attendanceHandler.DeleteHoliday)
+			
+			// Term dates management - School Admin only
+			schoolAdmin.POST("/term-dates", termDatesHandler.CreateOrUpdate)
+			schoolAdmin.DELETE("/term-dates/:id", termDatesHandler.Delete)
+			
+			// Calendar viewing - All authenticated users
+			protected.GET("/calendar/holidays", attendanceHandler.GetHolidays)
+			protected.GET("/term-dates", termDatesHandler.List)
+			protected.GET("/term-dates/current", termDatesHandler.Get)
+			
 			protected.GET("/school/levels", schoolHandler.GetSchoolLevels)
 			protected.GET("/classes", classHandler.List)
-			protected.GET("/classes/levels", classHandler.GetLevels)
+			protected.POST("/classes", classHandler.Create)
 			protected.GET("/classes/:id", classHandler.Get)
+			protected.PUT("/classes/:id", classHandler.Update)
+			protected.DELETE("/classes/:id", classHandler.Delete)
 			protected.GET("/classes/:id/students", classHandler.GetStudents)
 			protected.GET("/students/:id", studentHandler.Get)
 			protected.GET("/students/:id/results", resultHandler.GetByStudent)
+			protected.GET("/results/performance-summary", resultHandler.GetPerformanceSummary)
 			protected.GET("/subjects", subjectHandler.ListStandardSubjects)
+			protected.GET("/subjects/school", subjectHandler.GetSchoolSubjects)
 			protected.GET("/subjects/levels", subjectHandler.GetLevels)
 			protected.POST("/results", resultHandler.CreateOrUpdate)
+			protected.GET("/integration-activities", integrationActivityHandler.GetByClass)
+			protected.POST("/integration-activities", integrationActivityHandler.CreateOrUpdate)
 			protected.POST("/debug/results", func(c *gin.Context) {
 				var body map[string]interface{}
 				c.ShouldBindJSON(&body)
@@ -409,7 +746,6 @@ func handleCommand(cmd string) {
 		seedStandardSubjects(db)
 
 	default:
-		log.Printf("Unknown command: %s", cmd)
 	}
 }
 
@@ -436,110 +772,8 @@ func seedAdmin(db *gorm.DB, cfg *config.Config) {
 		log.Fatal("Failed to create system admin:", err)
 	}
 
-	log.Println("System Admin: sysadmin@school.ug / Admin@123")
-
-	// Create default school
-	var school models.School
-	if err := db.First(&school).Error; err != nil {
-		school = models.School{
-			Name:         "Nabumali Secondary School",
-			Type:         "Secondary",
-			Address:      "Nabumali, Mbale District",
-			Country:      "Uganda",
-			Region:       "Eastern",
-			ContactEmail: "nabumalisecondaryschool@gmail.com",
-			Phone:        "+256-782-390-592",
-			LogoURL:      "https://picsum.photos/150",
-			Motto:        "Excellence Through Discipline",
-			Config:       models.JSONB{"levels": []string{"S1", "S2", "S3", "S4", "S5", "S6"}},
-		}
-		db.Create(&school)
-	}
-
-	// Create school admin assigned to the school
-	schoolAdmin := &models.User{
-		SchoolID: &school.ID,
-		Email:    "schooladmin@school.ug",
-		FullName: "School Administrator",
-		Role:     "school_admin",
-		IsActive: true,
-	}
-
-	if err := authService.CreateUser(schoolAdmin, "Admin@123"); err != nil {
-		log.Fatal("Failed to create school admin:", err)
-	}
-
-	log.Println("School Admin: schooladmin@school.ug / Admin@123")
-
-	// Create teacher assigned to the school
-	teacher := &models.User{
-		SchoolID: &school.ID,
-		Email:    "teacher@school.ug",
-		FullName: "Teacher",
-		Role:     "teacher",
-		IsActive: true,
-	}
-
-	if err := authService.CreateUser(teacher, "Teacher@123"); err != nil {
-		log.Fatal("Failed to create teacher:", err)
-	}
-
-	log.Println("Teacher: teacher@school.ug / Teacher@123")
-
-	// Create bursar assigned to the school
-	bursar := &models.User{
-		SchoolID: &school.ID,
-		Email:    "bursar@school.ug",
-		FullName: "School Bursar",
-		Role:     "bursar",
-		IsActive: true,
-	}
-
-	if err := authService.CreateUser(bursar, "Bursar@123"); err != nil {
-		log.Fatal("Failed to create bursar:", err)
-	}
-
-	log.Println("Bursar: bursar@school.ug / Bursar@123")
-
-	// Create librarian assigned to the school
-	var existingLibrarian models.User
-	if err := db.Where("email = ?", "librarian@school.ug").First(&existingLibrarian).Error; err == nil {
-		log.Println("Librarian already exists")
-	} else {
-		librarian := &models.User{
-			SchoolID: &school.ID,
-			Email:    "librarian@school.ug",
-			FullName: "School Librarian",
-			Role:     "librarian",
-			IsActive: true,
-		}
-
-		if err := authService.CreateUser(librarian, "Librarian@123"); err != nil {
-			log.Fatal("Failed to create librarian:", err)
-		}
-
-		log.Println("Librarian: librarian@school.ug / Librarian@123")
-	}
-
-	// Create nurse assigned to the school
-	var existingNurse models.User
-	if err := db.Where("email = ?", "nurse@school.ug").First(&existingNurse).Error; err == nil {
-		log.Println("Nurse already exists")
-	} else {
-		nurse := &models.User{
-			SchoolID: &school.ID,
-			Email:    "nurse@school.ug",
-			FullName: "School Nurse",
-			Role:     "nurse",
-			IsActive: true,
-		}
-
-		if err := authService.CreateUser(nurse, "Nurse@123"); err != nil {
-			log.Fatal("Failed to create nurse:", err)
-		}
-
-		log.Println("Nurse: nurse@school.ug / Nurse@123")
-	}
+	log.Println("System Admin created: sysadmin@school.ug / Admin@123")
+	log.Println("Other users (school admin, teachers, etc.) should be created through the school management interface")
 }
 
 func seedStandardSubjects(db *gorm.DB) {
@@ -554,22 +788,63 @@ func seedStandardSubjects(db *gorm.DB) {
 
 	// Pre-Primary (Nursery) Learning Domains
 	nurseryDomains := []models.StandardSubject{
-		{Name: "Language & Early Literacy", Code: "LEL", Level: "Nursery", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Language development and early literacy skills"},
-		{Name: "Early Numeracy", Code: "EN", Level: "Nursery", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Basic number concepts and mathematical thinking"},
-		{Name: "Social & Emotional Development", Code: "SED", Level: "Nursery", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Social skills and emotional development"},
-		{Name: "Creative Arts", Code: "CA", Level: "Nursery", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Music, drama, and art activities"},
-		{Name: "Physical & Motor Skills", Code: "PMS", Level: "Nursery", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Physical development and motor skills"},
-		{Name: "Health, Hygiene & Nutrition", Code: "HHN", Level: "Nursery", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Health awareness and hygiene practices"},
-		{Name: "Play & Environmental Awareness", Code: "PEA", Level: "Nursery", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Environmental awareness through play"},
+		{Name: "Mathematics", Code: "MATH", Level: "Baby", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Basic mathematical concepts and number recognition"},
+		{Name: "English Language", Code: "ENG", Level: "Baby", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "English language development and communication"},
+		{Name: "Spiritual and Moral Development", Code: "SMD", Level: "Baby", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Spiritual growth and moral values"},
+		{Name: "Physical Health and Nutrition Development", Code: "PHND", Level: "Baby", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Physical health, nutrition awareness and development"},
+		{Name: "Interacting with the Environment", Code: "IWE", Level: "Baby", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Environmental awareness and interaction"},
+		{Name: "Personal and Social Development", Code: "PSD", Level: "Baby", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Personal growth and social skills development"},
+		{Name: "Literacy and Communication Skills", Code: "LCS", Level: "Baby", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Early literacy and communication development"},
+		{Name: "Reading", Code: "READ", Level: "Baby", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Reading skills and comprehension"},
+		{Name: "Writing", Code: "WRITE", Level: "Baby", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Writing skills and expression"},
+		
+		{Name: "Mathematics", Code: "MATH", Level: "Middle", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Basic mathematical concepts and number recognition"},
+		{Name: "English Language", Code: "ENG", Level: "Middle", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "English language development and communication"},
+		{Name: "Spiritual and Moral Development", Code: "SMD", Level: "Middle", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Spiritual growth and moral values"},
+		{Name: "Physical Health and Nutrition Development", Code: "PHND", Level: "Middle", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Physical health, nutrition awareness and development"},
+		{Name: "Interacting with the Environment", Code: "IWE", Level: "Middle", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Environmental awareness and interaction"},
+		{Name: "Personal and Social Development", Code: "PSD", Level: "Middle", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Personal growth and social skills development"},
+		{Name: "Literacy and Communication Skills", Code: "LCS", Level: "Middle", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Early literacy and communication development"},
+		{Name: "Reading", Code: "READ", Level: "Middle", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Reading skills and comprehension"},
+		{Name: "Writing", Code: "WRITE", Level: "Middle", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Writing skills and expression"},
+		
+		{Name: "Mathematics", Code: "MATH", Level: "Top", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Basic mathematical concepts and number recognition"},
+		{Name: "English Language", Code: "ENG", Level: "Top", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "English language development and communication"},
+		{Name: "Spiritual and Moral Development", Code: "SMD", Level: "Top", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Spiritual growth and moral values"},
+		{Name: "Physical Health and Nutrition Development", Code: "PHND", Level: "Top", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Physical health, nutrition awareness and development"},
+		{Name: "Interacting with the Environment", Code: "IWE", Level: "Top", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Environmental awareness and interaction"},
+		{Name: "Personal and Social Development", Code: "PSD", Level: "Top", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Personal growth and social skills development"},
+		{Name: "Literacy and Communication Skills", Code: "LCS", Level: "Top", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Early literacy and communication development"},
+		{Name: "Reading", Code: "READ", Level: "Top", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Reading skills and comprehension"},
+		{Name: "Writing", Code: "WRITE", Level: "Top", IsCompulsory: true, Papers: 1, GradingType: "nursery", Description: "Writing skills and expression"},
 	}
 
-	// P1-P3 Thematic Subjects
+	// P1-P3 Subjects
 	p13Subjects := []models.StandardSubject{
-		{Name: "Literacy", Code: "LIT", Level: "P1", IsCompulsory: true, Papers: 1, GradingType: "primary_lower", Description: "Reading, writing, and communication skills"},
-		{Name: "Numeracy", Code: "NUM", Level: "P1", IsCompulsory: true, Papers: 1, GradingType: "primary_lower", Description: "Basic mathematical concepts and problem solving"},
+		// P1
+		{Name: "Literacy One", Code: "LIT1", Level: "P1", IsCompulsory: true, Papers: 1, GradingType: "primary_lower", Description: "First literacy component"},
+		{Name: "Literacy Two", Code: "LIT2", Level: "P1", IsCompulsory: true, Papers: 1, GradingType: "primary_lower", Description: "Second literacy component"},
+		{Name: "Mathematics", Code: "MATH", Level: "P1", IsCompulsory: true, Papers: 1, GradingType: "primary_lower", Description: "Mathematical concepts and problem solving"},
+		{Name: "Religious Education", Code: "RE", Level: "P1", IsCompulsory: true, Papers: 1, GradingType: "primary_lower", Description: "Religious and moral education"},
 		{Name: "Life Skills", Code: "LS", Level: "P1", IsCompulsory: true, Papers: 1, GradingType: "primary_lower", Description: "Personal and social life skills"},
 		{Name: "Creative Arts", Code: "CA", Level: "P1", IsCompulsory: true, Papers: 1, GradingType: "primary_lower", Description: "Creative expression through arts"},
 		{Name: "Environment", Code: "ENV", Level: "P1", IsCompulsory: true, Papers: 1, GradingType: "primary_lower", Description: "Environmental awareness and science concepts"},
+		// P2
+		{Name: "Literacy One", Code: "LIT1", Level: "P2", IsCompulsory: true, Papers: 1, GradingType: "primary_lower", Description: "First literacy component"},
+		{Name: "Literacy Two", Code: "LIT2", Level: "P2", IsCompulsory: true, Papers: 1, GradingType: "primary_lower", Description: "Second literacy component"},
+		{Name: "Mathematics", Code: "MATH", Level: "P2", IsCompulsory: true, Papers: 1, GradingType: "primary_lower", Description: "Mathematical concepts and problem solving"},
+		{Name: "Religious Education", Code: "RE", Level: "P2", IsCompulsory: true, Papers: 1, GradingType: "primary_lower", Description: "Religious and moral education"},
+		{Name: "Life Skills", Code: "LS", Level: "P2", IsCompulsory: true, Papers: 1, GradingType: "primary_lower", Description: "Personal and social life skills"},
+		{Name: "Creative Arts", Code: "CA", Level: "P2", IsCompulsory: true, Papers: 1, GradingType: "primary_lower", Description: "Creative expression through arts"},
+		{Name: "Environment", Code: "ENV", Level: "P2", IsCompulsory: true, Papers: 1, GradingType: "primary_lower", Description: "Environmental awareness and science concepts"},
+		// P3
+		{Name: "Literacy One", Code: "LIT1", Level: "P3", IsCompulsory: true, Papers: 1, GradingType: "primary_lower", Description: "First literacy component"},
+		{Name: "Literacy Two", Code: "LIT2", Level: "P3", IsCompulsory: true, Papers: 1, GradingType: "primary_lower", Description: "Second literacy component"},
+		{Name: "Mathematics", Code: "MATH", Level: "P3", IsCompulsory: true, Papers: 1, GradingType: "primary_lower", Description: "Mathematical concepts and problem solving"},
+		{Name: "Religious Education", Code: "RE", Level: "P3", IsCompulsory: true, Papers: 1, GradingType: "primary_lower", Description: "Religious and moral education"},
+		{Name: "Life Skills", Code: "LS", Level: "P3", IsCompulsory: true, Papers: 1, GradingType: "primary_lower", Description: "Personal and social life skills"},
+		{Name: "Creative Arts", Code: "CA", Level: "P3", IsCompulsory: true, Papers: 1, GradingType: "primary_lower", Description: "Creative expression through arts"},
+		{Name: "Environment", Code: "ENV", Level: "P3", IsCompulsory: true, Papers: 1, GradingType: "primary_lower", Description: "Environmental awareness and science concepts"},
 	}
 
 	// P4-P7 Subjects
@@ -697,5 +972,4 @@ func seedStandardSubjects(db *gorm.DB) {
 		log.Fatal("Failed to seed standard subjects:", err)
 	}
 
-	log.Printf("Successfully seeded %d standard subjects", len(allSubjects))
 }

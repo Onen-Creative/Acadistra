@@ -1,16 +1,13 @@
 package handlers
 
 import (
-	"fmt"
 	"net/http"
-	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/school-system/backend/internal/models"
-	"github.com/school-system/backend/internal/utils"
-	ws "github.com/school-system/backend/internal/websocket"
 	"gorm.io/gorm"
 )
 
@@ -22,423 +19,53 @@ func NewStudentHandler(db *gorm.DB) *StudentHandler {
 	return &StudentHandler{db: db}
 }
 
-func (h *StudentHandler) List(c *gin.Context) {
-	classID := c.Query("class_id")
-	classLevel := c.Query("class_level")
-	term := c.Query("term")
-	year := c.Query("year")
-	search := c.Query("search")
-	page := c.DefaultQuery("page", "1")
-	limit := c.DefaultQuery("limit", "10")
-	schoolID := c.GetString("tenant_school_id")
-
-	// Debug logging
-	fmt.Printf("[DEBUG] Student List Query - classLevel: %s, term: %s, year: %s, schoolID: %s\n", classLevel, term, year, schoolID)
-
-	type StudentWithClass struct {
-		models.Student
-		ClassName     string `json:"class_name"`
-		ClassLevel    string `json:"class_level"`
-		ClassID       uuid.UUID `json:"class_id"`
-		BloodGroup    string `json:"-" gorm:"column:blood_group"`
-		Allergies     string `json:"-" gorm:"column:allergies"`
-		ChronicConditions string `json:"-" gorm:"column:chronic_conditions"`
-		Disabilities  string `json:"-" gorm:"column:disabilities"`
-		EmergencyContact string `json:"-" gorm:"column:emergency_contact"`
-		HealthProfile *models.StudentHealthProfile `json:"health_profile,omitempty" gorm:"-"`
-	}
-
-	var results []StudentWithClass
-	var query *gorm.DB
-
-	// Build query based on filters
-	if classLevel != "" || term != "" || year != "" {
-		// When filtering by class/term/year, use INNER JOIN to only get students with enrollments
-		query = h.db.Table("students").Select("students.*, classes.level as class_name, classes.level as class_level, classes.id as class_id, student_health_profiles.blood_group, student_health_profiles.allergies, student_health_profiles.chronic_conditions, student_health_profiles.disabilities, student_health_profiles.emergency_contact").
-			Joins("INNER JOIN enrollments ON students.id = enrollments.student_id AND enrollments.status = 'active'").
-			Joins("INNER JOIN classes ON enrollments.class_id = classes.id").
-			Joins("LEFT JOIN student_health_profiles ON students.id = student_health_profiles.student_id").
-			Where("students.deleted_at IS NULL")
-	} else {
-		// When not filtering, use LEFT JOIN to include all students
-		query = h.db.Table("students").Select("students.*, classes.level as class_name, classes.level as class_level, classes.id as class_id, student_health_profiles.blood_group, student_health_profiles.allergies, student_health_profiles.chronic_conditions, student_health_profiles.disabilities, student_health_profiles.emergency_contact").
-			Joins("LEFT JOIN enrollments ON students.id = enrollments.student_id AND enrollments.status = 'active'").
-			Joins("LEFT JOIN classes ON enrollments.class_id = classes.id").
-			Joins("LEFT JOIN student_health_profiles ON students.id = student_health_profiles.student_id").
-			Where("students.deleted_at IS NULL")
-	}
-
-	if schoolID != "" {
-		query = query.Where("students.school_id = ?", schoolID)
-	}
-
-	if search != "" {
-		query = query.Where("students.first_name ILIKE ? OR students.last_name ILIKE ? OR students.admission_no ILIKE ?", "%"+search+"%", "%"+search+"%", "%"+search+"%")
-	}
-
-	if classID != "" {
-		query = query.Where("enrollments.class_id = ?", classID)
-	} else if classLevel != "" {
-		// Filter by class level and optionally term/year
-		query = query.Where("classes.level = ?", classLevel)
-		if term != "" {
-			query = query.Where("enrollments.term = ?", term)
-		}
-		if year != "" {
-			yearInt, _ := strconv.Atoi(year)
-			query = query.Where("enrollments.year = ?", yearInt)
-		}
-	} else {
-		// When no class filter, still apply term/year to enrollments if provided
-		if term != "" {
-			query = query.Where("enrollments.term = ?", term)
-		}
-		if year != "" {
-			yearInt, _ := strconv.Atoi(year)
-			query = query.Where("enrollments.year = ?", yearInt)
-		}
-	}
-
-	var total int64
-	query.Count(&total)
-
-	// Debug logging
-	fmt.Printf("[DEBUG] Query returned total: %d\n", total)
-
-	offset := (utils.Atoi(page) - 1) * utils.Atoi(limit)
-	if err := query.Offset(offset).Limit(utils.Atoi(limit)).Scan(&results).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Populate health_profile object
-	for i := range results {
-		if results[i].BloodGroup != "" || results[i].Allergies != "" || results[i].ChronicConditions != "" {
-			results[i].HealthProfile = &models.StudentHealthProfile{
-				BloodGroup:        results[i].BloodGroup,
-				Allergies:         results[i].Allergies,
-				ChronicConditions: results[i].ChronicConditions,
-				Disabilities:      results[i].Disabilities,
-				EmergencyContact:  results[i].EmergencyContact,
-			}
-		}
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"students": results,
-		"total":    total,
-		"page":     page,
-		"limit":    limit,
-	})
-}
-
-func (h *StudentHandler) Create(c *gin.Context) {
-	var req struct {
-		FirstName        string     `json:"first_name" binding:"required"`
-		MiddleName       string     `json:"middle_name"`
-		LastName         string     `json:"last_name" binding:"required"`
-		DateOfBirth      *time.Time `json:"date_of_birth"`
-		Gender           string     `json:"gender"`
-		Nationality      string     `json:"nationality"`
-		Religion         string     `json:"religion"`
-		LIN              string     `json:"lin"`
-		Email            string     `json:"email"`
-		Phone            string     `json:"phone"`
-		Address          string     `json:"address"`
-		District         string     `json:"district"`
-		Village          string     `json:"village"`
-		ResidenceType    string     `json:"residence_type"`
-		PreviousSchool   string     `json:"previous_school"`
-		PreviousClass    string     `json:"previous_class"`
-		SpecialNeeds     string     `json:"special_needs"`
-		DisabilityStatus string     `json:"disability_status"`
-		ClassLevel       string     `json:"class_level" binding:"required"`
-		Term             string     `json:"term" binding:"required"`
-		Year             int        `json:"year" binding:"required"`
-		Guardians        []struct {
-			Relationship     string `json:"relationship" binding:"required"`
-			FullName         string `json:"full_name" binding:"required"`
-			Phone            string `json:"phone" binding:"required"`
-			AlternativePhone string `json:"alternative_phone"`
-			Email            string `json:"email"`
-			Occupation       string `json:"occupation"`
-			Address          string `json:"address"`
-			Workplace        string `json:"workplace"`
-			WorkAddress      string `json:"work_address"`
-			IsPrimaryContact bool   `json:"is_primary_contact"`
-			IsEmergency      bool   `json:"is_emergency"`
-			IsFeePayer       bool   `json:"is_fee_payer"`
-			NationalID       string `json:"national_id"`
-		} `json:"guardians"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Auto-assign student to the same school as the user
-	userRole := c.GetString("user_role")
-	var school models.School
-	if userRole != "system_admin" {
-		tenantSchoolID := c.GetString("tenant_school_id")
-		if tenantSchoolID == "" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "No school assigned to user"})
-			return
-		}
-		if err := h.db.First(&school, "id = ?", tenantSchoolID).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "School not found"})
-			return
-		}
-	} else {
-		// System admin must specify school through class selection
-		var class models.Class
-		if err := h.db.Preload("School").Where("level = ? AND term = ? AND year = ?", req.ClassLevel, req.Term, req.Year).First(&class).Error; err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Class not found"})
-			return
-		}
-		school = *class.School
-	}
-
-	// Find or create the specific class for this school, level, term, and year
-	var class models.Class
-	if err := h.db.Where("school_id = ? AND level = ? AND term = ? AND year = ?", school.ID, req.ClassLevel, req.Term, req.Year).First(&class).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			// Create the class if it doesn't exist
-			class = models.Class{
-				SchoolID: school.ID,
-				Name:     req.ClassLevel,
-				Level:    req.ClassLevel,
-				Year:     req.Year,
-				Term:     req.Term,
-			}
-			if err := h.db.Create(&class).Error; err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create class: " + err.Error()})
-				return
-			}
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error: " + err.Error()})
-			return
-		}
-	}
-
-	// Count students in this class
-	var count int64
-	h.db.Table("students").Joins("JOIN enrollments ON students.id = enrollments.student_id").
-		Where("enrollments.class_id = ?", class.ID).Count(&count)
-
-	// Generate admission number
-	schoolInitial := string(school.Name[0])
-	var schoolType string
-	switch school.Type {
-	case "Nursery":
-		schoolType = "NS"
-	case "Primary":
-		schoolType = "PS"
-	default:
-		schoolType = "SS"
-	}
-	sequence := int(count) + 1
-	admissionNo := fmt.Sprintf("%s%s/%s/%d/%03d", schoolInitial, schoolType, class.Level, req.Year, sequence)
-
-	// Set admission date to now if not provided
-	admissionDate := time.Now()
-	if req.DateOfBirth != nil {
-		admissionDate = time.Now()
-	}
-
-	// Default values
-	nationality := req.Nationality
-	if nationality == "" {
-		nationality = "Ugandan"
-	}
-	residenceType := req.ResidenceType
-	if residenceType == "" {
-		residenceType = "Day"
-	}
-
-	student := models.Student{
-		SchoolID:         school.ID,
-		AdmissionNo:      admissionNo,
-		LIN:              req.LIN,
-		FirstName:        req.FirstName,
-		MiddleName:       req.MiddleName,
-		LastName:         req.LastName,
-		DateOfBirth:      req.DateOfBirth,
-		Gender:           req.Gender,
-		Nationality:      nationality,
-		Religion:         req.Religion,
-		Email:            req.Email,
-		Phone:            req.Phone,
-		Address:          req.Address,
-		District:         req.District,
-		Village:          req.Village,
-		ResidenceType:    residenceType,
-		AdmissionDate:    &admissionDate,
-		Status:           "active",
-		PreviousSchool:   req.PreviousSchool,
-		PreviousClass:    req.PreviousClass,
-		SpecialNeeds:     req.SpecialNeeds,
-		DisabilityStatus: req.DisabilityStatus,
-	}
-
-	if err := h.db.Create(&student).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Create guardians if provided
-	var createdGuardians []models.Guardian
-	for _, g := range req.Guardians {
-		guardian := models.Guardian{
-			StudentID:        student.ID,
-			SchoolID:         school.ID,
-			Relationship:     g.Relationship,
-			FullName:         g.FullName,
-			Phone:            g.Phone,
-			AlternativePhone: g.AlternativePhone,
-			Email:            g.Email,
-			Occupation:       g.Occupation,
-			Address:          g.Address,
-			Workplace:        g.Workplace,
-			WorkAddress:      g.WorkAddress,
-			IsPrimaryContact: g.IsPrimaryContact,
-			IsEmergency:      g.IsEmergency,
-			IsFeePayer:       g.IsFeePayer,
-			NationalID:       g.NationalID,
-		}
-		if err := h.db.Create(&guardian).Error; err != nil {
-			// Rollback student creation if guardian creation fails
-			h.db.Delete(&student)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create guardian: " + err.Error()})
-			return
-		}
-		createdGuardians = append(createdGuardians, guardian)
-	}
-
-	enrollment := models.Enrollment{
-		StudentID:  student.ID,
-		ClassID:    class.ID,
-		Year:       req.Year,
-		Term:       req.Term,
-		Status:     "active",
-		EnrolledOn: time.Now(),
-	}
-	if err := h.db.Create(&enrollment).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create enrollment: " + err.Error()})
-		return
-	}
-
-	ws.GlobalHub.Broadcast("student:created", student, school.ID.String())
-	c.JSON(http.StatusCreated, gin.H{
-		"student":   student,
-		"guardians": createdGuardians,
-	})
-}
-
+// Get retrieves a single student by ID
 func (h *StudentHandler) Get(c *gin.Context) {
-	id := c.Param("id")
+	studentID := c.Param("id")
 	schoolID := c.GetString("tenant_school_id")
 
 	var student models.Student
-	query := h.db.Where("id = ?", id)
-
-	if schoolID != "" {
-		query = query.Where("school_id = ?", schoolID)
-	}
-
-	if err := query.First(&student).Error; err != nil {
+	if err := h.db.Preload("Guardians").Preload("Enrollments.Class").
+		Where("id = ? AND school_id = ?", studentID, schoolID).
+		First(&student).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Student not found"})
 		return
 	}
 
-	// Fetch active enrollment
-	var enrollment models.Enrollment
-	var className string
-	var classID uuid.UUID
-	if err := h.db.Where("student_id = ? AND status = ?", id, "active").First(&enrollment).Error; err == nil {
-		var class models.Class
-		if err := h.db.First(&class, "id = ?", enrollment.ClassID).Error; err == nil {
-			className = class.Level
-			classID = class.ID
-		}
-	}
-
-	// Fetch guardians
-	var guardians []models.Guardian
-	h.db.Where("student_id = ?", id).Find(&guardians)
-
-	response := map[string]interface{}{
-		"id":                student.ID,
-		"school_id":         student.SchoolID,
-		"admission_no":      student.AdmissionNo,
-		"lin":               student.LIN,
-		"first_name":        student.FirstName,
-		"middle_name":       student.MiddleName,
-		"last_name":         student.LastName,
-		"date_of_birth":     student.DateOfBirth,
-		"gender":            student.Gender,
-		"nationality":       student.Nationality,
-		"religion":          student.Religion,
-		"email":             student.Email,
-		"phone":             student.Phone,
-		"address":           student.Address,
-		"district":          student.District,
-		"village":           student.Village,
-		"residence_type":    student.ResidenceType,
-		"admission_date":    student.AdmissionDate,
-		"status":            student.Status,
-		"previous_school":   student.PreviousSchool,
-		"previous_class":    student.PreviousClass,
-		"special_needs":     student.SpecialNeeds,
-		"disability_status": student.DisabilityStatus,
-		"class_name":        className,
-		"class_id":          classID,
-		"guardians":         guardians,
-		"created_at":        student.CreatedAt,
-		"updated_at":        student.UpdatedAt,
-	}
-
-	c.JSON(http.StatusOK, response)
+	c.JSON(http.StatusOK, gin.H{"student": student})
 }
 
+// Update updates student information
 func (h *StudentHandler) Update(c *gin.Context) {
-	id := c.Param("id")
+	studentID := c.Param("id")
 	schoolID := c.GetString("tenant_school_id")
 
 	var student models.Student
-	query := h.db.Where("id = ?", id)
-
-	// Filter by school for non-system admins
-	if schoolID != "" {
-		query = query.Where("school_id = ?", schoolID)
-	}
-
-	if err := query.First(&student).Error; err != nil {
+	if err := h.db.Where("id = ? AND school_id = ?", studentID, schoolID).First(&student).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Student not found"})
 		return
 	}
 
 	var req struct {
-		FirstName        string     `json:"first_name"`
-		MiddleName       string     `json:"middle_name"`
-		LastName         string     `json:"last_name"`
-		DateOfBirth      *time.Time `json:"date_of_birth"`
-		Gender           string     `json:"gender"`
-		Nationality      string     `json:"nationality"`
-		Religion         string     `json:"religion"`
-		LIN              string     `json:"lin"`
-		Email            string     `json:"email"`
-		Phone            string     `json:"phone"`
-		Address          string     `json:"address"`
-		District         string     `json:"district"`
-		Village          string     `json:"village"`
-		ResidenceType    string     `json:"residence_type"`
-		Status           string     `json:"status"`
-		PreviousSchool   string     `json:"previous_school"`
-		PreviousClass    string     `json:"previous_class"`
-		SpecialNeeds     string     `json:"special_needs"`
-		DisabilityStatus string     `json:"disability_status"`
+		FirstName        string `json:"first_name"`
+		MiddleName       string `json:"middle_name"`
+		LastName         string `json:"last_name"`
+		DateOfBirth      string `json:"date_of_birth"`
+		Gender           string `json:"gender"`
+		Nationality      string `json:"nationality"`
+		Religion         string `json:"religion"`
+		LIN              string `json:"lin"`
+		Email            string `json:"email"`
+		Phone            string `json:"phone"`
+		Address          string `json:"address"`
+		District         string `json:"district"`
+		Village          string `json:"village"`
+		ResidenceType    string `json:"residence_type"`
+		PreviousSchool   string `json:"previous_school"`
+		PreviousClass    string `json:"previous_class"`
+		SpecialNeeds     string `json:"special_needs"`
+		DisabilityStatus string `json:"disability_status"`
+		Status           string `json:"status"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -446,21 +73,25 @@ func (h *StudentHandler) Update(c *gin.Context) {
 		return
 	}
 
-	// Update only provided fields
+	// Capitalize gender
+	if req.Gender != "" {
+		req.Gender = strings.Title(strings.ToLower(req.Gender))
+		if req.Gender != "Male" && req.Gender != "Female" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Gender must be 'Male' or 'Female'"})
+			return
+		}
+		student.Gender = req.Gender
+	}
+
+	// Update fields
 	if req.FirstName != "" {
-		student.FirstName = req.FirstName
+		student.FirstName = strings.Title(strings.ToLower(req.FirstName))
 	}
 	if req.MiddleName != "" {
-		student.MiddleName = req.MiddleName
+		student.MiddleName = strings.Title(strings.ToLower(req.MiddleName))
 	}
 	if req.LastName != "" {
-		student.LastName = req.LastName
-	}
-	if req.DateOfBirth != nil {
-		student.DateOfBirth = req.DateOfBirth
-	}
-	if req.Gender != "" {
-		student.Gender = req.Gender
+		student.LastName = strings.Title(strings.ToLower(req.LastName))
 	}
 	if req.Nationality != "" {
 		student.Nationality = req.Nationality
@@ -489,9 +120,6 @@ func (h *StudentHandler) Update(c *gin.Context) {
 	if req.ResidenceType != "" {
 		student.ResidenceType = req.ResidenceType
 	}
-	if req.Status != "" {
-		student.Status = req.Status
-	}
 	if req.PreviousSchool != "" {
 		student.PreviousSchool = req.PreviousSchool
 	}
@@ -504,44 +132,119 @@ func (h *StudentHandler) Update(c *gin.Context) {
 	if req.DisabilityStatus != "" {
 		student.DisabilityStatus = req.DisabilityStatus
 	}
+	if req.Status != "" {
+		student.Status = req.Status
+	}
 
 	if err := h.db.Save(&student).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update student"})
 		return
 	}
 
-	ws.GlobalHub.Broadcast("student:updated", student, schoolID)
-	c.JSON(http.StatusOK, student)
+	c.JSON(http.StatusOK, gin.H{"message": "Student updated successfully", "student": student})
 }
 
+// Delete soft deletes a student
 func (h *StudentHandler) Delete(c *gin.Context) {
-	id := c.Param("id")
+	studentID := c.Param("id")
 	schoolID := c.GetString("tenant_school_id")
 
-	query := h.db.Where("id = ?", id)
-
-	// Filter by school for non-system admins
-	if schoolID != "" {
-		query = query.Where("school_id = ?", schoolID)
-	}
-
-	if err := query.Delete(&models.Student{}).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	var student models.Student
+	if err := h.db.Where("id = ? AND school_id = ?", studentID, schoolID).First(&student).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Student not found"})
 		return
 	}
 
-	ws.GlobalHub.Broadcast("student:deleted", gin.H{"id": id}, schoolID)
-	c.JSON(http.StatusOK, gin.H{"message": "Student deleted"})
+	if err := h.db.Delete(&student).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete student"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Student deleted successfully"})
 }
 
+// List lists all students with filters
+func (h *StudentHandler) List(c *gin.Context) {
+	schoolID := c.GetString("tenant_school_id")
+	userRole := c.GetString("user_role")
+	guardianPhone := c.GetString("guardian_phone")
+	
+	// If parent, only show their children
+	if userRole == "parent" && guardianPhone != "" {
+		h.GetMyChildren(c)
+		return
+	}
+	
+	query := h.db.Table("students").Where("students.school_id = ?", schoolID)
+
+	// Check if we need to join enrollments and classes
+	level := c.Query("level")
+	classID := c.Query("class_id")
+	year := c.Query("year")
+	term := c.Query("term")
+	needsJoin := level != "" || classID != "" || year != "" || term != ""
+
+	if needsJoin {
+		query = query.Joins("INNER JOIN enrollments ON enrollments.student_id = students.id AND enrollments.status = 'active'")
+		query = query.Joins("INNER JOIN classes ON classes.id = enrollments.class_id")
+		
+		if level != "" {
+			query = query.Where("classes.level = ?", level)
+		}
+		if classID != "" {
+			query = query.Where("enrollments.class_id = ?", classID)
+		}
+		if year != "" {
+			query = query.Where("enrollments.year = ?", year)
+		}
+		if term != "" {
+			query = query.Where("enrollments.term = ?", term)
+		}
+	}
+
+	// Other filters
+	if search := c.Query("search"); search != "" {
+		query = query.Where("(LOWER(students.first_name) LIKE LOWER(?) OR LOWER(students.middle_name) LIKE LOWER(?) OR LOWER(students.last_name) LIKE LOWER(?) OR LOWER(students.admission_no) LIKE LOWER(?))", 
+			"%"+search+"%", "%"+search+"%", "%"+search+"%", "%"+search+"%")
+	}
+	if gender := c.Query("gender"); gender != "" {
+		query = query.Where("students.gender = ?", gender)
+	}
+
+	// Select distinct students
+	query = query.Select("DISTINCT students.*")
+
+	var students []models.Student
+	if err := query.Find(&students).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch students"})
+		return
+	}
+
+	// Load guardians and current class for each student
+	for i := range students {
+		h.db.Where("student_id = ?", students[i].ID).Find(&students[i].Guardians)
+		
+		// Load current class
+		var enrollment models.Enrollment
+		if err := h.db.Preload("Class").Where("student_id = ? AND status = 'active'", students[i].ID).First(&enrollment).Error; err == nil {
+			if enrollment.Class != nil {
+				students[i].ClassName = enrollment.Class.Name
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"students": students, "total": len(students)})
+}
+
+// PromoteOrDemote promotes or demotes a student to a new class
 func (h *StudentHandler) PromoteOrDemote(c *gin.Context) {
-	id := c.Param("id")
+	studentID := c.Param("id")
 	schoolID := c.GetString("tenant_school_id")
 
 	var req struct {
-		NewClassLevel string `json:"new_class_level" binding:"required"`
-		Year          int    `json:"year" binding:"required"`
-		Term          string `json:"term" binding:"required"`
+		NewClassID string `json:"new_class_id" binding:"required"`
+		Year       int    `json:"year" binding:"required"`
+		Term       string `json:"term" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -549,51 +252,97 @@ func (h *StudentHandler) PromoteOrDemote(c *gin.Context) {
 		return
 	}
 
-	// Get student
+	// Verify student exists
 	var student models.Student
-	if err := h.db.Where("id = ? AND school_id = ?", id, schoolID).First(&student).Error; err != nil {
+	if err := h.db.Where("id = ? AND school_id = ?", studentID, schoolID).First(&student).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Student not found"})
 		return
 	}
 
-	// Find or create the new class
+	// Verify new class exists
 	var newClass models.Class
-	if err := h.db.Where("school_id = ? AND level = ? AND term = ? AND year = ?", schoolID, req.NewClassLevel, req.Term, req.Year).First(&newClass).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			newClass = models.Class{
-				SchoolID: student.SchoolID,
-				Name:     req.NewClassLevel,
-				Level:    req.NewClassLevel,
-				Year:     req.Year,
-				Term:     req.Term,
-			}
-			if err := h.db.Create(&newClass).Error; err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create class"})
-				return
-			}
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
+	if err := h.db.Where("id = ? AND school_id = ?", req.NewClassID, schoolID).First(&newClass).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Class not found"})
+		return
 	}
 
 	// Deactivate current enrollment
-	h.db.Model(&models.Enrollment{}).Where("student_id = ? AND status = ?", id, "active").Update("status", "inactive")
+	h.db.Model(&models.Enrollment{}).Where("student_id = ? AND status = 'active'", studentID).Update("status", "completed")
 
 	// Create new enrollment
-	enrollment := models.Enrollment{
-		StudentID:  student.ID,
-		ClassID:    newClass.ID,
+	newEnrollment := models.Enrollment{
+		StudentID:  uuid.MustParse(studentID),
+		ClassID:    uuid.MustParse(req.NewClassID),
 		Year:       req.Year,
 		Term:       req.Term,
 		Status:     "active",
 		EnrolledOn: time.Now(),
 	}
-	if err := h.db.Create(&enrollment).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create enrollment"})
+
+	if err := h.db.Create(&newEnrollment).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create new enrollment"})
 		return
 	}
 
-	ws.GlobalHub.Broadcast("student:promoted", gin.H{"student_id": id, "new_class": req.NewClassLevel}, schoolID)
-	c.JSON(http.StatusOK, gin.H{"message": "Student class updated successfully", "new_class": req.NewClassLevel})
+	c.JSON(http.StatusOK, gin.H{"message": "Student promoted/demoted successfully", "enrollment": newEnrollment})
+}
+
+// GetMyChildren returns students for a parent based on guardian phone
+func (h *StudentHandler) GetMyChildren(c *gin.Context) {
+	guardianPhone := c.GetString("guardian_phone")
+	schoolID := c.GetString("tenant_school_id")
+
+	if guardianPhone == "" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Parent access only"})
+		return
+	}
+
+	// Normalize phone number - try with and without country code
+	phoneVariants := []string{guardianPhone}
+	if strings.HasPrefix(guardianPhone, "+256") {
+		// Add variant without country code
+		phoneVariants = append(phoneVariants, "0"+guardianPhone[4:])
+	} else if strings.HasPrefix(guardianPhone, "0") {
+		// Add variant with country code
+		phoneVariants = append(phoneVariants, "+256"+guardianPhone[1:])
+	}
+
+	// Get all students for this guardian using phone variants
+	var guardians []models.Guardian
+	if err := h.db.Where("(phone IN ? OR alternative_phone IN ?) AND school_id = ?", phoneVariants, phoneVariants, schoolID).Find(&guardians).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch children"})
+		return
+	}
+
+	if len(guardians) == 0 {
+		c.JSON(http.StatusOK, gin.H{"students": []models.Student{}, "total": 0})
+		return
+	}
+
+	// Extract student IDs
+	studentIDs := make([]uuid.UUID, len(guardians))
+	for i, g := range guardians {
+		studentIDs[i] = g.StudentID
+	}
+
+	// Get students with their current class
+	var students []models.Student
+	if err := h.db.Where("id IN ? AND school_id = ?", studentIDs, schoolID).Find(&students).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch students"})
+		return
+	}
+
+	// Load current class and guardians for each student
+	for i := range students {
+		var enrollment models.Enrollment
+		if err := h.db.Preload("Class").Where("student_id = ? AND status = 'active'", students[i].ID).First(&enrollment).Error; err == nil {
+			if enrollment.Class != nil {
+				students[i].ClassName = enrollment.Class.Name
+			}
+		}
+		// Load all guardians for the student
+		h.db.Where("student_id = ?", students[i].ID).Find(&students[i].Guardians)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"students": students, "total": len(students)})
 }

@@ -1,6 +1,6 @@
-# School Management System - Backend
+# Acadistra - Backend
 
-Go backend API for the School Management & Report Card System.
+Go backend API for Acadistra school management system.
 
 ## Quick Deploy to Railway
 
@@ -16,7 +16,7 @@ DB_HOST=your-mysql-host
 DB_PORT=3306
 DB_USER=your-db-user
 DB_PASSWORD=your-db-password
-DB_NAME=school_system
+DB_NAME=acadistra
 JWT_SECRET=your-jwt-secret
 SERVER_PORT=8080
 SERVER_ENV=production

@@ -82,10 +82,10 @@ func AuditLogger(db *gorm.DB) gin.HandlerFunc {
 func getActionAndEntity(method, path string) (string, string) {
 	// Map HTTP methods to actions
 	actionMap := map[string]string{
-		"POST":   "created",
-		"PUT":    "updated",
-		"PATCH":  "updated",
-		"DELETE": "deleted",
+		"POST":   "create",
+		"PUT":    "update",
+		"PATCH":  "update",
+		"DELETE": "delete",
 	}
 
 	action := actionMap[method]

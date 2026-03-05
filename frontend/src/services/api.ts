@@ -1,7 +1,7 @@
 import axios from 'axios';
 import type { AuthResponse, LoginRequest, TokenPair } from '@/types';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
 
 export const api = axios.create({
   baseURL: API_URL,
@@ -90,11 +90,6 @@ export const classesApi = {
     return data;
   },
 
-  getLevels: async () => {
-    const { data } = await api.get('/classes/levels');
-    return data;
-  },
-
   get: async (id: string) => {
     const { data } = await api.get(`/classes/${id}`);
     return data;
@@ -103,6 +98,21 @@ export const classesApi = {
   create: async (classData: unknown) => {
     const { data } = await api.post('/classes', classData);
     return data;
+  },
+
+  update: async (id: string, classData: unknown) => {
+    const { data } = await api.put(`/classes/${id}`, classData);
+    return data;
+  },
+
+  delete: async (id: string) => {
+    const { data } = await api.delete(`/classes/${id}`);
+    return data;
+  },
+
+  getTeachers: async () => {
+    const { data } = await api.get('/staff', { params: { role: 'Teacher' } });
+    return Array.isArray(data) ? data : data.staff || [];
   },
 };
 
@@ -236,6 +246,11 @@ export const schoolsApi = {
     return data;
   },
 
+  getMySchool: async () => {
+    const { data } = await api.get('/school');
+    return data;
+  },
+
   getLevels: async () => {
     const { data } = await api.get('/school/levels');
     return data;
@@ -253,6 +268,11 @@ export const schoolsApi = {
 
   delete: async (id: string) => {
     const { data } = await api.delete(`/schools/${id}`);
+    return data;
+  },
+
+  toggleActive: async (id: string, isActive: boolean) => {
+    const { data } = await api.patch(`/schools/${id}/toggle-active`, { is_active: isActive });
     return data;
   },
 
@@ -275,6 +295,11 @@ export const subjectsApi = {
     return data;
   },
 
+  getSchoolSubjects: async () => {
+    const { data } = await api.get('/subjects/school');
+    return data;
+  },
+
   create: async (subjectData: any) => {
     const { data } = await api.post('/subjects', subjectData);
     return data;
@@ -293,7 +318,7 @@ export const subjectsApi = {
 
 // Results API
 export const resultsApi = {
-  getByStudent: async (studentId: string, params?: { term?: string; year?: string }) => {
+  getByStudent: async (studentId: string, params?: { term?: string; year?: string; exam_type?: string }) => {
     const { data } = await api.get(`/students/${studentId}/results`, { params });
     return data;
   },
@@ -350,33 +375,36 @@ export const feesApi = {
   },
 };
 
-// Teachers API
-export const teachersApi = {
-  list: async (params?: { search?: string; page?: number; limit?: number }) => {
-    const { data } = await api.get('/teachers', { params });
+// Staff API
+export const staffApi = {
+  list: async (params?: { search?: string; role?: string; page?: number; limit?: number }) => {
+    const { data } = await api.get('/staff', { params });
     return data;
   },
 
   get: async (id: string) => {
-    const { data } = await api.get(`/teachers/${id}`);
+    const { data } = await api.get(`/staff/${id}`);
     return data;
   },
 
-  create: async (teacherData: any) => {
-    const { data } = await api.post('/teachers', teacherData);
+  create: async (staffData: any) => {
+    const { data } = await api.post('/staff', staffData);
     return data;
   },
 
-  update: async (id: string, teacherData: any) => {
-    const { data } = await api.put(`/teachers/${id}`, teacherData);
+  update: async (id: string, staffData: any) => {
+    const { data } = await api.put(`/staff/${id}`, staffData);
     return data;
   },
 
   delete: async (id: string) => {
-    const { data } = await api.delete(`/teachers/${id}`);
+    const { data } = await api.delete(`/staff/${id}`);
     return data;
   },
 };
+
+// Teachers API (alias for backward compatibility)
+export const teachersApi = staffApi;
 
 // Library API
 export const libraryApi = {
@@ -448,6 +476,11 @@ export const libraryApi = {
   },
 
   getReports: async (params: { type: string; term?: string; year?: string }) => {
+    const { data } = await api.get('/library/reports', { params });
+    return data;
+  },
+
+  getReportData: async (params: { type: string; term?: string; year?: string }) => {
     const { data } = await api.get('/library/reports', { params });
     return data;
   },
@@ -598,6 +631,21 @@ export const clinicApi = {
     return data;
   },
 
+  getIncident: async (id: string) => {
+    const { data } = await api.get(`/clinic/incidents/${id}`);
+    return data;
+  },
+
+  updateIncident: async (id: string, incidentData: any) => {
+    const { data } = await api.put(`/clinic/incidents/${id}`, incidentData);
+    return data;
+  },
+
+  deleteIncident: async (id: string) => {
+    const { data } = await api.delete(`/clinic/incidents/${id}`);
+    return data;
+  },
+
   // Summary (Admin only - aggregated data)
   getSummary: async (params?: { term?: string; year?: number; start_date?: string; end_date?: string }) => {
     const { data } = await api.get('/clinic/summary', { params });
@@ -609,3 +657,232 @@ export const clinicApi = {
     return data;
   },
 };
+
+// Attendance API
+export const attendanceApi = {
+  mark: async (attendanceData: any) => {
+    const { data } = await api.post('/attendance', attendanceData);
+    return data;
+  },
+
+  bulkMark: async (bulkData: any) => {
+    const { data } = await api.post('/attendance/bulk', bulkData);
+    return data;
+  },
+
+  list: async (params?: { class_id?: string; student_id?: string; date?: string; start_date?: string; end_date?: string; page?: number; limit?: number }) => {
+    const { data } = await api.get('/attendance', { params });
+    return data;
+  },
+
+  getByDate: async (params: { class_id: string; date: string }) => {
+    const { data } = await api.get('/attendance/by-date', { params });
+    return data;
+  },
+
+  getStats: async (params?: { class_id?: string; student_id?: string; start_date?: string; end_date?: string }) => {
+    const { data } = await api.get('/attendance/stats', { params });
+    return data;
+  },
+
+  getClassSummary: async (params: { class_id: string; start_date?: string; end_date?: string }) => {
+    const { data } = await api.get('/attendance/class-summary', { params });
+    return data;
+  },
+
+  getReport: async (params: { class_id: string; period: string; start_date?: string; end_date?: string }) => {
+    const { data } = await api.get('/attendance/report', { params });
+    return data;
+  },
+
+  getStudentHistory: async (studentId: string, params?: { period?: string; start_date?: string; end_date?: string }) => {
+    const { data } = await api.get(`/attendance/student/${studentId}/history`, { params });
+    return data;
+  },
+
+  delete: async (id: string) => {
+    const { data } = await api.delete(`/attendance/${id}`);
+    return data;
+  },
+
+  getHolidays: async (params?: { year?: number; term?: string; start_date?: string; end_date?: string }) => {
+    const { data } = await api.get('/calendar/holidays', { params });
+    return data;
+  },
+};
+
+// Calendar API (Holidays and non-school days)
+export const calendarApi = {
+  addHoliday: async (holidayData: any) => {
+    const { data } = await api.post('/calendar/holidays', holidayData);
+    return data;
+  },
+
+  listHolidays: async (params?: { year?: number; term?: string; start_date?: string; end_date?: string }) => {
+    const { data } = await api.get('/calendar/holidays', { params });
+    return data;
+  },
+
+  deleteHoliday: async (id: string) => {
+    const { data } = await api.delete(`/calendar/holidays/${id}`);
+    return data;
+  },
+};
+
+// Term Dates API
+export const termDatesApi = {
+  list: async (params?: { year?: number }) => {
+    const { data } = await api.get('/term-dates', { params });
+    return data;
+  },
+
+  getCurrent: async (params?: { year?: number; term?: string }) => {
+    const { data } = await api.get('/term-dates/current', { params });
+    return data;
+  },
+
+  createOrUpdate: async (termData: any) => {
+    const { data } = await api.post('/term-dates', termData);
+    return data;
+  },
+
+  delete: async (id: string) => {
+    const { data } = await api.delete(`/term-dates/${id}`);
+    return data;
+  },
+};
+
+// Finance API
+export const financeApi = {
+  // Income
+  createIncome: async (incomeData: any) => {
+    const { data } = await api.post('/finance/income', incomeData);
+    return data;
+  },
+
+  listIncome: async (params?: { term?: string; year?: number; category?: string; start_date?: string; end_date?: string }) => {
+    const { data } = await api.get('/finance/income', { params });
+    return data;
+  },
+
+  getIncome: async (id: string) => {
+    const { data } = await api.get(`/finance/income/${id}`);
+    return data;
+  },
+
+  updateIncome: async (id: string, incomeData: any) => {
+    const { data } = await api.put(`/finance/income/${id}`, incomeData);
+    return data;
+  },
+
+  deleteIncome: async (id: string) => {
+    const { data } = await api.delete(`/finance/income/${id}`);
+    return data;
+  },
+
+  // Expenditure
+  createExpenditure: async (expenditureData: any) => {
+    const { data } = await api.post('/finance/expenditure', expenditureData);
+    return data;
+  },
+
+  listExpenditure: async (params?: { term?: string; year?: number; category?: string; status?: string; start_date?: string; end_date?: string }) => {
+    const { data } = await api.get('/finance/expenditure', { params });
+    return data;
+  },
+
+  getExpenditure: async (id: string) => {
+    const { data } = await api.get(`/finance/expenditure/${id}`);
+    return data;
+  },
+
+  updateExpenditure: async (id: string, expenditureData: any) => {
+    const { data } = await api.put(`/finance/expenditure/${id}`, expenditureData);
+    return data;
+  },
+
+  deleteExpenditure: async (id: string) => {
+    const { data } = await api.delete(`/finance/expenditure/${id}`);
+    return data;
+  },
+
+  // Summary
+  getSummary: async (params?: { term?: string; year?: number; start_date?: string; end_date?: string }) => {
+    const { data } = await api.get('/finance/summary', { params });
+    return data;
+  },
+
+  // Export
+  exportReport: async (params: { period: 'daily' | 'weekly' | 'monthly' | 'termly' | 'yearly'; term?: string; year?: number }) => {
+    const { data } = await api.get('/finance/export', { params, responseType: 'blob' });
+    return data;
+  },
+  
+  exportFeesReport: async (params: { period: 'daily' | 'weekly' | 'monthly' | 'termly' | 'yearly'; term?: string; year?: number }) => {
+    const { data } = await api.get('/fees/export', { params, responseType: 'blob' });
+    return data;
+  },
+};
+
+// Inventory API
+export const inventoryApi = {
+  listCategories: async () => {
+    const { data } = await api.get('/inventory/categories');
+    return data;
+  },
+
+  listItems: async (params?: { category_id?: string; search?: string; low_stock?: boolean }) => {
+    const { data } = await api.get('/inventory/items', { params });
+    return data;
+  },
+
+  createItem: async (itemData: any) => {
+    const { data } = await api.post('/inventory/items', itemData);
+    return data;
+  },
+
+  updateItem: async (id: string, itemData: any) => {
+    const { data } = await api.put(`/inventory/items/${id}`, itemData);
+    return data;
+  },
+
+  deleteItem: async (id: string) => {
+    const { data } = await api.delete(`/inventory/items/${id}`);
+    return data;
+  },
+
+  recordTransaction: async (transactionData: any) => {
+    const { data } = await api.post('/inventory/transactions', transactionData);
+    return data;
+  },
+
+  listTransactions: async (params?: { item_id?: string; type?: string }) => {
+    const { data } = await api.get('/inventory/transactions', { params });
+    return data;
+  },
+
+  getPurchaseReceipt: async (transactionId: string) => {
+    const { data } = await api.get(`/inventory/transactions/${transactionId}/receipt`);
+    return data;
+  },
+
+  getStats: async () => {
+    const { data } = await api.get('/inventory/stats');
+    return data;
+  },
+};
+
+// Integration Activities API (S1-S4)
+export const integrationActivitiesApi = {
+  getByClass: async (params: { class_id: string; subject_id?: string; term: string; year: number }) => {
+    const { data } = await api.get('/integration-activities', { params });
+    return data;
+  },
+
+  createOrUpdate: async (activityData: any) => {
+    const { data } = await api.post('/integration-activities', activityData);
+    return data;
+  },
+};
+
+export default api;

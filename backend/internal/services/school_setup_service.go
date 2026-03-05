@@ -21,31 +21,11 @@ func NewSchoolSetupService(db *gorm.DB) *SchoolSetupService {
 	}
 }
 
-// SetupSchool configures a school with classes, subjects, users, and default settings
+// SetupSchool configures a school - grading rules are now standard and shared
 func (s *SchoolSetupService) SetupSchool(school *models.School, levels []string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		// 1. Create classes for each level
-		if err := s.createClasses(tx, school.ID, levels); err != nil {
-			return fmt.Errorf("failed to create classes: %w", err)
-		}
-
-		// 2. Create subjects for each level
-		if err := s.createSubjects(tx, school.ID, levels); err != nil {
-			return fmt.Errorf("failed to create subjects: %w", err)
-		}
-
-		// 3. Create grading rules
-		if err := s.createGradingRules(tx, school.ID, levels); err != nil {
-			return fmt.Errorf("failed to create grading rules: %w", err)
-		}
-
-		// 4. Create default school admin
-		if _, err := s.userAssignmentService.CreateSchoolAdmin(school.ID, school.Name); err != nil {
-			return fmt.Errorf("failed to create school admin: %w", err)
-		}
-
-		return nil
-	})
+	// Grading rules are now standard (school_id = NULL) and shared across all schools
+	// No need to create school-specific rules
+	return nil
 }
 
 func (s *SchoolSetupService) createClasses(tx *gorm.DB, schoolID uuid.UUID, levels []string) error {
@@ -86,164 +66,6 @@ func (s *SchoolSetupService) createSubjects(tx *gorm.DB, schoolID uuid.UUID, lev
 	return standardSubjectService.CreateSchoolSubjectsFromStandard(schoolID, levels)
 }
 
-func (s *SchoolSetupService) createSubjectsOld(tx *gorm.DB, schoolID uuid.UUID, levels []string) error {
-	// Check if subjects already exist for this school
-	var count int64
-	tx.Model(&models.Subject{}).Where("school_id = ?", schoolID).Count(&count)
-	if count > 0 {
-		return nil // Subjects already exist
-	}
-	subjectsByLevel := map[string][]SubjectConfig{
-		"ECCE": {
-			{"English", "ENG", true, 1},
-			{"Mathematics", "MATH", true, 1},
-			{"Science", "SCI", true, 1},
-			{"Social Studies", "SST", true, 1},
-			{"Art & Craft", "ART", false, 1},
-			{"Music", "MUS", false, 1},
-			{"Physical Education", "PE", false, 1},
-		},
-		"P1": {
-			{"English", "ENG", true, 1},
-			{"Mathematics", "MATH", true, 1},
-			{"Science", "SCI", true, 1},
-			{"Social Studies", "SST", true, 1},
-			{"Religious Education", "RE", true, 1},
-		},
-		"P2": {
-			{"English", "ENG", true, 1},
-			{"Mathematics", "MATH", true, 1},
-			{"Science", "SCI", true, 1},
-			{"Social Studies", "SST", true, 1},
-			{"Religious Education", "RE", true, 1},
-		},
-		"P3": {
-			{"English", "ENG", true, 1},
-			{"Mathematics", "MATH", true, 1},
-			{"Science", "SCI", true, 1},
-			{"Social Studies", "SST", true, 1},
-			{"Religious Education", "RE", true, 1},
-		},
-		"P4": {
-			{"English", "ENG", true, 1},
-			{"Mathematics", "MATH", true, 1},
-			{"Science", "SCI", true, 1},
-			{"Social Studies", "SST", true, 1},
-			{"Religious Education", "RE", true, 1},
-		},
-		"P5": {
-			{"English", "ENG", true, 1},
-			{"Mathematics", "MATH", true, 1},
-			{"Science", "SCI", true, 1},
-			{"Social Studies", "SST", true, 1},
-			{"Religious Education", "RE", true, 1},
-		},
-		"P6": {
-			{"English", "ENG", true, 1},
-			{"Mathematics", "MATH", true, 1},
-			{"Science", "SCI", true, 1},
-			{"Social Studies", "SST", true, 1},
-			{"Religious Education", "RE", true, 1},
-		},
-		"P7": {
-			{"English", "ENG", true, 1},
-			{"Mathematics", "MATH", true, 1},
-			{"Science", "SCI", true, 1},
-			{"Social Studies", "SST", true, 1},
-			{"Religious Education", "RE", true, 1},
-		},
-		"S1": {
-			{"English Language", "ENG", true, 1},
-			{"Mathematics", "MATH", true, 1},
-			{"Biology", "BIO", true, 1},
-			{"Chemistry", "CHEM", true, 1},
-			{"Physics", "PHY", true, 1},
-			{"History", "HIST", true, 1},
-			{"Geography", "GEO", true, 1},
-			{"Religious Education", "RE", true, 1},
-			{"Computer Studies", "COMP", false, 1},
-		},
-		"S2": {
-			{"English Language", "ENG", true, 1},
-			{"Mathematics", "MATH", true, 1},
-			{"Biology", "BIO", true, 1},
-			{"Chemistry", "CHEM", true, 1},
-			{"Physics", "PHY", true, 1},
-			{"History", "HIST", true, 1},
-			{"Geography", "GEO", true, 1},
-			{"Religious Education", "RE", true, 1},
-			{"Computer Studies", "COMP", false, 1},
-		},
-		"S3": {
-			{"English Language", "ENG", true, 1},
-			{"Mathematics", "MATH", true, 1},
-			{"Biology", "BIO", false, 1},
-			{"Chemistry", "CHEM", false, 1},
-			{"Physics", "PHY", false, 1},
-			{"History", "HIST", false, 1},
-			{"Geography", "GEO", false, 1},
-			{"Economics", "ECON", false, 1},
-			{"Literature", "LIT", false, 1},
-			{"Computer Studies", "COMP", false, 1},
-		},
-		"S4": {
-			{"English Language", "ENG", true, 1},
-			{"Mathematics", "MATH", true, 1},
-			{"Biology", "BIO", false, 1},
-			{"Chemistry", "CHEM", false, 1},
-			{"Physics", "PHY", false, 1},
-			{"History", "HIST", false, 1},
-			{"Geography", "GEO", false, 1},
-			{"Economics", "ECON", false, 1},
-			{"Literature", "LIT", false, 1},
-			{"Computer Studies", "COMP", false, 1},
-		},
-		"S5": {
-			{"General Paper", "GP", true, 1},
-			{"Mathematics", "MATH", false, 2},
-			{"Physics", "PHY", false, 2},
-			{"Chemistry", "CHEM", false, 2},
-			{"Biology", "BIO", false, 2},
-			{"History", "HIST", false, 1},
-			{"Geography", "GEO", false, 1},
-			{"Economics", "ECON", false, 1},
-			{"Literature", "LIT", false, 1},
-			{"Computer Science", "COMP", false, 2},
-		},
-		"S6": {
-			{"General Paper", "GP", true, 1},
-			{"Mathematics", "MATH", false, 2},
-			{"Physics", "PHY", false, 2},
-			{"Chemistry", "CHEM", false, 2},
-			{"Biology", "BIO", false, 2},
-			{"History", "HIST", false, 1},
-			{"Geography", "GEO", false, 1},
-			{"Economics", "ECON", false, 1},
-			{"Literature", "LIT", false, 1},
-			{"Computer Science", "COMP", false, 2},
-		},
-	}
-
-	for _, level := range levels {
-		if subjects, exists := subjectsByLevel[level]; exists {
-			for _, subjectConfig := range subjects {
-				subject := models.Subject{
-					SchoolID:     schoolID,
-					Name:         subjectConfig.Name,
-					Code:         subjectConfig.Code,
-					Level:        level,
-					IsCompulsory: subjectConfig.IsCompulsory,
-					Papers:       subjectConfig.Papers,
-				}
-				if err := tx.Create(&subject).Error; err != nil {
-					return err
-				}
-			}
-		}
-	}
-	return nil
-}
-
 func (s *SchoolSetupService) createGradingRules(tx *gorm.DB, schoolID uuid.UUID, levels []string) error {
 	for _, level := range levels {
 		// Check if grading rule already exists
@@ -259,7 +81,20 @@ func (s *SchoolSetupService) createGradingRules(tx *gorm.DB, schoolID uuid.UUID,
 		var ruleVersion string
 		var rules models.JSONB
 
-		if isPrimaryLevel(level) {
+		// Map Baby, Middle, Top to ECCE grading
+		if level == "Baby" || level == "Middle" || level == "Top" {
+			ruleVersion = "NCDC_ECCE_2023"
+			rules = models.JSONB{
+				"type": "ecce",
+				"grades": map[string]interface{}{
+					"E": map[string]interface{}{"description": "Excellent"},
+					"VG": map[string]interface{}{"description": "Very Good"},
+					"G": map[string]interface{}{"description": "Good"},
+					"S": map[string]interface{}{"description": "Satisfactory"},
+					"NI": map[string]interface{}{"description": "Needs Improvement"},
+				},
+			}
+		} else if isPrimaryLevel(level) {
 			ruleVersion = "NCDC_PRIMARY_2023"
 			rules = models.JSONB{
 				"type": "primary",
@@ -304,7 +139,7 @@ func (s *SchoolSetupService) createGradingRules(tx *gorm.DB, schoolID uuid.UUID,
 				}
 			}
 		} else {
-			// ECCE level
+			// Default to ECCE for any other nursery-like levels
 			ruleVersion = "NCDC_ECCE_2023"
 			rules = models.JSONB{
 				"type": "ecce",
@@ -319,7 +154,7 @@ func (s *SchoolSetupService) createGradingRules(tx *gorm.DB, schoolID uuid.UUID,
 		}
 
 		gradingRule := models.GradingRule{
-			SchoolID:    schoolID,
+			SchoolID:    &schoolID,
 			Level:       level,
 			RuleVersion: ruleVersion,
 			Rules:       rules,

@@ -2,7 +2,13 @@ export interface User {
   id: string;
   email: string;
   full_name: string;
-  role: 'system_admin' | 'school_admin' | 'teacher';
+  role:
+    | "system_admin"
+    | "school_admin"
+    | "teacher"
+    | "bursar"
+    | "nurse"
+    | "librarian";
   school_id: string;
   is_active: boolean;
 }
@@ -10,7 +16,7 @@ export interface User {
 export interface School {
   id: string;
   name: string;
-  type: 'ECCE' | 'Primary' | 'Secondary' | 'Combined';
+  type: "ECCE" | "Primary" | "Secondary" | "Combined";
   address: string;
   country: string;
   region: string;
@@ -18,6 +24,7 @@ export interface School {
   phone: string;
 }
 
+// I need to create crud functionalities for class management in a school
 export interface Class {
   id: string;
   school_id: string;
@@ -25,7 +32,7 @@ export interface Class {
   level: string;
   teacher_id: string;
   year: number;
-  term: 'Term1' | 'Term2' | 'Term3';
+  term: "Term1" | "Term2" | "Term3";
 }
 
 export interface Student {
@@ -35,7 +42,7 @@ export interface Student {
   first_name: string;
   last_name: string;
   dob: string;
-  gender: 'Male' | 'Female' | 'Other';
+  gender: "Male" | "Female" | "Other";
   lin?: string;
   photo_url?: string;
   home_address?: string;
@@ -57,10 +64,18 @@ export interface Assessment {
   school_id: string;
   class_id: string;
   subject_id: string;
-  assessment_type: 'CA' | 'Exam' | 'Project' | 'Observation' | 'Paper1' | 'Paper2' | 'Paper3' | 'Paper4';
+  assessment_type:
+    | "CA"
+    | "Exam"
+    | "Project"
+    | "Observation"
+    | "Paper1"
+    | "Paper2"
+    | "Paper3"
+    | "Paper4";
   max_marks: number;
   date: string;
-  term: 'Term1' | 'Term2' | 'Term3';
+  term: "Term1" | "Term2" | "Term3";
   year: number;
 }
 
@@ -82,7 +97,7 @@ export interface OfflineMark {
   student_id: string;
   marks_obtained: number;
   teacher_comment?: string;
-  status: 'pending' | 'syncing' | 'synced' | 'conflict';
+  status: "pending" | "syncing" | "synced" | "conflict";
   created_at: number;
   updated_at: number;
 }
@@ -91,10 +106,10 @@ export interface ReportCard {
   id: string;
   student_id: string;
   class_id: string;
-  term: 'Term1' | 'Term2' | 'Term3';
+  term: "Term1" | "Term2" | "Term3";
   year: number;
   pdf_url?: string;
-  status: 'generated' | 'pending' | 'failed';
+  status: "generated" | "pending" | "failed";
   generated_at?: string;
 }
 

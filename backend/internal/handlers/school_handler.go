@@ -1,11 +1,12 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
+
 	"github.com/school-system/backend/internal/models"
 	"github.com/school-system/backend/internal/services"
 	"gorm.io/gorm"
@@ -65,43 +66,98 @@ func (h *SchoolHandler) List(c *gin.Context) {
 
 func (h *SchoolHandler) Create(c *gin.Context) {
 	var req struct {
-		models.School
-		Levels []string `json:"levels"`
+		Name         string `json:"name" binding:"required"`
+		Address      string `json:"address"`
+		Country      string `json:"country"`
+		Region       string `json:"region"`
+		ContactEmail string `json:"contact_email"`
+		Phone        string `json:"phone"`
+		LogoURL      string `json:"logo_url"`
+		Motto        string `json:"motto"`
+		SchoolType   string `json:"school_type" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Store levels in config
-	if req.School.Config == nil {
-		req.School.Config = make(models.JSONB)
-	}
-	req.School.Config["levels"] = req.Levels
+	var levels []string
+	var academicLevels []string
 
-	if err := h.db.Create(&req.School).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	switch req.SchoolType {
+	case "nursery":
+		levels = []string{"Baby", "Middle", "Top"}
+		academicLevels = []string{"nursery"}
+	case "primary":
+		levels = []string{"P1", "P2", "P3", "P4", "P5", "P6", "P7"}
+		academicLevels = []string{"primary"}
+	case "ordinary":
+		levels = []string{"S1", "S2", "S3", "S4"}
+		academicLevels = []string{"ordinary"}
+	case "advanced":
+		levels = []string{"S5", "S6"}
+		academicLevels = []string{"advanced"}
+	case "nursery_primary":
+		levels = []string{"Baby", "Middle", "Top", "P1", "P2", "P3", "P4", "P5", "P6", "P7"}
+		academicLevels = []string{"nursery", "primary"}
+	case "nursery_primary_ordinary":
+		levels = []string{"Baby", "Middle", "Top", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "S1", "S2", "S3", "S4"}
+		academicLevels = []string{"nursery", "primary", "ordinary"}
+	case "nursery_primary_ordinary_advanced":
+		levels = []string{"Baby", "Middle", "Top", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "S1", "S2", "S3", "S4", "S5", "S6"}
+		academicLevels = []string{"nursery", "primary", "ordinary", "advanced"}
+	case "ordinary_advanced":
+		levels = []string{"S1", "S2", "S3", "S4", "S5", "S6"}
+		academicLevels = []string{"ordinary", "advanced"}
+	case "primary_ordinary":
+		levels = []string{"P1", "P2", "P3", "P4", "P5", "P6", "P7", "S1", "S2", "S3", "S4"}
+		academicLevels = []string{"primary", "ordinary"}
+	case "primary_ordinary_advanced":
+		levels = []string{"P1", "P2", "P3", "P4", "P5", "P6", "P7", "S1", "S2", "S3", "S4", "S5", "S6"}
+		academicLevels = []string{"primary", "ordinary", "advanced"}
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid school type"})
 		return
 	}
 
-	// Log audit
-	if userID, exists := c.Get("user_id"); exists {
-		h.auditService.Log(userID.(uuid.UUID), "CREATE", "school", req.School.ID, nil, models.JSONB{"name": req.School.Name}, c.ClientIP())
+	school := models.School{
+		Name:         req.Name,
+		Type:         req.SchoolType,
+		Address:      req.Address,
+		Country:      req.Country,
+		Region:       req.Region,
+		ContactEmail: req.ContactEmail,
+		Phone:        req.Phone,
+		LogoURL:      req.LogoURL,
+		Motto:        req.Motto,
+		IsActive:     true,
+		Config:       models.JSONB{"academic_levels": academicLevels, "levels": levels},
 	}
 
-	// Setup school with classes, subjects, and grading rules
-	if err := h.setupService.SetupSchool(&req.School, req.Levels); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to setup school: " + err.Error()})
+	if err := h.db.Create(&school).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create school"})
 		return
 	}
 
-	c.JSON(http.StatusCreated, req.School)
+	c.JSON(http.StatusCreated, school)
 }
 
 func (h *SchoolHandler) Get(c *gin.Context) {
 	id := c.Param("id")
+	
 	var school models.School
 	if err := h.db.First(&school, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "School not found"})
+		return
+	}
+	c.JSON(http.StatusOK, school)
+}
+
+func (h *SchoolHandler) GetMySchool(c *gin.Context) {
+	tenantSchoolID := c.GetString("tenant_school_id")
+	
+	var school models.School
+	if err := h.db.First(&school, "id = ?", tenantSchoolID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "School not found"})
 		return
 	}
@@ -116,22 +172,40 @@ func (h *SchoolHandler) Update(c *gin.Context) {
 		return
 	}
 
-	var updateData models.School
-	if err := c.ShouldBindJSON(&updateData); err != nil {
+	var req struct {
+		Name         string       `json:"name"`
+		Type         string       `json:"type"`
+		SchoolType   string       `json:"school_type"`
+		Address      string       `json:"address"`
+		Country      string       `json:"country"`
+		Region       string       `json:"region"`
+		ContactEmail string       `json:"contact_email"`
+		Phone        string       `json:"phone"`
+		LogoURL      string       `json:"logo_url"`
+		Motto        string       `json:"motto"`
+		Config       models.JSONB `json:"config"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	school.Name = updateData.Name
-	school.Type = updateData.Type
-	school.Address = updateData.Address
-	school.Country = updateData.Country
-	school.Region = updateData.Region
-	school.ContactEmail = updateData.ContactEmail
-	school.Phone = updateData.Phone
-	school.LogoURL = updateData.LogoURL
-	school.Motto = updateData.Motto
-	school.Config = updateData.Config
+	school.Name = req.Name
+	if req.Type != "" {
+		school.Type = req.Type
+	} else if req.SchoolType != "" {
+		school.Type = req.SchoolType
+	}
+	school.Address = req.Address
+	school.Country = req.Country
+	school.Region = req.Region
+	school.ContactEmail = req.ContactEmail
+	school.Phone = req.Phone
+	school.LogoURL = req.LogoURL
+	school.Motto = req.Motto
+	if req.Config != nil {
+		school.Config = req.Config
+	}
 
 	if err := h.db.Save(&school).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -139,8 +213,8 @@ func (h *SchoolHandler) Update(c *gin.Context) {
 	}
 
 	// Setup additional levels if added
-	if updateData.Config != nil {
-		if newLevels, ok := updateData.Config["levels"].([]interface{}); ok {
+	if req.Config != nil {
+		if newLevels, ok := req.Config["levels"].([]interface{}); ok {
 			var levels []string
 			for _, lvl := range newLevels {
 				if level, ok := lvl.(string); ok {
@@ -206,67 +280,46 @@ func (h *SchoolHandler) SetupSchool(c *gin.Context) {
 
 func (h *SchoolHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
+	
 	var school models.School
 	if err := h.db.First(&school, "id = ?", id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "School not found"})
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "School not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch school"})
 		return
 	}
 
-	// Cascade delete all related data in proper order
-	err := h.db.Transaction(func(tx *gorm.DB) error {
-		// Delete marks first (depends on assessments)
-		if err := tx.Exec("DELETE FROM marks WHERE assessment_id IN (SELECT id FROM assessments WHERE school_id = ?)", id).Error; err != nil {
-			return err
-		}
-		// Delete subject results
-		if err := tx.Where("school_id = ?", id).Delete(&models.SubjectResult{}).Error; err != nil {
-			return err
-		}
-		// Delete assessments
-		if err := tx.Where("school_id = ?", id).Delete(&models.Assessment{}).Error; err != nil {
-			return err
-		}
-		// Delete report cards
-		if err := tx.Exec("DELETE FROM report_cards WHERE student_id IN (SELECT id FROM students WHERE school_id = ?)", id).Error; err != nil {
-			return err
-		}
-		// Delete enrollments
-		if err := tx.Exec("DELETE FROM enrollments WHERE student_id IN (SELECT id FROM students WHERE school_id = ?)", id).Error; err != nil {
-			return err
-		}
-		// Delete students
-		if err := tx.Where("school_id = ?", id).Delete(&models.Student{}).Error; err != nil {
-			return err
-		}
-		// Delete classes
-		if err := tx.Where("school_id = ?", id).Delete(&models.Class{}).Error; err != nil {
-			return err
-		}
-		// Delete subjects
-		if err := tx.Where("school_id = ?", id).Delete(&models.Subject{}).Error; err != nil {
-			return err
-		}
-		// Delete grading rules
-		if err := tx.Where("school_id = ?", id).Delete(&models.GradingRule{}).Error; err != nil {
-			return err
-		}
-		// Delete users assigned to this school (but not system admins)
-		if err := tx.Where("school_id = ? AND role != 'system_admin'", id).Delete(&models.User{}).Error; err != nil {
-			return err
-		}
-		// Finally delete the school
-		if err := tx.Delete(&school).Error; err != nil {
-			return err
-		}
-		return nil
-	})
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete school: " + err.Error()})
+	if err := h.db.Delete(&school).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete school"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "School and all related data deleted successfully"})
+	c.JSON(http.StatusOK, gin.H{"message": "School deleted successfully"})
+}
+
+func (h *SchoolHandler) ToggleActive(c *gin.Context) {
+	id := c.Param("id")
+	
+	var school models.School
+	if err := h.db.First(&school, "id = ?", id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "School not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch school"})
+		return
+	}
+
+	newStatus := !school.IsActive
+	if err := h.db.Model(&school).Update("is_active", newStatus).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update school status"})
+		return
+	}
+
+	school.IsActive = newStatus
+	c.JSON(http.StatusOK, school)
 }
 
 func (h *SchoolHandler) GetSchoolSummary(c *gin.Context) {
@@ -274,159 +327,80 @@ func (h *SchoolHandler) GetSchoolSummary(c *gin.Context) {
 	term := c.Query("term")
 	year := c.Query("year")
 
+	// Default to current year and term 1 if not provided
+	if year == "" {
+		year = "2026"
+	}
+	if term == "" {
+		term = "Term 1"
+	}
+
+	yearInt, _ := strconv.Atoi(year)
+
+	fmt.Printf("[DEBUG] GetSchoolSummary - schoolID: %s, term: %s, year: %d\n", schoolID, term, yearInt)
+
 	type SchoolSummary struct {
-		// User counts
-		TotalUsers    int64            `json:"total_users"`
-		UsersByRole   map[string]int64 `json:"users_by_role"`
-		
-		// Student counts
-		TotalStudents int64            `json:"total_students"`
-		StudentsByLevel map[string]int64 `json:"students_by_level"`
-		
-		// Teacher summary
-		TotalTeachers int64 `json:"total_teachers"`
-		
-		// Library summary
-		LibrarySummary struct {
-			TotalBooks     int64 `json:"total_books"`
-			AvailableBooks int64 `json:"available_books"`
-			IssuedBooks    int64 `json:"issued_books"`
-			OverdueBooks   int64 `json:"overdue_books"`
-		} `json:"library_summary"`
-		
-		// Fees summary
-		FeesSummary struct {
-			TotalFeesCollected float64 `json:"total_fees_collected"`
-			OutstandingFees    float64 `json:"outstanding_fees"`
-			StudentsWithFees   int64   `json:"students_with_fees"`
-		} `json:"fees_summary"`
-		
-		// Clinic summary (aggregated only)
-		ClinicSummary struct {
-			TotalVisits        int64 `json:"total_visits"`
-			MalariaTests       int64 `json:"malaria_tests"`
-			PregnancyTests     int64 `json:"pregnancy_tests"`
-			Emergencies        int64 `json:"emergencies"`
-			LowStockMedicines  int64 `json:"low_stock_medicines"`
-		} `json:"clinic_summary"`
+		TotalStudents    int64   `json:"total_students"`
+		TotalTeachers    int64   `json:"total_teachers"`
+		TotalClasses     int64   `json:"total_classes"`
+		AttendanceRate   float64 `json:"attendance_rate"`
+		TotalIncome      float64 `json:"total_income"`
+		TotalBooks       int64   `json:"total_books"`
+		ClinicVisits     int64   `json:"clinic_visits"`
+		InventoryItems   int64   `json:"inventory_items"`
 	}
 
-	summary := SchoolSummary{
-		UsersByRole:     make(map[string]int64),
-		StudentsByLevel: make(map[string]int64),
+	summary := SchoolSummary{}
+
+	// Total classes for the specific term/year
+	h.db.Model(&models.Class{}).
+		Where("school_id = ? AND term = ? AND year = ?", schoolID, term, yearInt).
+		Count(&summary.TotalClasses)
+	fmt.Printf("[DEBUG] Total classes: %d\n", summary.TotalClasses)
+
+	// Total students - count through enrollments for the specific term/year
+	h.db.Table("students").
+		Select("COUNT(DISTINCT students.id)").
+		Joins("INNER JOIN enrollments ON students.id = enrollments.student_id AND enrollments.status = 'active'").
+		Joins("INNER JOIN classes ON enrollments.class_id = classes.id").
+		Where("students.school_id = ? AND students.status = 'active'", schoolID).
+		Where("classes.term = ? AND classes.year = ?", term, yearInt).
+		Scan(&summary.TotalStudents)
+	fmt.Printf("[DEBUG] Total students: %d\n", summary.TotalStudents)
+
+	// Total teachers
+	h.db.Model(&models.Staff{}).Where("school_id = ? AND role = ? AND status = ?", schoolID, "Teacher", "active").Count(&summary.TotalTeachers)
+
+	// Attendance rate for the specific term/year
+	var totalAttendance, presentCount int64
+	h.db.Model(&models.Attendance{}).
+		Where("school_id = ? AND term = ? AND year = ?", schoolID, term, yearInt).
+		Select("COUNT(DISTINCT CONCAT(student_id, '-', date))").
+		Scan(&totalAttendance)
+	h.db.Model(&models.Attendance{}).
+		Where("school_id = ? AND term = ? AND year = ? AND status = 'present'", schoolID, term, yearInt).
+		Select("COUNT(DISTINCT CONCAT(student_id, '-', date))").
+		Scan(&presentCount)
+	if totalAttendance > 0 {
+		summary.AttendanceRate = float64(presentCount) / float64(totalAttendance) * 100
 	}
 
-	// User counts
-	h.db.Model(&models.User{}).Where("school_id = ?", schoolID).Count(&summary.TotalUsers)
-	var userRoleResults []struct {
-		Role  string
-		Count int64
-	}
-	h.db.Model(&models.User{}).Select("role, COUNT(*) as count").Where("school_id = ?", schoolID).Group("role").Scan(&userRoleResults)
-	for _, result := range userRoleResults {
-		summary.UsersByRole[result.Role] = result.Count
-	}
+	// Total income for the specific term/year
+	h.db.Model(&models.Income{}).
+		Where("school_id = ? AND term = ? AND year = ?", schoolID, term, yearInt).
+		Select("COALESCE(SUM(amount), 0)").
+		Scan(&summary.TotalIncome)
 
-	// Student counts
-	if term != "" || year != "" {
-		// Filter by term/year through enrollments
-		query := h.db.Table("students").
-			Select("COUNT(DISTINCT students.id)").
-			Joins("JOIN enrollments ON students.id = enrollments.student_id AND enrollments.status = 'active'").
-			Joins("JOIN classes ON enrollments.class_id = classes.id").
-			Where("students.school_id = ?", schoolID)
-		if term != "" {
-			query = query.Where("classes.term = ?", term)
-		}
-		if year != "" {
-			query = query.Where("classes.year = ?", year)
-		}
-		query.Scan(&summary.TotalStudents)
-	} else {
-		h.db.Model(&models.Student{}).Where("school_id = ?", schoolID).Count(&summary.TotalStudents)
-	}
-	var studentLevelResults []struct {
-		Level string
-		Count int64
-	}
-	studentQuery := h.db.Table("students").
-		Select("classes.level, COUNT(DISTINCT students.id) as count").
-		Joins("LEFT JOIN enrollments ON students.id = enrollments.student_id AND enrollments.status = 'active'").
-		Joins("LEFT JOIN classes ON enrollments.class_id = classes.id").
-		Where("students.school_id = ?", schoolID)
-	if term != "" {
-		studentQuery = studentQuery.Where("classes.term = ?", term)
-	}
-	if year != "" {
-		studentQuery = studentQuery.Where("classes.year = ?", year)
-	}
-	studentQuery.Group("classes.level").Scan(&studentLevelResults)
-	for _, result := range studentLevelResults {
-		if result.Level != "" {
-			summary.StudentsByLevel[result.Level] = result.Count
-		}
-	}
+	// Total books (not filtered by term/year)
+	h.db.Model(&models.Book{}).Where("school_id = ?", schoolID).Count(&summary.TotalBooks)
 
-	// Library summary - filter by term/year
-	libraryQuery := h.db.Model(&models.BookIssue{}).
-		Joins("JOIN books ON book_issues.book_id = books.id").
-		Where("books.school_id = ?", schoolID)
-	if term != "" {
-		libraryQuery = libraryQuery.Where("book_issues.term = ?", term)
-	}
-	if year != "" {
-		libraryQuery = libraryQuery.Where("book_issues.year = ?", year)
-	}
-	
-	h.db.Model(&models.Book{}).Where("school_id = ?", schoolID).Count(&summary.LibrarySummary.TotalBooks)
-	h.db.Model(&models.Book{}).Where("school_id = ? AND available > 0", schoolID).Count(&summary.LibrarySummary.AvailableBooks)
-	libraryQuery.Where("book_issues.status = 'issued'").Count(&summary.LibrarySummary.IssuedBooks)
-	libraryQuery.Where("book_issues.status = 'issued' AND book_issues.due_date < NOW()").Count(&summary.LibrarySummary.OverdueBooks)
+	// Clinic visits for the specific term/year
+	h.db.Model(&models.ClinicVisit{}).
+		Where("school_id = ? AND term = ? AND year = ?", schoolID, term, yearInt).
+		Count(&summary.ClinicVisits)
 
-	// Fees summary - filter by term/year
-	feesQuery := h.db.Model(&models.StudentFees{}).Where("school_id = ?", schoolID)
-	if term != "" {
-		feesQuery = feesQuery.Where("term = ?", term)
-	}
-	if year != "" {
-		feesQuery = feesQuery.Where("year = ?", year)
-	}
-	feesQuery.Count(&summary.FeesSummary.StudentsWithFees)
-	feesQuery.Select("COALESCE(SUM(amount_paid), 0)").Scan(&summary.FeesSummary.TotalFeesCollected)
-	feesQuery.Select("COALESCE(SUM(outstanding), 0)").Scan(&summary.FeesSummary.OutstandingFees)
-
-	// Clinic summary - filter by term/year
-	clinicQuery := h.db.Where("school_id = ?", schoolID)
-	if term != "" {
-		clinicQuery = clinicQuery.Where("term = ?", term)
-	}
-	if year != "" {
-		clinicQuery = clinicQuery.Where("year = ?", year)
-	}
-	clinicQuery.Model(&models.ClinicVisit{}).Count(&summary.ClinicSummary.TotalVisits)
-	
-	testQuery := h.db.Where("school_id = ?", schoolID)
-	if term != "" {
-		testQuery = testQuery.Where("term = ?", term)
-	}
-	if year != "" {
-		testQuery = testQuery.Where("year = ?", year)
-	}
-	testQuery.Model(&models.MedicalTest{}).Where("test_type = 'malaria_rdt'").Count(&summary.ClinicSummary.MalariaTests)
-	testQuery.Model(&models.MedicalTest{}).Where("test_type = 'pregnancy'").Count(&summary.ClinicSummary.PregnancyTests)
-	
-	emergencyQuery := h.db.Where("school_id = ?", schoolID)
-	if term != "" {
-		emergencyQuery = emergencyQuery.Where("term = ?", term)
-	}
-	if year != "" {
-		emergencyQuery = emergencyQuery.Where("year = ?", year)
-	}
-	emergencyQuery.Model(&models.EmergencyIncident{}).Count(&summary.ClinicSummary.Emergencies)
-	h.db.Model(&models.Medicine{}).Where("school_id = ? AND quantity <= minimum_stock", schoolID).Count(&summary.ClinicSummary.LowStockMedicines)
-	
-	// Teacher summary
-	h.db.Model(&models.Teacher{}).Where("school_id = ? AND status = 'active'", schoolID).Count(&summary.TotalTeachers)
+	// Inventory items (not filtered by term/year)
+	h.db.Table("inventory_items").Where("school_id = ?", schoolID).Count(&summary.InventoryItems)
 
 	c.JSON(http.StatusOK, summary)
 }
@@ -534,6 +508,41 @@ func (h *SchoolHandler) GetSchoolLevels(c *gin.Context) {
 					levels = append(levels, level)
 				}
 			}
+		}
+	}
+	
+	// Auto-fix: If no levels configured, set them based on school type
+	if len(levels) == 0 && school.Type != "" {
+		switch school.Type {
+		case "nursery":
+			levels = []string{"Baby", "Middle", "Top"}
+		case "primary":
+			levels = []string{"P1", "P2", "P3", "P4", "P5", "P6", "P7"}
+		case "ordinary":
+			levels = []string{"S1", "S2", "S3", "S4"}
+		case "advanced":
+			levels = []string{"S5", "S6"}
+		case "nursery_primary":
+			levels = []string{"Baby", "Middle", "Top", "P1", "P2", "P3", "P4", "P5", "P6", "P7"}
+		case "nursery_primary_ordinary":
+			levels = []string{"Baby", "Middle", "Top", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "S1", "S2", "S3", "S4"}
+		case "nursery_primary_ordinary_advanced":
+			levels = []string{"Baby", "Middle", "Top", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "S1", "S2", "S3", "S4", "S5", "S6"}
+		case "ordinary_advanced":
+			levels = []string{"S1", "S2", "S3", "S4", "S5", "S6"}
+		case "primary_ordinary":
+			levels = []string{"P1", "P2", "P3", "P4", "P5", "P6", "P7", "S1", "S2", "S3", "S4"}
+		case "primary_ordinary_advanced":
+			levels = []string{"P1", "P2", "P3", "P4", "P5", "P6", "P7", "S1", "S2", "S3", "S4", "S5", "S6"}
+		}
+		
+		// Save the levels to database
+		if len(levels) > 0 {
+			if school.Config == nil {
+				school.Config = make(models.JSONB)
+			}
+			school.Config["levels"] = levels
+			h.db.Save(&school)
 		}
 	}
 	

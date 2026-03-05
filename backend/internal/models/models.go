@@ -55,10 +55,27 @@ type School struct {
 	Phone        string `gorm:"type:varchar(50)" json:"phone"`
 	LogoURL      string `gorm:"type:varchar(500)" json:"logo_url"`
 	Motto        string `gorm:"type:varchar(255)" json:"motto"`
+	IsActive     bool   `gorm:"default:true" json:"is_active"`
 	Config       JSONB  `gorm:"type:json" json:"config"`
 }
 
-// User represents system users (admin/teacher)
+// SchoolPaymentConfig stores payment gateway credentials per school
+type SchoolPaymentConfig struct {
+	BaseModel
+	SchoolID              uuid.UUID `gorm:"type:char(36);not null;uniqueIndex" json:"school_id"`
+	Provider              string    `gorm:"type:varchar(50);not null;default:'flutterwave'" json:"provider"`
+	PublicKey             string    `gorm:"type:varchar(255)" json:"public_key"`
+	SecretKey             string    `gorm:"type:varchar(255)" json:"-"`
+	EncryptionKey         string    `gorm:"type:varchar(255)" json:"-"`
+	WebhookSecret         string    `gorm:"type:varchar(255)" json:"-"`
+	MerchantAccountNumber string    `gorm:"type:varchar(100)" json:"merchant_account_number"`
+	MerchantAccountName   string    `gorm:"type:varchar(255)" json:"merchant_account_name"`
+	MerchantBankName      string    `gorm:"type:varchar(255)" json:"merchant_bank_name"`
+	IsActive              bool      `gorm:"default:false" json:"is_active"`
+	School                *School   `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
+}
+
+// User represents system users (system admin/ school admin/teacher/ librarian/ nurse/ bursar/ storekeeper)
 type User struct {
 	BaseModel
 	SchoolID     *uuid.UUID `gorm:"type:char(36);index" json:"school_id"`
@@ -74,14 +91,16 @@ type User struct {
 // Class represents a class/grade
 type Class struct {
 	BaseModel
-	SchoolID  uuid.UUID  `gorm:"type:char(36);not null;index:idx_class_school_year_term" json:"school_id"`
-	Name      string     `gorm:"type:varchar(100);not null" json:"name"`
-	Level     string     `gorm:"type:varchar(50);not null" json:"level"`
-	TeacherID *uuid.UUID `gorm:"type:char(36);index" json:"teacher_id"`
-	Year      int        `gorm:"not null;index:idx_class_school_year_term" json:"year"`
-	Term      string     `gorm:"type:varchar(10);not null;index:idx_class_school_year_term" json:"term"`
-	School    *School    `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
-	Teacher   *User      `gorm:"foreignKey:TeacherID" json:"teacher,omitempty"`
+	SchoolID         uuid.UUID        `gorm:"type:char(36);not null;index:idx_class_school_year_term" json:"school_id"`
+	Name             string           `gorm:"type:varchar(100);not null" json:"name"`
+	Level            string           `gorm:"type:varchar(50);not null" json:"level"`
+	Stream           string           `gorm:"type:varchar(10);default:''" json:"stream"`
+	Capacity         int              `gorm:"default:30" json:"capacity"`
+	TeacherProfileID *uuid.UUID       `gorm:"column:teacher_profile_id;type:char(36);index" json:"teacher_profile_id"`
+	Year             int              `gorm:"not null;index:idx_class_school_year_term" json:"year"`
+	Term             string           `gorm:"type:varchar(10);not null;index:idx_class_school_year_term" json:"term"`
+	School           *School          `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
+	TeacherProfile   *TeacherProfile  `gorm:"foreignKey:TeacherProfileID" json:"teacher_profile,omitempty"`
 }
 
 // Student represents a student
@@ -112,7 +131,9 @@ type Student struct {
 	DisabilityStatus string       `gorm:"type:varchar(100)" json:"disability_status"`
 	School           *School      `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
 	Class            *Class       `gorm:"-" json:"class,omitempty"` // Virtual field populated via join
+	ClassName        string       `gorm:"-" json:"class_name,omitempty"` // Virtual field for class name
 	Enrollments      []Enrollment `gorm:"foreignKey:StudentID" json:"enrollments,omitempty"`
+	Guardians        []Guardian   `gorm:"foreignKey:StudentID" json:"guardians,omitempty"`
 }
 
 // Guardian represents a student's parent or guardian
@@ -152,16 +173,7 @@ type Enrollment struct {
 }
 
 // Subject represents a subject/course
-type Subject struct {
-	BaseModel
-	SchoolID     uuid.UUID `gorm:"type:char(36);not null;index" json:"school_id"`
-	Name         string    `gorm:"type:varchar(255);not null" json:"name"`
-	Code         string    `gorm:"type:varchar(50);not null" json:"code"`
-	Level        string    `gorm:"type:varchar(50);not null" json:"level"`
-	IsCompulsory bool      `gorm:"default:false" json:"is_compulsory"`
-	Papers       int       `gorm:"default:1" json:"papers"`
-	School       *School   `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
-}
+
 
 // Assessment represents a test/exam
 type Assessment struct {
@@ -188,7 +200,7 @@ type Mark struct {
 	StudentID      uuid.UUID `gorm:"type:char(36);not null;index:idx_mark_assessment_student" json:"student_id"`
 	MarksObtained  float64   `gorm:"type:decimal(5,2);not null" json:"marks_obtained"`
 	GradedCode     *int      `gorm:"type:smallint" json:"graded_code,omitempty"`
-	Grade          string    `gorm:"type:char(2)" json:"grade"`
+	Grade          string    `gorm:"type:varchar(20)" json:"grade"`
 	TeacherComment string    `gorm:"type:text" json:"teacher_comment"`
 	EnteredBy      uuid.UUID `gorm:"type:char(36);not null" json:"entered_by"`
 	EnteredAt      time.Time `json:"entered_at"`
@@ -204,10 +216,12 @@ type SubjectResult struct {
 	ClassID             uuid.UUID       `gorm:"type:char(36);not null;index" json:"class_id"`
 	Term                string          `gorm:"type:varchar(10);not null;uniqueIndex:idx_unique_result" json:"term"`
 	Year                int             `gorm:"not null;uniqueIndex:idx_unique_result" json:"year"`
+	ExamType            string          `gorm:"type:varchar(20);uniqueIndex:idx_unique_result;index" json:"exam_type"`
+	Paper               int             `gorm:"default:0;uniqueIndex:idx_unique_result" json:"paper"`
 	SchoolID            uuid.UUID       `gorm:"type:char(36);not null;index" json:"school_id"`
 	RawMarks            JSONB           `gorm:"type:json" json:"raw_marks"`
 	DerivedCodes        JSONB           `gorm:"type:json" json:"derived_codes"`
-	FinalGrade          string          `gorm:"type:char(2)" json:"final_grade"`
+	FinalGrade          string          `gorm:"type:varchar(20)" json:"final_grade"`
 	ComputationReason   string          `gorm:"type:text" json:"computation_reason"`
 	RuleVersionHash     string          `gorm:"type:varchar(64)" json:"rule_version_hash"`
 	Student             *Student        `gorm:"foreignKey:StudentID" json:"student,omitempty"`
@@ -273,7 +287,7 @@ func (j *Job) BeforeCreate(tx *gorm.DB) error {
 // GradingRule stores grading configuration
 type GradingRule struct {
 	BaseModel
-	SchoolID    uuid.UUID `gorm:"type:char(36);not null;index" json:"school_id"`
+	SchoolID    *uuid.UUID `gorm:"type:char(36);index" json:"school_id,omitempty"`
 	Level       string    `gorm:"type:varchar(50);not null" json:"level"`
 	RuleVersion string    `gorm:"type:varchar(50);not null" json:"rule_version"`
 	Rules       JSONB     `gorm:"type:json" json:"rules"`
@@ -372,40 +386,6 @@ type Book struct {
 	School          *School   `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
 }
 
-// Teacher represents a teacher with comprehensive details
-type Teacher struct {
-	BaseModel
-	SchoolID         uuid.UUID  `gorm:"type:char(36);not null;index" json:"school_id"`
-	EmployeeID       string     `gorm:"type:varchar(50);not null;uniqueIndex:idx_employee_school" json:"employee_id"`
-	FirstName        string     `gorm:"type:varchar(100);not null" json:"first_name"`
-	MiddleName       string     `gorm:"type:varchar(100)" json:"middle_name"`
-	LastName         string     `gorm:"type:varchar(100);not null" json:"last_name"`
-	DateOfBirth      *time.Time `gorm:"type:date" json:"date_of_birth,omitempty"`
-	Gender           string     `gorm:"type:varchar(10)" json:"gender"`
-	Nationality      string     `gorm:"type:varchar(100);default:'Ugandan'" json:"nationality"`
-	NationalID       string     `gorm:"type:varchar(50)" json:"national_id"`
-	Email            string     `gorm:"type:varchar(255);uniqueIndex" json:"email"`
-	Phone            string     `gorm:"type:varchar(50);not null" json:"phone"`
-	AlternativePhone string     `gorm:"type:varchar(50)" json:"alternative_phone"`
-	Address          string     `gorm:"type:text" json:"address"`
-	District         string     `gorm:"type:varchar(100)" json:"district"`
-	Village          string     `gorm:"type:varchar(100)" json:"village"`
-	Qualifications   string     `gorm:"type:text" json:"qualifications"`
-	Specialization   string     `gorm:"type:varchar(255)" json:"specialization"`
-	Experience       int        `gorm:"default:0" json:"experience"`
-	EmploymentType   string     `gorm:"type:varchar(50);default:'Permanent'" json:"employment_type"`
-	DateJoined       *time.Time `gorm:"type:date" json:"date_joined,omitempty"`
-	Salary           float64    `gorm:"type:decimal(10,2)" json:"salary"`
-	BankAccount      string     `gorm:"type:varchar(100)" json:"bank_account"`
-	BankName         string     `gorm:"type:varchar(100)" json:"bank_name"`
-	EmergencyContact string     `gorm:"type:varchar(255)" json:"emergency_contact"`
-	EmergencyPhone   string     `gorm:"type:varchar(50)" json:"emergency_phone"`
-	Status           string     `gorm:"type:varchar(20);default:'active';index" json:"status"`
-	PhotoURL         string     `gorm:"type:varchar(500)" json:"photo_url"`
-	Notes            string     `gorm:"type:text" json:"notes"`
-	School           *School    `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
-}
-
 // BulkIssue represents a bulk borrowing transaction
 type BulkIssue struct {
 	BaseModel
@@ -424,7 +404,7 @@ type BulkIssue struct {
 	Fine         float64    `gorm:"type:decimal(10,2);default:0" json:"fine"`
 	Notes        string     `gorm:"type:text" json:"notes"`
 	Student      *Student   `gorm:"foreignKey:BorrowerID" json:"student,omitempty"`
-	Teacher      *Teacher   `gorm:"foreignKey:BorrowerID" json:"teacher,omitempty"`
+	Staff        *Staff     `gorm:"foreignKey:BorrowerID" json:"staff,omitempty"`
 	Librarian    *User      `gorm:"foreignKey:IssuedBy" json:"librarian,omitempty"`
 }
 
@@ -449,6 +429,7 @@ type BookIssue struct {
 	BorrowerID    uuid.UUID  `gorm:"type:char(36);not null;index" json:"borrower_id"`
 	BorrowerName  string     `gorm:"type:varchar(255);not null" json:"borrower_name"`
 	BorrowerType  string     `gorm:"type:varchar(20);not null" json:"borrower_type"` // student or teacher
+	BorrowerLevel string     `gorm:"type:varchar(50)" json:"borrower_level"`
 	BorrowerClass string     `gorm:"type:varchar(50)" json:"borrower_class"`
 	IssuedBy      uuid.UUID  `gorm:"type:char(36);not null" json:"issued_by"`
 	CopyNumber    string     `gorm:"type:varchar(10);not null;index" json:"copy_number"`
@@ -463,7 +444,7 @@ type BookIssue struct {
 	BulkIssueID   *uuid.UUID `gorm:"type:char(36);index" json:"bulk_issue_id,omitempty"`
 	Book          *Book      `gorm:"foreignKey:BookID" json:"book,omitempty"`
 	Student       *Student   `gorm:"-" json:"student,omitempty"`
-	Teacher       *Teacher   `gorm:"-" json:"teacher,omitempty"`
+	Staff         *Staff     `gorm:"-" json:"staff,omitempty"`
 	Librarian     *User      `gorm:"foreignKey:IssuedBy" json:"librarian,omitempty"`
 	BulkIssue     *BulkIssue `gorm:"foreignKey:BulkIssueID" json:"bulk_issue,omitempty"`
 }
@@ -644,4 +625,238 @@ type EmergencyIncident struct {
 	Visit            *ClinicVisit `gorm:"foreignKey:VisitID" json:"visit,omitempty"`
 	School           *School      `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
 	Nurse            *User        `gorm:"foreignKey:ReportedBy" json:"nurse,omitempty"`
+}
+
+// Phase 1 Models - Attendance, Communication, Exams, Parent Portal
+
+// Attendance tracks daily student attendance
+type Attendance struct {
+	BaseModel
+	StudentID  uuid.UUID `gorm:"type:char(36);not null;uniqueIndex:idx_attendance_unique" json:"student_id"`
+	SchoolID   uuid.UUID `gorm:"type:char(36);not null;index" json:"school_id"`
+	ClassID    uuid.UUID `gorm:"type:char(36);not null;index" json:"class_id"`
+	Year       int       `gorm:"not null;index" json:"year"`
+	Term       string    `gorm:"type:varchar(10);not null;index" json:"term"`
+	Date       time.Time `gorm:"type:date;not null;uniqueIndex:idx_attendance_unique" json:"date"`
+	Status     string    `gorm:"type:varchar(20);not null" json:"status"` // present, absent, late, sick, excused
+	Remarks    string    `gorm:"type:text" json:"remarks"`
+	MarkedBy   uuid.UUID `gorm:"type:char(36);not null" json:"marked_by"`
+	MarkedAt   time.Time `gorm:"not null" json:"marked_at"`
+	Student    *Student  `gorm:"foreignKey:StudentID" json:"student,omitempty"`
+	School     *School   `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
+	Class      *Class    `gorm:"foreignKey:ClassID" json:"class,omitempty"`
+	Teacher    *User     `gorm:"foreignKey:MarkedBy" json:"teacher,omitempty"`
+}
+
+// SMSLog tracks all SMS sent
+type SMSLog struct {
+	BaseModel
+	SchoolID     uuid.UUID `gorm:"type:char(36);not null;index" json:"school_id"`
+	Recipient    string    `gorm:"type:varchar(20);not null" json:"recipient"`
+	Message      string    `gorm:"type:text;not null" json:"message"`
+	Status       string    `gorm:"type:varchar(20);not null" json:"status"` // pending, sent, failed
+	SMSType      string    `gorm:"type:varchar(50);not null" json:"sms_type"` // attendance, fees, results, general
+	Cost         float64   `gorm:"type:decimal(10,2)" json:"cost"`
+	SentAt       *time.Time `json:"sent_at,omitempty"`
+	ErrorMessage string    `gorm:"type:text" json:"error_message"`
+	SentBy       uuid.UUID `gorm:"type:char(36);not null" json:"sent_by"`
+	School       *School   `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
+}
+
+// Notification for in-app notifications
+// Exam represents exam schedules
+type Exam struct {
+	BaseModel
+	SchoolID    uuid.UUID `gorm:"type:char(36);not null;index" json:"school_id"`
+	Name        string    `gorm:"type:varchar(255);not null" json:"name"`
+	ExamType    string    `gorm:"type:varchar(50);not null" json:"exam_type"` // BOT, MOT, EOT, Mock, UNEB
+	Term        string    `gorm:"type:varchar(10);not null" json:"term"`
+	Year        int       `gorm:"not null" json:"year"`
+	StartDate   time.Time `gorm:"type:date;not null" json:"start_date"`
+	EndDate     time.Time `gorm:"type:date;not null" json:"end_date"`
+	Description string    `gorm:"type:text" json:"description"`
+	School      *School   `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
+}
+
+// ExamTimetable represents exam schedule per subject
+type ExamTimetable struct {
+	BaseModel
+	ExamID    uuid.UUID `gorm:"type:char(36);not null;index" json:"exam_id"`
+	SchoolID  uuid.UUID `gorm:"type:char(36);not null;index" json:"school_id"`
+	SubjectID uuid.UUID `gorm:"type:char(36);not null" json:"subject_id"`
+	Level     string    `gorm:"type:varchar(50);not null" json:"level"`
+	Date      time.Time `gorm:"type:date;not null" json:"date"`
+	StartTime string    `gorm:"type:varchar(10);not null" json:"start_time"`
+	EndTime   string    `gorm:"type:varchar(10);not null" json:"end_time"`
+	Venue     string    `gorm:"type:varchar(255)" json:"venue"`
+	Exam      *Exam     `gorm:"foreignKey:ExamID" json:"exam,omitempty"`
+	School    *School   `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
+	Subject   *StandardSubject `gorm:"foreignKey:SubjectID" json:"subject,omitempty"`
+}
+
+// ParentAccount for parent portal access
+type ParentAccount struct {
+	BaseModel
+	GuardianID   uuid.UUID `gorm:"type:char(36);not null;uniqueIndex" json:"guardian_id"`
+	SchoolID     uuid.UUID `gorm:"type:char(36);not null;index" json:"school_id"`
+	Email        string    `gorm:"type:varchar(255);uniqueIndex" json:"email"`
+	Phone        string    `gorm:"type:varchar(20);uniqueIndex" json:"phone"`
+	PasswordHash string    `gorm:"type:varchar(255);not null" json:"-"`
+	IsActive     bool      `gorm:"default:true" json:"is_active"`
+	LastLogin    *time.Time `json:"last_login,omitempty"`
+	Guardian     *Guardian `gorm:"foreignKey:GuardianID" json:"guardian,omitempty"`
+	School       *School   `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
+}
+
+// SchoolCalendar tracks holidays and non-school days
+type SchoolCalendar struct {
+	BaseModel
+	SchoolID    uuid.UUID `gorm:"type:char(36);not null;index" json:"school_id"`
+	Date        time.Time `gorm:"type:date;not null;index" json:"date"`
+	DayType     string    `gorm:"type:varchar(20);not null" json:"day_type"` // weekend, holiday, school_day
+	Name        string    `gorm:"type:varchar(255)" json:"name"` // Holiday name
+	Description string    `gorm:"type:text" json:"description"`
+	Year        int       `gorm:"not null;index" json:"year"`
+	Term        string    `gorm:"type:varchar(10);index" json:"term"`
+	School      *School   `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
+}
+
+// TermDates defines start and end dates for school terms
+type TermDates struct {
+	BaseModel
+	SchoolID  uuid.UUID `gorm:"type:char(36);not null;uniqueIndex:idx_term_dates" json:"school_id"`
+	Year      int       `gorm:"not null;uniqueIndex:idx_term_dates" json:"year"`
+	Term      string    `gorm:"type:varchar(10);not null;uniqueIndex:idx_term_dates" json:"term"`
+	StartDate time.Time `gorm:"type:date;not null" json:"start_date"`
+	EndDate   time.Time `gorm:"type:date;not null" json:"end_date"`
+	School    *School   `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
+}
+
+// MobileMoneyPayment tracks mobile money transactions
+type MobileMoneyPayment struct {
+	BaseModel
+	StudentFeesID   uuid.UUID    `gorm:"type:char(36);not null;index" json:"student_fees_id"`
+	SchoolID        uuid.UUID    `gorm:"type:char(36);not null;index" json:"school_id"`
+	Amount          float64      `gorm:"type:decimal(10,2);not null" json:"amount"`
+	PhoneNumber     string       `gorm:"type:varchar(20);not null" json:"phone_number"`
+	Provider        string       `gorm:"type:varchar(20);not null" json:"provider"` // MTN, Airtel
+	TransactionRef  string       `gorm:"type:varchar(100);uniqueIndex" json:"transaction_ref"`
+	ExternalRef     string       `gorm:"type:varchar(100)" json:"external_ref"`
+	Status          string       `gorm:"type:varchar(20);not null" json:"status"` // pending, success, failed
+	InitiatedAt     time.Time    `gorm:"not null" json:"initiated_at"`
+	CompletedAt     *time.Time   `json:"completed_at,omitempty"`
+	ErrorMessage    string       `gorm:"type:text" json:"error_message"`
+	StudentFees     *StudentFees `gorm:"foreignKey:StudentFeesID" json:"student_fees,omitempty"`
+	School          *School      `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
+}
+
+// NotificationLog tracks all notifications sent
+type NotificationLog struct {
+	BaseModel
+	SchoolID     uuid.UUID  `gorm:"type:char(36);not null;index" json:"school_id"`
+	RecipientID  uuid.UUID  `gorm:"type:char(36);index" json:"recipient_id"`
+	Type         string     `gorm:"not null" json:"type"` // sms, email
+	Channel      string     `json:"channel"` // fees, results, attendance, announcement
+	Recipient    string     `gorm:"not null" json:"recipient"` // phone or email
+	Subject      string     `json:"subject"`
+	Message      string     `gorm:"type:text;not null" json:"message"`
+	Status       string     `gorm:"default:'pending'" json:"status"` // pending, sent, failed, delivered
+	Provider     string     `json:"provider"` // africastalking, smtp, ses
+	ProviderID   string     `json:"provider_id"`
+	ErrorMessage string     `json:"error_message"`
+	SentAt       *time.Time `json:"sent_at,omitempty"`
+	DeliveredAt  *time.Time `json:"delivered_at,omitempty"`
+	Cost         float64    `json:"cost"`
+	School       *School    `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
+}
+
+// NotificationPreference stores user notification preferences
+type NotificationPreference struct {
+	BaseModel
+	GuardianID      uuid.UUID `gorm:"type:char(36);not null;uniqueIndex" json:"guardian_id"`
+	SchoolID        uuid.UUID `gorm:"type:char(36);not null;index" json:"school_id"`
+	SMSEnabled      bool      `gorm:"default:true" json:"sms_enabled"`
+	EmailEnabled    bool      `gorm:"default:true" json:"email_enabled"`
+	FeesReminders   bool      `gorm:"default:true" json:"fees_reminders"`
+	PaymentConfirm  bool      `gorm:"default:true" json:"payment_confirm"`
+	ResultsNotify   bool      `gorm:"default:true" json:"results_notify"`
+	AttendanceAlert bool      `gorm:"default:true" json:"attendance_alert"`
+	Announcements   bool      `gorm:"default:true" json:"announcements"`
+	WeeklySummary   bool      `gorm:"default:false" json:"weekly_summary"`
+	MonthlySummary  bool      `gorm:"default:true" json:"monthly_summary"`
+	Guardian        *Guardian `gorm:"foreignKey:GuardianID" json:"guardian,omitempty"`
+	School          *School   `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
+}
+
+// PaymentWebhookLog logs all webhook callbacks
+type PaymentWebhookLog struct {
+	ID             uuid.UUID  `gorm:"type:char(36);primaryKey" json:"id"`
+	Provider       string     `gorm:"not null" json:"provider"`
+	Event          string     `json:"event"`
+	TransactionRef string     `json:"transaction_ref"`
+	Payload        JSONB      `gorm:"type:json;not null" json:"payload"`
+	Processed      bool       `gorm:"default:false" json:"processed"`
+	ProcessedAt    *time.Time `json:"processed_at,omitempty"`
+	ErrorMessage   string     `json:"error_message"`
+	CreatedAt      time.Time  `json:"created_at"`
+}
+
+func (p *PaymentWebhookLog) BeforeCreate(tx *gorm.DB) error {
+	if p.ID == uuid.Nil {
+		p.ID = uuid.New()
+	}
+	return nil
+}
+
+// Income tracks school income
+type Income struct {
+	BaseModel
+	SchoolID    uuid.UUID `gorm:"type:char(36);not null;index" json:"school_id"`
+	Category    string    `gorm:"type:varchar(100);not null" json:"category"` // Fees, Donations, Grants, Fundraising, Other
+	Source      string    `gorm:"type:varchar(200)" json:"source"`
+	Amount      float64   `gorm:"type:decimal(15,2);not null" json:"amount"`
+	Description string    `gorm:"type:text" json:"description"`
+	Date        time.Time `gorm:"not null;index" json:"date"`
+	Term        string    `gorm:"type:varchar(20);index" json:"term"`
+	Year        int       `gorm:"index" json:"year"`
+	ReceiptNo   string    `gorm:"type:varchar(100)" json:"receipt_no"`
+	ReceivedBy  uuid.UUID `gorm:"type:char(36)" json:"received_by"`
+	School      *School   `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
+	User        *User     `gorm:"foreignKey:ReceivedBy" json:"user,omitempty"`
+}
+
+// Expenditure tracks school expenses
+type Expenditure struct {
+	BaseModel
+	SchoolID    uuid.UUID  `gorm:"type:char(36);not null;index" json:"school_id"`
+	Category    string     `gorm:"type:varchar(100);not null" json:"category"` // Salaries, Utilities, Supplies, Maintenance, Transport, Other
+	Vendor      string     `gorm:"type:varchar(200)" json:"vendor"`
+	Amount      float64    `gorm:"type:decimal(15,2);not null" json:"amount"`
+	Description string     `gorm:"type:text" json:"description"`
+	Date        time.Time  `gorm:"not null;index" json:"date"`
+	Term        string     `gorm:"type:varchar(20);index" json:"term"`
+	Year        int        `gorm:"index" json:"year"`
+	InvoiceNo   string     `gorm:"type:varchar(100)" json:"invoice_no"`
+	ApprovedBy  *uuid.UUID `gorm:"type:char(36)" json:"approved_by"`
+	RecordedBy  uuid.UUID  `gorm:"type:char(36)" json:"recorded_by"`
+	Status      string     `gorm:"type:varchar(20);default:'approved'" json:"status"` // pending, approved, paid
+	School      *School    `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
+	Approver    *User      `gorm:"foreignKey:ApprovedBy" json:"approver,omitempty"`
+	Recorder    *User      `gorm:"foreignKey:RecordedBy" json:"recorder,omitempty"`
+}
+
+// IntegrationActivity stores Activities of Integration marks for S1-S4 (0-3 per activity, 5 activities per subject)
+type IntegrationActivity struct {
+	BaseModel
+	StudentID uuid.UUID `gorm:"type:char(36);not null;uniqueIndex:idx_integration_unique" json:"student_id"`
+	SubjectID uuid.UUID `gorm:"type:char(36);not null;uniqueIndex:idx_integration_unique" json:"subject_id"`
+	ClassID   uuid.UUID `gorm:"type:char(36);not null;index" json:"class_id"`
+	SchoolID  uuid.UUID `gorm:"type:char(36);not null;index" json:"school_id"`
+	Term      string    `gorm:"type:varchar(10);not null;uniqueIndex:idx_integration_unique" json:"term"`
+	Year      int       `gorm:"not null;uniqueIndex:idx_integration_unique" json:"year"`
+	Marks     JSONB     `gorm:"type:json" json:"marks"` // {"activity1": 2.5, "activity2": 3, ...}
+	Student   *Student  `gorm:"foreignKey:StudentID" json:"student,omitempty"`
+	Subject   *StandardSubject `gorm:"foreignKey:SubjectID" json:"subject,omitempty"`
+	Class     *Class    `gorm:"foreignKey:ClassID" json:"class,omitempty"`
+	School    *School   `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
 }

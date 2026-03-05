@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -87,6 +88,13 @@ func (h *FeesHandler) ListStudentFees(c *gin.Context) {
 	for i := range fees {
 		var student models.Student
 		if err := h.db.First(&student, "id = ?", fees[i].StudentID).Error; err == nil {
+			// Load student's current class
+			var enrollment models.Enrollment
+			if err := h.db.Preload("Class").Where("student_id = ? AND status = 'active'", student.ID).First(&enrollment).Error; err == nil {
+				if enrollment.Class != nil {
+					student.ClassName = enrollment.Class.Name
+				}
+			}
 			fees[i].Student = &student
 		}
 	}
@@ -210,10 +218,18 @@ func (h *FeesHandler) RecordPayment(c *gin.Context) {
 
 	// Get student fees record
 	var studentFees models.StudentFees
-	if err := h.db.First(&studentFees, "id = ?", studentFeesID).Error; err != nil {
+	if err := h.db.Preload("Student").First(&studentFees, "id = ?", studentFeesID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Student fees record not found"})
 		return
 	}
+
+	// Start transaction
+	tx := h.db.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
 
 	payment := models.FeesPayment{
 		StudentFeesID: studentFeesID,
@@ -225,7 +241,8 @@ func (h *FeesHandler) RecordPayment(c *gin.Context) {
 		RecordedBy:    userID,
 	}
 
-	if err := h.db.Create(&payment).Error; err != nil {
+	if err := tx.Create(&payment).Error; err != nil {
+		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -233,13 +250,49 @@ func (h *FeesHandler) RecordPayment(c *gin.Context) {
 	// Update student fees totals
 	studentFees.AmountPaid += req.Amount
 	studentFees.Outstanding = studentFees.TotalFees - studentFees.AmountPaid
-	if err := h.db.Save(&studentFees).Error; err != nil {
+	if err := tx.Save(&studentFees).Error; err != nil {
+		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	// Automatically create income record
+	studentName := "Unknown Student"
+	if studentFees.Student != nil {
+		studentName = studentFees.Student.FirstName
+		if studentFees.Student.MiddleName != "" {
+			studentName += " " + studentFees.Student.MiddleName
+		}
+		studentName += " " + studentFees.Student.LastName
+	}
+
+	income := models.Income{
+		SchoolID:    studentFees.SchoolID,
+		Category:    "Fees",
+		Source:      "Student Fees - " + studentName,
+		Amount:      req.Amount,
+		Description: fmt.Sprintf("Fees payment for %s %d", studentFees.Term, studentFees.Year),
+		Date:        payment.PaymentDate,
+		Term:        studentFees.Term,
+		Year:        studentFees.Year,
+		ReceiptNo:   req.ReceiptNo,
+		ReceivedBy:  userID,
+	}
+
+	if err := tx.Create(&income).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create income record: " + err.Error()})
+		return
+	}
+
+	// Commit transaction
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit transaction"})
+		return
+	}
+
 	ws.GlobalHub.Broadcast("fees:payment:recorded", gin.H{"payment": payment, "updated_fees": studentFees}, studentFees.SchoolID.String())
-	c.JSON(http.StatusOK, gin.H{"payment": payment, "updated_fees": studentFees})
+	c.JSON(http.StatusOK, gin.H{"payment": payment, "updated_fees": studentFees, "income_created": true})
 }
 
 // Get student fees details
@@ -250,6 +303,16 @@ func (h *FeesHandler) GetStudentFeesDetails(c *gin.Context) {
 	if err := h.db.Preload("Student").First(&fees, "id = ?", studentFeesID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Student fees record not found"})
 		return
+	}
+
+	// Load student's current class
+	if fees.Student != nil {
+		var enrollment models.Enrollment
+		if err := h.db.Preload("Class").Where("student_id = ? AND status = 'active'", fees.Student.ID).First(&enrollment).Error; err == nil {
+			if enrollment.Class != nil {
+				fees.Student.ClassName = enrollment.Class.Name
+			}
+		}
 	}
 
 	var payments []models.FeesPayment
@@ -282,6 +345,8 @@ func (h *FeesHandler) GetReportData(c *gin.Context) {
 	reportType := c.Query("type")
 	term := c.Query("term")
 	year := c.Query("year")
+	level := c.Query("level")
+	classID := c.Query("class_id")
 
 	var startDate, endDate time.Time
 	now := time.Now()
@@ -312,20 +377,66 @@ func (h *FeesHandler) GetReportData(c *gin.Context) {
 		return
 	}
 
-	// Get all student fees
+	// Get all student fees with proper filtering
 	var fees []models.StudentFees
-	feesQuery := h.db.Preload("Student").Where("student_fees.school_id = ?", schoolID)
+	feesQuery := h.db.Where("student_fees.school_id = ?", schoolID)
+	
 	if reportType == "termly" && term != "" {
 		feesQuery = feesQuery.Where("student_fees.term = ?", term)
 	}
 	if (reportType == "termly" || reportType == "yearly") && year != "" {
 		feesQuery = feesQuery.Where("student_fees.year = ?", year)
 	}
+	
+	if level != "" || classID != "" {
+		// Get student IDs that match the class filter
+		var studentIDs []uuid.UUID
+		studentQuery := h.db.Table("students").
+			Select("DISTINCT students.id").
+			Joins("INNER JOIN enrollments ON students.id = enrollments.student_id AND enrollments.status = 'active'").
+			Joins("INNER JOIN classes ON enrollments.class_id = classes.id")
+		
+		if level != "" {
+			studentQuery = studentQuery.Where("classes.level = ?", level)
+		}
+		if classID != "" {
+			studentQuery = studentQuery.Where("classes.id = ?", classID)
+		}
+		
+		studentQuery.Pluck("students.id", &studentIDs)
+		
+		if len(studentIDs) > 0 {
+			feesQuery = feesQuery.Where("student_fees.student_id IN ?", studentIDs)
+		} else {
+			// No students found, return empty result
+			feesQuery = feesQuery.Where("1 = 0")
+		}
+	}
+	
 	feesQuery.Find(&fees)
+	
+	// Manually load students with guardians and class info for each fee
+	for i := range fees {
+		var student models.Student
+		if err := h.db.Where("id = ?", fees[i].StudentID).First(&student).Error; err == nil {
+			// Load guardians
+			var guardians []models.Guardian
+			h.db.Where("student_id = ?", student.ID).Find(&guardians)
+			
+			// Load current class
+			var enrollment models.Enrollment
+			if err := h.db.Preload("Class").Where("student_id = ? AND status = 'active'", student.ID).First(&enrollment).Error; err == nil {
+				student.Class = enrollment.Class
+			}
+			
+			fees[i].Student = &student
+			fees[i].Student.Guardians = guardians
+		}
+	}
 
 	// Get payments based on date range
 	var payments []models.FeesPayment
-	paymentsQuery := h.db.Preload("StudentFees.Student").Joins("JOIN student_fees ON fees_payments.student_fees_id = student_fees.id").Where("student_fees.school_id = ?", schoolID)
+	paymentsQuery := h.db.Joins("JOIN student_fees ON fees_payments.student_fees_id = student_fees.id").Where("student_fees.school_id = ?", schoolID)
 	if reportType == "daily" || reportType == "weekly" || reportType == "monthly" {
 		paymentsQuery = paymentsQuery.Where("fees_payments.payment_date >= ? AND fees_payments.payment_date < ?", startDate, endDate)
 	}
@@ -336,6 +447,29 @@ func (h *FeesHandler) GetReportData(c *gin.Context) {
 		paymentsQuery = paymentsQuery.Where("student_fees.year = ?", year)
 	}
 	paymentsQuery.Select("fees_payments.*").Find(&payments)
+	
+	// Load full student data with guardians and class for each payment
+	for i := range payments {
+		var studentFees models.StudentFees
+		if err := h.db.Where("id = ?", payments[i].StudentFeesID).First(&studentFees).Error; err == nil {
+			var student models.Student
+			if err := h.db.Where("id = ?", studentFees.StudentID).First(&student).Error; err == nil {
+				// Load guardians
+				var guardians []models.Guardian
+				h.db.Where("student_id = ?", student.ID).Find(&guardians)
+				
+				// Load current class
+				var enrollment models.Enrollment
+				if err := h.db.Preload("Class").Where("student_id = ? AND status = 'active'", student.ID).First(&enrollment).Error; err == nil {
+					student.Class = enrollment.Class
+				}
+				
+				student.Guardians = guardians
+				studentFees.Student = &student
+			}
+			payments[i].StudentFees = &studentFees
+		}
+	}
 
 	// Get fees by class
 	var feesByClass []struct {
@@ -346,7 +480,7 @@ func (h *FeesHandler) GetReportData(c *gin.Context) {
 		TotalOutstanding float64 `json:"total_outstanding"`
 	}
 	classQuery := h.db.Table("student_fees").
-		Select("classes.level as class, COUNT(DISTINCT student_fees.student_id) as total_students, SUM(student_fees.total_fees) as total_fees, SUM(student_fees.amount_paid) as total_paid, SUM(student_fees.outstanding) as total_outstanding").
+		Select("classes.name as class, COUNT(DISTINCT student_fees.student_id) as total_students, SUM(student_fees.total_fees) as total_fees, SUM(student_fees.amount_paid) as total_paid, SUM(student_fees.outstanding) as total_outstanding").
 		Joins("JOIN students ON student_fees.student_id = students.id").
 		Joins("JOIN enrollments ON students.id = enrollments.student_id AND enrollments.status = 'active'").
 		Joins("JOIN classes ON enrollments.class_id = classes.id").
@@ -357,7 +491,13 @@ func (h *FeesHandler) GetReportData(c *gin.Context) {
 	if (reportType == "termly" || reportType == "yearly") && year != "" {
 		classQuery = classQuery.Where("student_fees.year = ?", year)
 	}
-	classQuery.Group("classes.level").Order("class").Scan(&feesByClass)
+	if level != "" {
+		classQuery = classQuery.Where("classes.level = ?", level)
+		if classID != "" {
+			classQuery = classQuery.Where("classes.id = ?", classID)
+		}
+	}
+	classQuery.Group("classes.id, classes.name").Order("class").Scan(&feesByClass)
 
 	// Get payment methods summary
 	var paymentMethods []struct {

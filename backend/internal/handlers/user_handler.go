@@ -14,14 +14,12 @@ import (
 type UserHandler struct {
 	db          *gorm.DB
 	authService *services.AuthService
-	auditService *services.AuditService
 }
 
 func NewUserHandler(db *gorm.DB, authService *services.AuthService) *UserHandler {
 	return &UserHandler{
-		db: db, 
+		db:          db,
 		authService: authService,
-		auditService: services.NewAuditService(db),
 	}
 }
 
@@ -55,8 +53,26 @@ func (h *UserHandler) List(c *gin.Context) {
 		return
 	}
 
+	// Map users with school_name for frontend
+	type UserResponse struct {
+		models.User
+		SchoolName string `json:"school_name"`
+	}
+
+	var response []UserResponse
+	for _, user := range users {
+		schoolName := "System"
+		if user.School != nil {
+			schoolName = user.School.Name
+		}
+		response = append(response, UserResponse{
+			User:       user,
+			SchoolName: schoolName,
+		})
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"users": users,
+		"users": response,
 		"total": total,
 		"page":  page,
 		"limit": limit,
@@ -77,38 +93,34 @@ func (h *UserHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// Validate school assignment
-	if req.Role != "system_admin" && req.SchoolID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "School assignment required for non-system admin users"})
+	// System admin can only create school_admin
+	if req.Role != "school_admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "System admin can only create school_admin users"})
+		return
+	}
+
+	if req.SchoolID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "School assignment required for school_admin"})
+		return
+	}
+
+	schoolID, err := uuid.Parse(req.SchoolID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid school_id"})
 		return
 	}
 
 	user := &models.User{
+		SchoolID: &schoolID,
 		Email:    req.Email,
 		FullName: req.FullName,
 		Role:     req.Role,
 		IsActive: true,
 	}
 
-	if req.Role == "system_admin" {
-		user.SchoolID = nil
-	} else {
-		schoolID, err := uuid.Parse(req.SchoolID)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid school_id"})
-			return
-		}
-		user.SchoolID = &schoolID
-	}
-
 	if err := h.authService.CreateUser(user, req.Password); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
-	}
-
-	// Log audit
-	if userID, exists := c.Get("user_id"); exists {
-		h.auditService.Log(userID.(uuid.UUID), "CREATE", "user", user.ID, nil, models.JSONB{"name": user.FullName, "role": user.Role}, c.ClientIP())
 	}
 
 	c.JSON(http.StatusCreated, user)
@@ -122,6 +134,25 @@ func (h *UserHandler) Get(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, user)
+}
+
+func (h *UserHandler) GetSchoolUser(c *gin.Context) {
+	id := c.Param("id")
+	schoolID := c.GetString("tenant_school_id")
+	var user models.User
+	if err := h.db.Preload("School").Where("id = ? AND school_id = ?", id, schoolID).First(&user).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+	type UserResponse struct {
+		models.User
+		SchoolName string `json:"school_name"`
+	}
+	schoolName := "System"
+	if user.School != nil {
+		schoolName = user.School.Name
+	}
+	c.JSON(http.StatusOK, UserResponse{User: user, SchoolName: schoolName})
 }
 
 func (h *UserHandler) Update(c *gin.Context) {
@@ -162,29 +193,15 @@ func (h *UserHandler) Update(c *gin.Context) {
 		return
 	}
 
-	// Log audit
-	if userID, exists := c.Get("user_id"); exists {
-		h.auditService.Log(userID.(uuid.UUID), "UPDATE", "user", user.ID, nil, models.JSONB{"name": user.FullName}, c.ClientIP())
-	}
-
 	c.JSON(http.StatusOK, user)
 }
 
 func (h *UserHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
-	var user models.User
-	h.db.First(&user, "id = ?", id)
-	
 	if err := h.db.Delete(&models.User{}, "id = ?", id).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	// Log audit
-	if userID, exists := c.Get("user_id"); exists {
-		h.auditService.Log(userID.(uuid.UUID), "DELETE", "user", uuid.MustParse(id), models.JSONB{"name": user.FullName}, nil, c.ClientIP())
-	}
-
 	c.JSON(http.StatusOK, gin.H{"message": "User deleted"})
 }
 
@@ -214,14 +231,12 @@ func (h *UserHandler) CreateSchoolUser(c *gin.Context) {
 		return
 	}
 
-	// School admin cannot create system_admin or school_admin users
 	if req.Role == "system_admin" || req.Role == "school_admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot create system_admin or school_admin users"})
 		return
 	}
 
-	// Validate role
-	allowedRoles := []string{"teacher", "bursar", "librarian", "nurse"}
+	allowedRoles := []string{"teacher", "bursar", "librarian", "nurse", "store_keeper", "security", "cleaner", "cook", "driver", "gardener", "maintenance", "receptionist"}
 	validRole := false
 	for _, role := range allowedRoles {
 		if req.Role == role {
@@ -230,7 +245,7 @@ func (h *UserHandler) CreateSchoolUser(c *gin.Context) {
 		}
 	}
 	if !validRole {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role. Allowed: teacher, bursar, librarian, nurse"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role. Allowed: teacher, bursar, librarian, nurse, store_keeper, security, cleaner, cook, driver, gardener, maintenance, receptionist"})
 		return
 	}
 
@@ -248,25 +263,19 @@ func (h *UserHandler) CreateSchoolUser(c *gin.Context) {
 		return
 	}
 
-	// Log audit
-	if userID, exists := c.Get("user_id"); exists {
-		h.auditService.Log(userID.(uuid.UUID), "CREATE", "user", user.ID, nil, models.JSONB{"name": user.FullName, "role": user.Role}, c.ClientIP())
-	}
-
 	c.JSON(http.StatusCreated, user)
 }
 
 func (h *UserHandler) UpdateSchoolUser(c *gin.Context) {
 	id := c.Param("id")
 	schoolID := c.GetString("tenant_school_id")
-	
+
 	var user models.User
 	if err := h.db.Where("id = ? AND school_id = ?", id, schoolID).First(&user).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
 
-	// Cannot update system_admin or school_admin users
 	if user.Role == "system_admin" || user.Role == "school_admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot update system_admin or school_admin users"})
 		return
@@ -291,8 +300,7 @@ func (h *UserHandler) UpdateSchoolUser(c *gin.Context) {
 		user.FullName = req.FullName
 	}
 	if req.Role != "" {
-		// Validate role
-		allowedRoles := []string{"teacher", "bursar", "librarian", "nurse"}
+		allowedRoles := []string{"teacher", "bursar", "librarian", "nurse", "store_keeper", "security", "cleaner", "cook", "driver", "gardener", "maintenance", "receptionist"}
 		validRole := false
 		for _, role := range allowedRoles {
 			if req.Role == role {
@@ -301,7 +309,7 @@ func (h *UserHandler) UpdateSchoolUser(c *gin.Context) {
 			}
 		}
 		if !validRole {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role. Allowed: teacher, bursar, librarian, nurse"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role. Allowed: teacher, bursar, librarian, nurse, store_keeper, security, cleaner, cook, driver, gardener, maintenance, receptionist"})
 			return
 		}
 		user.Role = req.Role
@@ -315,38 +323,27 @@ func (h *UserHandler) UpdateSchoolUser(c *gin.Context) {
 		return
 	}
 
-	// Log audit
-	if userID, exists := c.Get("user_id"); exists {
-		h.auditService.Log(userID.(uuid.UUID), "UPDATE", "user", user.ID, nil, models.JSONB{"name": user.FullName}, c.ClientIP())
-	}
-
 	c.JSON(http.StatusOK, user)
 }
 
 func (h *UserHandler) DeleteSchoolUser(c *gin.Context) {
 	id := c.Param("id")
 	schoolID := c.GetString("tenant_school_id")
-	
+
 	var user models.User
 	if err := h.db.Where("id = ? AND school_id = ?", id, schoolID).First(&user).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
 
-	// Cannot delete system_admin or school_admin users
 	if user.Role == "system_admin" || user.Role == "school_admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot delete system_admin or school_admin users"})
 		return
 	}
-	
+
 	if err := h.db.Delete(&user).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
-	}
-
-	// Log audit
-	if userID, exists := c.Get("user_id"); exists {
-		h.auditService.Log(userID.(uuid.UUID), "DELETE", "user", user.ID, models.JSONB{"name": user.FullName}, nil, c.ClientIP())
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "User deleted"})
