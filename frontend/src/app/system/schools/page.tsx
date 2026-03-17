@@ -45,7 +45,7 @@ export default function SchoolsPage() {
 
   const { data: schools, isLoading } = useQuery({
     queryKey: ['schools', searchTerm],
-    queryFn: () => api.get('/schools', { params: { search: searchTerm } }).then(res => res.data),
+    queryFn: () => api.get('/api/v1/schools', { params: { search: searchTerm } }).then(res => res.data),
   })
 
   const createMutation = useMutation({
@@ -54,12 +54,12 @@ export default function SchoolsPage() {
       if (logoFile) {
         const formData = new FormData()
         formData.append('logo', logoFile)
-        const uploadRes = await api.post('/upload/logo', formData, {
+        const uploadRes = await api.post('/api/v1/upload/logo', formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         })
         logoUrl = uploadRes.data.logo_url
       }
-      return api.post('/schools', { ...data, logo_url: logoUrl })
+      return api.post('/api/v1/schools', { ...data, logo_url: logoUrl })
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['schools'] })
@@ -76,12 +76,12 @@ export default function SchoolsPage() {
       if (logoFile) {
         const formData = new FormData()
         formData.append('logo', logoFile)
-        const uploadRes = await api.post('/upload/logo', formData, {
+        const uploadRes = await api.post('/api/v1/upload/logo', formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         })
         logoUrl = uploadRes.data.logo_url
       }
-      return api.put(`/schools/${id}`, { ...data, logo_url: logoUrl })
+      return api.put(`/api/v1/schools/${id}`, { ...data, logo_url: logoUrl })
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['schools'] })
@@ -94,12 +94,12 @@ export default function SchoolsPage() {
   })
 
   const toggleActiveMutation = useMutation({
-    mutationFn: (id: string) => api.patch(`/schools/${id}/toggle-active`),
+    mutationFn: (id: string) => api.patch(`/api/v1/schools/${id}/toggle-active`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['schools'] }),
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/schools/${id}`),
+    mutationFn: (id: string) => api.delete(`/api/v1/schools/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['schools'] }),
   })
 

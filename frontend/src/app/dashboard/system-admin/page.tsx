@@ -128,7 +128,7 @@ export default function SystemAdminDashboard() {
                 description="Register a new school in the system"
                 icon="➕"
                 color="bg-gradient-to-br from-blue-50 to-blue-100 text-blue-600"
-                link="/system/schools/create"
+                link="/system/schools"
               />
               <QuickAction
                 title="Manage Schools"
