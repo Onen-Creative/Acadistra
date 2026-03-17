@@ -14,7 +14,7 @@ export default function AuditLogsPage() {
   const { data: logs, isLoading, refetch } = useQuery({
     queryKey: ['audit-logs', page, actionFilter],
     queryFn: async () => {
-      const res = await api.get('/audit-logs', { params: { page, action: actionFilter } })
+      const res = await api.get('/api/v1/audit-logs', { params: { page, action: actionFilter } })
       return Array.isArray(res.data) ? { logs: res.data } : res.data
     },
     staleTime: 0,
