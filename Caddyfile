@@ -1,5 +1,13 @@
 # Main domain - Frontend with API routing
 acadistra.com, www.acadistra.com {
+	# Route /logos/* and /photos/* to backend
+	handle /logos/* {
+		reverse_proxy backend:8080
+	}
+	handle /photos/* {
+		reverse_proxy backend:8080
+	}
+	
 	# Route /api/* to backend
 	handle /api/* {
 		reverse_proxy backend:8080
