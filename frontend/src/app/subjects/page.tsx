@@ -13,7 +13,7 @@ export default function SubjectsPage() {
   const { data: subjects, isLoading } = useQuery({
     queryKey: ['subjects', selectedLevel],
     queryFn: async () => {
-      const res = await api.get('/subjects', { params: { level: selectedLevel } });
+      const res = await api.get('/api/v1/subjects', { params: { level: selectedLevel } });
       return res.data;
     }
   });
@@ -21,7 +21,7 @@ export default function SubjectsPage() {
   const { data: levels } = useQuery({
     queryKey: ['subject-levels'],
     queryFn: async () => {
-      const res = await api.get('/subjects/levels');
+      const res = await api.get('/api/v1/subjects/levels');
       return res.data;
     }
   });

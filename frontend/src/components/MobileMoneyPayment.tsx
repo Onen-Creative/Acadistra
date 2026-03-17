@@ -28,7 +28,7 @@ export function MobileMoneyPayment({ studentFeesId, outstandingAmount, studentNa
     setStep('processing')
 
     try {
-      const res = await api.post('/payments/mobile-money', {
+      const res = await api.post('/api/v1/payments/mobile-money', {
         student_fees_id: studentFeesId,
         amount: parseFloat(amount),
         phone_number: phoneNumber,

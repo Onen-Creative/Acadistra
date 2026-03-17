@@ -25,7 +25,7 @@ export function NotificationPreferences() {
 
   const loadPreferences = async () => {
     try {
-      const res = await api.get('/notifications/preferences')
+      const res = await api.get('/api/v1/notifications/preferences')
       if (res.data.preferences) {
         setPreferences(res.data.preferences)
       }
@@ -39,7 +39,7 @@ export function NotificationPreferences() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      await api.put('/notifications/preferences', preferences)
+      await api.put('/api/v1/notifications/preferences', preferences)
       alert('Preferences saved successfully!')
     } catch (error) {
       alert('Failed to save preferences')

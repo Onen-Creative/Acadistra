@@ -11,15 +11,15 @@ import * as XLSX from 'xlsx'
 
 const payrollApi = {
   listStaff: async () => {
-    const { data } = await api.get('/staff')
+    const { data } = await api.get('/api/v1/staff')
     return data
   },
   listSalaryStructures: async () => {
-    const { data } = await api.get('/payroll/salary-structures')
+    const { data } = await api.get('/api/v1/payroll/salary-structures')
     return data
   },
   createSalaryStructure: async (data: any) => {
-    const { data: response } = await api.post('/payroll/salary-structures', data)
+    const { data: response } = await api.post('/api/v1/payroll/salary-structures', data)
     return response
   },
   updateSalaryStructure: async (id: number, data: any) => {
@@ -31,11 +31,11 @@ const payrollApi = {
     return data
   },
   processPayroll: async (data: any) => {
-    const { data: response } = await api.post('/payroll/process', data)
+    const { data: response } = await api.post('/api/v1/payroll/process', data)
     return response
   },
   listPayrollRuns: async () => {
-    const { data } = await api.get('/payroll/runs')
+    const { data } = await api.get('/api/v1/payroll/runs')
     return data
   },
   markPaymentPaid: async (id: number, data: any) => {

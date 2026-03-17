@@ -23,12 +23,12 @@ export default function SchoolAdminDashboard() {
     setLoading(true)
     try {
       const [studentsRes, staffRes, classesRes, feesRes, attendanceRes, financeRes] = await Promise.all([
-        api.get('/students'),
-        api.get('/staff'),
-        api.get('/classes'),
-        api.get('/fees', { params: { term, year } }),
-        api.get('/attendance/stats', { params: { period: 'today' } }).catch(() => ({ data: { present: 0, total_days: 0, percentage: 0 } })),
-        api.get('/finance/summary', { params: { term, year } })
+        api.get('/api/v1/students'),
+        api.get('/api/v1/staff'),
+        api.get('/api/v1/classes'),
+        api.get('/api/v1/fees', { params: { term, year } }),
+        api.get('/api/v1/attendance/stats', { params: { period: 'today' } }).catch(() => ({ data: { present: 0, total_days: 0, percentage: 0 } })),
+        api.get('/api/v1/finance/summary', { params: { term, year } })
       ])
 
       const students = studentsRes.data?.students || []

@@ -71,7 +71,7 @@ export default function BudgetPage() {
         });
         toast.success('✅ Budget updated successfully!', { id: loadingToast });
       } else {
-        await api.post('/budgets', {
+        await api.post('/api/v1/budgets', {
           ...formData,
           allocated_amount: parseFloat(formData.allocated_amount)
         });

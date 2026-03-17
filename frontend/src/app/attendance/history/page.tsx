@@ -55,7 +55,7 @@ export default function AttendanceHistoryPage() {
 
   const loadLevels = async () => {
     try {
-      const response = await api.get('/school/levels')
+      const response = await api.get('/api/v1/school/levels')
       setLevels(response.data.levels || [])
     } catch (error) {
       toast.error('Failed to load levels')
@@ -64,7 +64,7 @@ export default function AttendanceHistoryPage() {
 
   const loadClasses = async () => {
     try {
-      const response = await api.get('/classes', {
+      const response = await api.get('/api/v1/classes', {
         params: { year: selectedYear }
       })
       setClasses(Array.isArray(response.data) ? response.data : response.data.classes || [])
@@ -75,7 +75,7 @@ export default function AttendanceHistoryPage() {
 
   const loadStudents = async () => {
     try {
-      const response = await api.get('/students', {
+      const response = await api.get('/api/v1/students', {
         params: { class_id: selectedClass, limit: 1000 }
       })
       setStudents(response.data.students || [])
@@ -94,7 +94,7 @@ export default function AttendanceHistoryPage() {
       } else {
         params.period = classPeriod
       }
-      const response = await api.get('/attendance/class-summary', { params })
+      const response = await api.get('/api/v1/attendance/class-summary', { params })
       setClassSummary(response.data)
     } catch (error) {
       toast.error('Failed to load class summary')

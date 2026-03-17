@@ -26,7 +26,7 @@ export default function ReportCardPage() {
   const { data: schoolData } = useQuery({
     queryKey: ['school'],
     queryFn: async () => {
-      const res = await api.get('/school')
+      const res = await api.get('/api/v1/school')
       return res.data.school || res.data
     }
   })

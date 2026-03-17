@@ -35,7 +35,7 @@ export default function SettingsPage() {
       localStorage.setItem('school_settings', JSON.stringify(settings))
       
       // Save to backend
-      await api.put('/school-settings', { section, data })
+      await api.put('/api/v1/school-settings', { section, data })
       
       toast.success('Settings saved successfully')
       return true
@@ -100,15 +100,15 @@ function CalendarSection({ onSave }: any) {
     const loadSettings = async () => {
       try {
         // Load from school settings
-        const response = await api.get('/school-settings');
+        const response = await api.get('/api/v1/school-settings');
         const saved = response.data;
         
         // Also load from term_dates table
-        const termDatesResponse = await api.get('/term-dates');
+        const termDatesResponse = await api.get('/api/v1/term-dates');
         const termDates = termDatesResponse.data;
         
         // Load from calendar holidays
-        const holidaysResponse = await api.get('/calendar/holidays');
+        const holidaysResponse = await api.get('/api/v1/calendar/holidays');
         const savedHolidays = holidaysResponse.data;
         
         if (saved.calendar) {
@@ -166,7 +166,7 @@ function CalendarSection({ onSave }: any) {
       
       // Also save term dates to term_dates table for system use
       if (formData.term1_start && formData.term1_end) {
-        await api.post('/term-dates', {
+        await api.post('/api/v1/term-dates', {
           term: 1,
           start_date: formData.term1_start,
           end_date: formData.term1_end,
@@ -174,7 +174,7 @@ function CalendarSection({ onSave }: any) {
         });
       }
       if (formData.term2_start && formData.term2_end) {
-        await api.post('/term-dates', {
+        await api.post('/api/v1/term-dates', {
           term: 2,
           start_date: formData.term2_start,
           end_date: formData.term2_end,
@@ -182,7 +182,7 @@ function CalendarSection({ onSave }: any) {
         });
       }
       if (formData.term3_start && formData.term3_end) {
-        await api.post('/term-dates', {
+        await api.post('/api/v1/term-dates', {
           term: 3,
           start_date: formData.term3_start,
           end_date: formData.term3_end,
@@ -192,7 +192,7 @@ function CalendarSection({ onSave }: any) {
       
       // Save holidays to calendar/holidays table
       for (const holiday of holidays) {
-        await api.post('/calendar/holidays', {
+        await api.post('/api/v1/calendar/holidays', {
           date: holiday.date,
           name: holiday.name
         }).catch(() => {}); // Ignore duplicates
@@ -331,7 +331,7 @@ function NotificationsSection({ onSave }: any) {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const response = await api.get('/school-settings');
+        const response = await api.get('/api/v1/school-settings');
         if (response.data.notifications) {
           setSettings(response.data.notifications);
         }
@@ -402,7 +402,7 @@ function SecuritySection({ onSave }: any) {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const response = await api.get('/school-settings');
+        const response = await api.get('/api/v1/school-settings');
         if (response.data.security) {
           setSettings(prev => ({ ...prev, ...response.data.security, current_password: '', new_password: '', confirm_password: '' }));
         }

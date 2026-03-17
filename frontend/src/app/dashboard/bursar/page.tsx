@@ -20,8 +20,8 @@ export default function BursarDashboard() {
     setLoading(true)
     try {
       const [feesRes, financeRes] = await Promise.all([
-        api.get('/fees', { params: { term, year } }),
-        api.get('/finance/summary', { params: { term, year } })
+        api.get('/api/v1/fees', { params: { term, year } }),
+        api.get('/api/v1/finance/summary', { params: { term, year } })
       ])
 
       const feesData = feesRes.data?.fees || []

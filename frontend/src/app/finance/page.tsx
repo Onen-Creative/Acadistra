@@ -25,9 +25,9 @@ export default function FinancePage() {
     try {
       const params = { term: `Term ${term}`, year }
       const [incomeRes, expRes, summaryRes] = await Promise.all([
-        api.get('/finance/income', { params }),
-        api.get('/finance/expenditure', { params }),
-        api.get('/finance/summary', { params })
+        api.get('/api/v1/finance/income', { params }),
+        api.get('/api/v1/finance/expenditure', { params }),
+        api.get('/api/v1/finance/summary', { params })
       ])
       setIncomes(incomeRes.data.incomes || [])
       setExpenditures(expRes.data.expenditures || [])
@@ -55,13 +55,13 @@ export default function FinancePage() {
         if (editingItem) {
           await api.put(`/finance/income/${editingItem.id}`, payload)
         } else {
-          await api.post('/finance/income', payload)
+          await api.post('/api/v1/finance/income', payload)
         }
       } else {
         if (editingItem) {
           await api.put(`/finance/expenditure/${editingItem.id}`, payload)
         } else {
-          await api.post('/finance/expenditure', payload)
+          await api.post('/api/v1/finance/expenditure', payload)
         }
       }
       toast.success('Saved successfully')

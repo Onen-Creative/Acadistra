@@ -60,7 +60,7 @@ export default function StaffRegisterPage() {
       const payload: any = { ...formData }
       if (payload.salary) payload.salary = parseFloat(payload.salary)
       if (payload.experience) payload.experience = parseInt(payload.experience)
-      await api.post('/staff', payload)
+      await api.post('/api/v1/staff', payload)
       toast.success('Staff registered successfully!')
       router.push('/staff')
     } catch (error: any) {

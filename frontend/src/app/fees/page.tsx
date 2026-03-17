@@ -46,7 +46,7 @@ export default function FeesPage() {
 
   const loadLevels = async () => {
     try {
-      const response = await api.get('/school/levels')
+      const response = await api.get('/api/v1/school/levels')
       setLevels(response.data.levels || [])
     } catch (error) {
       toast.error('Failed to load levels')
@@ -55,7 +55,7 @@ export default function FeesPage() {
 
   const loadClasses = async () => {
     try {
-      const response = await api.get('/classes', { params: { year } })
+      const response = await api.get('/api/v1/classes', { params: { year } })
       const filtered = (Array.isArray(response.data) ? response.data : []).filter((c: any) => c.level === selectedLevel)
       setClasses(filtered)
     } catch (error) {
@@ -65,7 +65,7 @@ export default function FeesPage() {
 
   const loadStudents = async () => {
     try {
-      const response = await api.get('/students', { params: { class_id: selectedClass, limit: 1000 } })
+      const response = await api.get('/api/v1/students', { params: { class_id: selectedClass, limit: 1000 } })
       setStudents(response.data.students || [])
     } catch (error) {
       toast.error('Failed to load students')
@@ -75,7 +75,7 @@ export default function FeesPage() {
   const loadFees = async () => {
     setLoading(true)
     try {
-      const response = await api.get('/fees', { params: { class_id: selectedClass, term, year } })
+      const response = await api.get('/api/v1/fees', { params: { class_id: selectedClass, term, year } })
       const feesData = Array.isArray(response.data) ? response.data : response.data?.fees || []
       
       // Load payment history for each fee
@@ -113,7 +113,7 @@ export default function FeesPage() {
     })
     
     try {
-      await api.post('/fees', {
+      await api.post('/api/v1/fees', {
         student_id: formData.get('student_id'),
         term,
         year,
@@ -143,7 +143,7 @@ export default function FeesPage() {
     })
     
     try {
-      const response = await api.post('/fees/payment', {
+      const response = await api.post('/api/v1/fees/payment', {
         student_fees_id: selectedFee.id,
         amount: totalAmount,
         payment_method: formData.get('payment_method'),

@@ -25,7 +25,7 @@ export default function HolidaysPage() {
   const loadHolidays = async () => {
     setLoading(true)
     try {
-      const response = await api.get('/calendar/holidays')
+      const response = await api.get('/api/v1/calendar/holidays')
       setHolidays(Array.isArray(response.data) ? response.data : response.data.holidays || [])
     } catch (error) {
       toast.error('Failed to load holidays')
@@ -54,7 +54,7 @@ export default function HolidaysPage() {
 
     try {
       for (const holiday of ugandanHolidays) {
-        await api.post('/calendar/holidays', holiday)
+        await api.post('/api/v1/calendar/holidays', holiday)
       }
       toast.success('Ugandan holidays added successfully')
       loadHolidays()
@@ -76,7 +76,7 @@ export default function HolidaysPage() {
         await api.put(`/calendar/holidays/${editingHoliday.id}`, payload)
         toast.success('Holiday updated successfully')
       } else {
-        await api.post('/calendar/holidays', payload)
+        await api.post('/api/v1/calendar/holidays', payload)
         toast.success('Holiday added successfully')
       }
       setModalOpen(false)

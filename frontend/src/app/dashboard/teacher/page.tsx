@@ -28,8 +28,8 @@ export default function TeacherDashboard() {
     setLoading(true)
     try {
       const [classesRes, attendanceRes] = await Promise.all([
-        api.get('/classes', { params: { year: currentYear } }),
-        api.get('/attendance/stats', { params: { start_date: getStartOfWeek(), end_date: new Date().toISOString().split('T')[0] } })
+        api.get('/api/v1/classes', { params: { year: currentYear } }),
+        api.get('/api/v1/attendance/stats', { params: { start_date: getStartOfWeek(), end_date: new Date().toISOString().split('T')[0] } })
       ])
 
       setClasses(Array.isArray(classesRes.data) ? classesRes.data.slice(0, 6) : [])

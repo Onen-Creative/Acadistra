@@ -34,7 +34,7 @@ export default function StudentDetailPage() {
       const params: any = {}
       if (selectedYear) params.year = selectedYear
       if (selectedTerm) params.term = selectedTerm
-      const response = await api.get('/classes', { params })
+      const response = await api.get('/api/v1/classes', { params })
       return Array.isArray(response.data) ? { classes: response.data } : response.data
     },
   })

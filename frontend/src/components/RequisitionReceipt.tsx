@@ -38,7 +38,7 @@ export default function RequisitionReceipt({ requisition, onClose }: Requisition
 
   const loadSchool = async () => {
     try {
-      const response = await api.get('/school')
+      const response = await api.get('/api/v1/school')
       setSchool(response.data)
     } catch (error) {
       console.error('Failed to load school:', error)

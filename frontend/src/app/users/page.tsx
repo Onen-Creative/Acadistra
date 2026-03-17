@@ -39,7 +39,7 @@ export default function UsersPage() {
   const { data: users, isLoading } = useQuery({
     queryKey: ['school-users', roleFilter],
     queryFn: async () => {
-      const res = await api.get('/school-users', { params: { role: roleFilter } })
+      const res = await api.get('/api/v1/school-users', { params: { role: roleFilter } })
       return res.data
     }
   })
@@ -48,7 +48,7 @@ export default function UsersPage() {
     mutationFn: (data: UserForm) => 
       editingUser 
         ? api.put(`/school-users/${editingUser.id}`, data)
-        : api.post('/school-users', data),
+        : api.post('/api/v1/school-users', data),
     onSuccess: () => {
       notifications.show({ 
         title: 'Success', 

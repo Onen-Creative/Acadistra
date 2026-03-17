@@ -95,7 +95,7 @@ export default function StudentsPage() {
   const { data: imports } = useQuery({
     queryKey: ['imports'],
     queryFn: async () => {
-      const res = await api.get('/import/list')
+      const res = await api.get('/api/v1/import/list')
       return res.data
     }
   })
@@ -116,7 +116,7 @@ export default function StudentsPage() {
       const formData = new FormData()
       formData.append('file', file)
       formData.append('class_id', importClass)
-      const res = await api.post('/import/students/upload', formData, {
+      const res = await api.post('/api/v1/import/students/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       })
       return res.data

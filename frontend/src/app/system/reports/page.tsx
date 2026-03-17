@@ -15,7 +15,7 @@ export default function SystemReportsPage() {
 
   const { data: stats } = useQuery({
     queryKey: ['system-stats'],
-    queryFn: () => api.get('/stats').then(res => res.data),
+    queryFn: () => api.get('/api/v1/stats').then(res => res.data),
   })
 
   const generateReport = async (type: string) => {

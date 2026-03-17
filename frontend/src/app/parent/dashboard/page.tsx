@@ -19,7 +19,7 @@ export default function ParentDashboard() {
 
   const loadDashboard = async () => {
     try {
-      const res = await api.get('/parent/dashboard', { params: { term, year } })
+      const res = await api.get('/api/v1/parent/dashboard', { params: { term, year } })
       setChildren(res.data?.children || [])
       setSummary(res.data?.summary || {})
     } catch (error) {

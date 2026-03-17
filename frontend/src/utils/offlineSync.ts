@@ -18,7 +18,7 @@ export class OfflineSync {
 
       for (const mark of unsynced) {
         try {
-          await api.post('/marks', mark.data, {
+          await api.post('/api/v1/marks', mark.data, {
             headers: {
               Authorization: `Bearer ${mark.token}`
             }

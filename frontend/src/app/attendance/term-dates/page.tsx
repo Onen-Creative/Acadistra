@@ -26,7 +26,7 @@ export default function TermDatesPage() {
   const loadTermDates = async () => {
     setLoading(true)
     try {
-      const response = await api.get('/term-dates')
+      const response = await api.get('/api/v1/term-dates')
       setTermDates(Array.isArray(response.data) ? response.data : response.data.term_dates || [])
     } catch (error) {
       toast.error('Failed to load term dates')
@@ -38,7 +38,7 @@ export default function TermDatesPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      await api.post('/term-dates', formData)
+      await api.post('/api/v1/term-dates', formData)
       toast.success('Term dates saved successfully')
       setModalOpen(false)
       setEditingTerm(null)

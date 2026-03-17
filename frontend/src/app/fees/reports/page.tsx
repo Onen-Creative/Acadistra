@@ -21,7 +21,7 @@ export default function FeesReportsPage() {
       } else if (period === 'yearly') {
         params.year = year
       }
-      const response = await api.get('/fees/reports', { params })
+      const response = await api.get('/api/v1/fees/reports', { params })
       setReportData(response.data)
     } catch (error) {
       toast.error('Failed to generate report')
@@ -39,7 +39,7 @@ export default function FeesReportsPage() {
       } else if (period === 'yearly') {
         params.year = year
       }
-      const response = await api.get('/finance/export-fees', { params, responseType: 'blob' })
+      const response = await api.get('/api/v1/finance/export-fees', { params, responseType: 'blob' })
       const url = window.URL.createObjectURL(new Blob([response.data]))
       const link = document.createElement('a')
       link.href = url

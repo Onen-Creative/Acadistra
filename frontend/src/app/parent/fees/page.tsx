@@ -26,7 +26,7 @@ export default function ParentFeesPage() {
 
   const loadChildren = async () => {
     try {
-      const res = await api.get('/parent/dashboard')
+      const res = await api.get('/api/v1/parent/dashboard')
       const childrenData = res.data?.children || []
       setChildren(childrenData)
       if (childrenData.length > 0) setSelectedChild(childrenData[0])

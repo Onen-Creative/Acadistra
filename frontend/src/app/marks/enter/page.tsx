@@ -160,7 +160,7 @@ export default function MarksEntryPage() {
 
   const fetchImports = async () => {
     try {
-      const res = await api.get('/marks/imports')
+      const res = await api.get('/api/v1/marks/imports')
       setImports(res.data.imports || [])
     } catch (error) {
       console.error('Failed to fetch imports', error)
@@ -217,7 +217,7 @@ export default function MarksEntryPage() {
     formData.append('exam_type', examType)
 
     try {
-      const res = await api.post('/marks/bulk-import', formData, {
+      const res = await api.post('/api/v1/marks/bulk-import', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       })
       

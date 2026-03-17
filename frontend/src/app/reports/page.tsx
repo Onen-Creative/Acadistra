@@ -17,9 +17,9 @@ export default function SchoolReportsPage() {
     queryKey: ['school-stats'],
     queryFn: async () => {
       const [studentsRes, classRes, staffRes] = await Promise.all([
-        api.get('/students', { params: { limit: 1 } }),
-        api.get('/classes'),
-        api.get('/staff')
+        api.get('/api/v1/students', { params: { limit: 1 } }),
+        api.get('/api/v1/classes'),
+        api.get('/api/v1/staff')
       ])
       return {
         students: studentsRes.data.total || studentsRes.data.students?.length || 0,
@@ -32,13 +32,13 @@ export default function SchoolReportsPage() {
   const generateStudentsReport = async () => {
     setGenerating('students')
     try {
-      const classesRes = await api.get('/classes')
+      const classesRes = await api.get('/api/v1/classes')
       const classes = Array.isArray(classesRes.data) ? classesRes.data : classesRes.data.classes || []
       
       const allStudents: any[] = []
       for (const cls of classes) {
         try {
-          const res = await api.get('/students', { params: { class_id: cls.id, year: selectedYear, term: selectedTerm } })
+          const res = await api.get('/api/v1/students', { params: { class_id: cls.id, year: selectedYear, term: selectedTerm } })
           const students = res.data.students || []
           students.forEach((s: any) => {
             allStudents.push({ ...s, className: cls.name })
@@ -73,7 +73,7 @@ export default function SchoolReportsPage() {
   const generateStaffReport = async () => {
     setGenerating('staff')
     try {
-      const res = await api.get('/staff', { params: { limit: 10000 } })
+      const res = await api.get('/api/v1/staff', { params: { limit: 10000 } })
       const staff = Array.isArray(res.data) ? res.data : res.data.staff || []
       const data = staff.map((s: any, i: number) => ({
         '#': i + 1,
@@ -102,7 +102,7 @@ export default function SchoolReportsPage() {
   const generateClassesReport = async () => {
     setGenerating('classes')
     try {
-      const res = await api.get('/classes', { params: { year: selectedYear } })
+      const res = await api.get('/api/v1/classes', { params: { year: selectedYear } })
       const classes = Array.isArray(res.data) ? res.data : res.data.classes || []
       const data = classes.map((c: any, i: number) => ({
         '#': i + 1,
@@ -136,13 +136,13 @@ export default function SchoolReportsPage() {
         return
       }
       
-      const classesRes = await api.get('/classes')
+      const classesRes = await api.get('/api/v1/classes')
       const classes = Array.isArray(classesRes.data) ? classesRes.data : classesRes.data.classes || []
       
       const allSummary: any[] = []
       for (const cls of classes) {
         try {
-          const res = await api.get('/attendance/class-summary', {
+          const res = await api.get('/api/v1/attendance/class-summary', {
             params: { class_id: cls.id, start_date: dateRange.start, end_date: dateRange.end }
           })
           const summary = res.data.summary || []
@@ -185,7 +185,7 @@ export default function SchoolReportsPage() {
   const generateFinanceReport = async () => {
     setGenerating('finance')
     try {
-      const res = await api.get('/finance/summary')
+      const res = await api.get('/api/v1/finance/summary')
       const summary = res.data
       
       const data = [
@@ -221,7 +221,7 @@ export default function SchoolReportsPage() {
   const generatePerformanceReport = async () => {
     setGenerating('performance')
     try {
-      const res = await api.get('/results/performance-summary', {
+      const res = await api.get('/api/v1/results/performance-summary', {
         params: { year: selectedYear, term: selectedTerm }
       })
       const results = res.data.results || []

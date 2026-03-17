@@ -53,7 +53,7 @@ export default function RequisitionsPage() {
 
   const fetchBudgets = async () => {
     try {
-      const response = await api.get('/budgets');
+      const response = await api.get('/api/v1/budgets');
       setBudgets(response.data.budgets || []);
     } catch (error) {
       // Silently fail - user doesn't have access to budgets
@@ -77,7 +77,7 @@ export default function RequisitionsPage() {
 
   const fetchStats = async () => {
     try {
-      const response = await api.get('/requisitions/stats');
+      const response = await api.get('/api/v1/requisitions/stats');
       setStats(response.data);
     } catch (error) {
       console.error('Failed to fetch stats:', error);
@@ -97,7 +97,7 @@ export default function RequisitionsPage() {
           unit_price: parseFloat(item.unit_price)
         }))
       };
-      await api.post('/requisitions', payload);
+      await api.post('/api/v1/requisitions', payload);
       toast.success('✅ Requisition created successfully!', { id: loadingToast });
       setShowModal(false);
       setFormData({ department: '', category: '', title: '', description: '', justification: '', priority: 'medium', budget_id: '', items: [{ item_name: '', quantity: 1, unit: 'pieces', unit_price: '', specifications: '' }] });
