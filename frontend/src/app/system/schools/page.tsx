@@ -36,7 +36,8 @@ export default function SchoolsPage() {
   const getLogoUrl = (logoUrl: string | null | undefined) => {
     if (!logoUrl) return ''
     if (logoUrl.startsWith('http') || logoUrl.startsWith('blob:')) return logoUrl
-    return `http://localhost:8080${logoUrl}`
+    // Use relative path - Caddy will proxy to backend
+    return logoUrl
   }
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<SchoolFormData>({
