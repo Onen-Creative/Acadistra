@@ -1,25 +1,25 @@
 # Main domain - Frontend with API routing
 acadistra.com, www.acadistra.com {
-    # Route /api/* to backend
-    handle /api/* {
-        reverse_proxy backend:8080
-    }
-    
-    # Everything else to frontend
-    reverse_proxy frontend:3000
+	# Route /api/* to backend
+	handle /api/* {
+		reverse_proxy backend:8080
+	}
+	
+	# Everything else to frontend
+	reverse_proxy frontend:3000
 }
 
 # API subdomain
 api.acadistra.com {
-    reverse_proxy backend:8080
+	reverse_proxy backend:8080
 }
 
 # MinIO console
 storage.acadistra.com {
-    reverse_proxy minio:9001
+	reverse_proxy minio:9001
 }
 
 # Wildcard for school subdomains
 *.acadistra.com {
-    reverse_proxy frontend:3000
+	reverse_proxy frontend:3000
 }
