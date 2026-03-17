@@ -32,8 +32,8 @@ export default function SchoolAdminDashboard() {
       ])
 
       const students = Array.isArray(studentsRes.data?.students) ? studentsRes.data.students : []
-      const staff = Array.isArray(staffRes.data) ? staffRes.data : []
-      const classes = Array.isArray(classesRes.data) ? classesRes.data : []
+      const staff = Array.isArray(staffRes.data) ? staffRes.data : (Array.isArray(staffRes.data?.staff) ? staffRes.data.staff : [])
+      const classes = Array.isArray(classesRes.data) ? classesRes.data : (Array.isArray(classesRes.data?.classes) ? classesRes.data.classes : [])
       const fees = Array.isArray(feesRes.data?.fees) ? feesRes.data.fees : []
       const attendance = attendanceRes.data || {}
       const finance = financeRes.data || {}
