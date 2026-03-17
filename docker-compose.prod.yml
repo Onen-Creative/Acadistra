@@ -80,6 +80,8 @@ services:
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
       - JWT_SECRET=${JWT_SECRET}
       - ENV=production
+    volumes:
+      - backend_uploads:/app/public
     depends_on:
       postgres:
         condition: service_healthy
@@ -145,6 +147,8 @@ volumes:
   caddy_data:
     driver: local
   caddy_config:
+    driver: local
+  backend_uploads:
     driver: local
 
 networks:
