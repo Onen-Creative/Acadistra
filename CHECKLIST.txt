@@ -1,0 +1,53 @@
+DEPLOYMENT CHECKLIST
+====================
+
+LOCAL MACHINE:
+--------------
+[ ] 1. Open terminal in project directory
+[ ] 2. Run: git push Acadistra main
+       (or: git push origin main)
+[ ] 3. Enter GitHub credentials when prompted
+[ ] 4. Verify push succeeded
+
+VPS:
+----
+[ ] 5. SSH to VPS: ssh user@185.208.207.16
+[ ] 6. Navigate: cd "/home/od/workspace/programming/school management system"
+[ ] 7. Pull changes: git pull Acadistra main
+[ ] 8. Make executable: chmod +x complete-migration.sh rollback.sh
+[ ] 9. Run migration: sudo ./complete-migration.sh
+[ ] 10. Type "YES" when prompted
+[ ] 11. Wait 5-10 minutes for completion
+
+VERIFICATION:
+-------------
+[ ] 12. Check table count: 
+        docker exec acadistra_postgres psql -U acadistra -d acadistra \
+          -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public'"
+        Expected: 65+
+
+[ ] 13. Check new tables exist:
+        docker exec acadistra_postgres psql -U acadistra -d acadistra \
+          -c "\dt" | grep -E "lesson_records|budgets|requisitions|inventory"
+        Expected: 9 tables listed
+
+[ ] 14. Check services running:
+        docker compose -f docker-compose.prod.yml ps
+        Expected: All services "Up"
+
+[ ] 15. Test website: https://acadistra.com
+        Login: sysadmin@school.ug / Admin@123
+
+[ ] 16. Test pages (no 500 errors):
+        - Lessons page
+        - Budget page
+        - Requisitions page
+        - Inventory page
+
+DONE! ✓
+-------
+
+If anything fails:
+- Check logs: docker logs acadistra_backend
+- Rollback: sudo ./rollback.sh
+- Restart: docker compose -f docker-compose.prod.yml restart

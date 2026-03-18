@@ -1,0 +1,200 @@
+#!/bin/bash
+# DEPLOYMENT GUIDE - Run these commands step by step
+
+echo "=========================================="
+echo "STEP-BY-STEP DEPLOYMENT TO VPS"
+echo "=========================================="
+echo ""
+
+cat << 'EOF'
+
+╔══════════════════════════════════════════════════════════════╗
+║  STEP 1: PUSH TO GITHUB (Run on Local Machine)              ║
+╚══════════════════════════════════════════════════════════════╝
+
+The changes are already committed locally. Now push to GitHub:
+
+cd "/home/od/workspace/programming/school management system"
+
+# Push to GitHub (you'll be prompted for credentials)
+git push Acadistra main
+
+# OR if you prefer origin:
+git push origin main
+
+✓ Files committed:
+  - complete-migration.sh (main migration script)
+  - rollback.sh (backup restoration)
+  - database.go (updated with 9 new models)
+  - docker-compose.prod.yml (PostgreSQL port change)
+  - Documentation files
+
+
+╔══════════════════════════════════════════════════════════════╗
+║  STEP 2: CONNECT TO VPS                                      ║
+╚══════════════════════════════════════════════════════════════╝
+
+ssh user@185.208.207.16
+
+# Or if you have a specific username:
+ssh your_username@185.208.207.16
+
+
+╔══════════════════════════════════════════════════════════════╗
+║  STEP 3: NAVIGATE TO PROJECT (Run on VPS)                    ║
+╚══════════════════════════════════════════════════════════════╝
+
+cd "/home/od/workspace/programming/school management system"
+
+
+╔══════════════════════════════════════════════════════════════╗
+║  STEP 4: PULL LATEST CHANGES (Run on VPS)                    ║
+╚══════════════════════════════════════════════════════════════╝
+
+# Pull from GitHub
+git pull Acadistra main
+
+# OR if you use origin:
+git pull origin main
+
+# Verify files were downloaded
+ls -lh complete-migration.sh rollback.sh
+
+
+╔══════════════════════════════════════════════════════════════╗
+║  STEP 5: MAKE SCRIPTS EXECUTABLE (Run on VPS)                ║
+╚══════════════════════════════════════════════════════════════╝
+
+chmod +x complete-migration.sh rollback.sh check-ready.sh
+
+
+╔══════════════════════════════════════════════════════════════╗
+║  STEP 6: REVIEW WHAT WILL HAPPEN (Run on VPS)                ║
+╚══════════════════════════════════════════════════════════════╝
+
+# Read the migration guide
+cat START_HERE.md
+
+# Or quick reference
+cat QUICK_REFERENCE.txt
+
+
+╔══════════════════════════════════════════════════════════════╗
+║  STEP 7: RUN THE MIGRATION (Run on VPS)                      ║
+╚══════════════════════════════════════════════════════════════╝
+
+sudo ./complete-migration.sh
+
+⚠️  Type "YES" when prompted to confirm
+⏱️  Duration: 5-10 minutes
+
+The script will:
+  [1/10] Create database backup
+  [2/10] Stop all services
+  [3/10] Remove old containers
+  [4/10] Remove database volume (fresh start)
+  [5/10] Rebuild backend with new code
+  [6/10] Rebuild frontend
+  [7/10] Start all services
+  [8/10] Wait for services to be healthy
+  [9/10] Run database migrations (create all 65 tables)
+  [10/10] Verify tables were created
+
+
+╔══════════════════════════════════════════════════════════════╗
+║  STEP 8: VERIFY SUCCESS (Run on VPS)                         ║
+╚══════════════════════════════════════════════════════════════╝
+
+# Check table count (should be 65+)
+docker exec acadistra_postgres psql -U acadistra -d acadistra \
+  -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public'"
+
+# Verify new tables exist
+docker exec acadistra_postgres psql -U acadistra -d acadistra \
+  -c "\dt" | grep -E "lesson_records|budgets|requisitions|inventory"
+
+# Check services are running
+docker compose -f docker-compose.prod.yml ps
+
+# Check backend logs for errors
+docker logs acadistra_backend | grep -i error
+
+
+╔══════════════════════════════════════════════════════════════╗
+║  STEP 9: TEST APPLICATION                                    ║
+╚══════════════════════════════════════════════════════════════╝
+
+Visit: https://acadistra.com
+
+Login:
+  Email: sysadmin@school.ug
+  Password: Admin@123
+
+Test these pages (should NOT show 500 errors):
+  ✓ Dashboard
+  ✓ Staff
+  ✓ Students
+  ✓ Lessons (NEW)
+  ✓ Budget (NEW)
+  ✓ Requisitions (NEW)
+  ✓ Inventory (NEW)
+
+
+╔══════════════════════════════════════════════════════════════╗
+║  IF SOMETHING GOES WRONG                                     ║
+╚══════════════════════════════════════════════════════════════╝
+
+# Option 1: Check logs
+docker logs acadistra_backend -f
+
+# Option 2: Restart services
+docker compose -f docker-compose.prod.yml restart
+
+# Option 3: Rollback to backup
+sudo ./rollback.sh
+
+
+╔══════════════════════════════════════════════════════════════╗
+║  BACKUP LOCATION                                             ║
+╚══════════════════════════════════════════════════════════════╝
+
+Backups are saved to:
+/home/od/workspace/programming/school management system/backups/
+
+Format: acadistra_full_backup_YYYYMMDD_HHMMSS.sql
+
+
+╔══════════════════════════════════════════════════════════════╗
+║  SUMMARY OF CHANGES                                          ║
+╚══════════════════════════════════════════════════════════════╝
+
+✓ 9 NEW TABLES:
+  1. lesson_records
+  2. budgets
+  3. budget_transfers
+  4. requisitions
+  5. requisition_items
+  6. requisition_approval_flows
+  7. inventory_categories
+  8. inventory_items
+  9. inventory_transactions
+
+✓ UPDATED FILES:
+  - backend/internal/database/database.go (added 9 models)
+  - docker-compose.prod.yml (PostgreSQL port 5432→5433)
+
+✓ NEW SCRIPTS:
+  - complete-migration.sh (main migration)
+  - rollback.sh (restore backup)
+
+
+╔══════════════════════════════════════════════════════════════╗
+║  READY TO START?                                             ║
+╚══════════════════════════════════════════════════════════════╝
+
+1. Push to GitHub (local machine)
+2. SSH to VPS
+3. Pull changes
+4. Run: sudo ./complete-migration.sh
+
+EOF
