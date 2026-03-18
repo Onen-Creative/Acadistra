@@ -26,10 +26,19 @@ export default function InventoryPage() {
     setToast({ isOpen: true, title, message, type })
   }
 
-  const { data: categories } = useQuery({
+  const { data: categories, isLoading: categoriesLoading, error: categoriesError } = useQuery({
     queryKey: ['inventory-categories'],
     queryFn: () => inventoryApi.listCategories(),
   })
+
+  useEffect(() => {
+    if (categoriesError) {
+      console.error('Categories error:', categoriesError)
+    }
+    if (categories) {
+      console.log('Categories loaded:', categories)
+    }
+  }, [categories, categoriesError])
 
   const { data: items, isLoading } = useQuery({
     queryKey: ['inventory-items', selectedCategory, search, showLowStock],

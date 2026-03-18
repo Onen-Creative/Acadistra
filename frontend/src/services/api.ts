@@ -834,7 +834,9 @@ export const financeApi = {
 export const inventoryApi = {
   listCategories: async () => {
     const { data } = await api.get('/api/v1/inventory/categories');
-    return data;
+    console.log('Raw categories response:', data);
+    // Backend returns array directly, not wrapped in object
+    return Array.isArray(data) ? data : (data?.categories || []);
   },
 
   listItems: async (params?: { category_id?: string; search?: string; low_stock?: boolean }) => {
