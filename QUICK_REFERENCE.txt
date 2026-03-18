@@ -1,0 +1,107 @@
+╔══════════════════════════════════════════════════════════════╗
+║         ACADISTRA COMPLETE MIGRATION - QUICK GUIDE          ║
+╚══════════════════════════════════════════════════════════════╝
+
+┌──────────────────────────────────────────────────────────────┐
+│ RUN MIGRATION                                                │
+└──────────────────────────────────────────────────────────────┘
+
+  sudo ./complete-migration.sh
+
+  Type "YES" when prompted to confirm.
+  Duration: 5-10 minutes
+
+
+┌──────────────────────────────────────────────────────────────┐
+│ WHAT IT DOES                                                 │
+└──────────────────────────────────────────────────────────────┘
+
+  ✓ Backs up existing database
+  ✓ Drops and recreates database (FRESH START)
+  ✓ Rebuilds all containers with latest code
+  ✓ Creates ALL 65 tables
+  ✓ Seeds admin user and subjects
+
+
+┌──────────────────────────────────────────────────────────────┐
+│ NEW TABLES CREATED (9)                                       │
+└──────────────────────────────────────────────────────────────┘
+
+  1. lesson_records              - Lesson monitoring
+  2. budgets                     - Budget planning
+  3. budget_transfers            - Budget transfers
+  4. requisitions                - Purchase requests
+  5. requisition_items           - Requisition line items
+  6. requisition_approval_flows  - Approval tracking
+  7. inventory_categories        - Item categories
+  8. inventory_items             - Inventory items
+  9. inventory_transactions      - Stock movements
+
+
+┌──────────────────────────────────────────────────────────────┐
+│ AFTER MIGRATION                                              │
+└──────────────────────────────────────────────────────────────┘
+
+  Login: https://acadistra.com
+    Email: sysadmin@school.ug
+    Password: Admin@123
+
+  Test these pages (should NOT show 500 errors):
+    ✓ Lessons
+    ✓ Budget
+    ✓ Requisitions
+    ✓ Inventory
+
+
+┌──────────────────────────────────────────────────────────────┐
+│ VERIFY SUCCESS                                               │
+└──────────────────────────────────────────────────────────────┘
+
+  # Count tables (should be 65+)
+  docker exec acadistra_postgres psql -U acadistra -d acadistra \
+    -c "SELECT COUNT(*) FROM information_schema.tables 
+        WHERE table_schema = 'public'"
+
+  # List all tables
+  docker exec acadistra_postgres psql -U acadistra -d acadistra \
+    -c "\dt"
+
+
+┌──────────────────────────────────────────────────────────────┐
+│ ROLLBACK (IF NEEDED)                                         │
+└──────────────────────────────────────────────────────────────┘
+
+  sudo ./rollback.sh
+
+  Restores database from backup created before migration.
+
+
+┌──────────────────────────────────────────────────────────────┐
+│ USEFUL COMMANDS                                              │
+└──────────────────────────────────────────────────────────────┘
+
+  # View logs
+  docker logs acadistra_backend -f
+
+  # Check service status
+  docker compose -f docker-compose.prod.yml ps
+
+  # Restart services
+  docker compose -f docker-compose.prod.yml restart
+
+  # Check backend health
+  curl http://localhost:8080/health
+
+
+┌──────────────────────────────────────────────────────────────┐
+│ BACKUP LOCATION                                              │
+└──────────────────────────────────────────────────────────────┘
+
+  /home/od/workspace/programming/school management system/backups/
+  
+  Format: acadistra_full_backup_YYYYMMDD_HHMMSS.sql
+
+
+╔══════════════════════════════════════════════════════════════╗
+║  ⚠️  WARNING: THIS DELETES ALL DATA! BACKUP CREATED FIRST   ║
+╚══════════════════════════════════════════════════════════════╝
