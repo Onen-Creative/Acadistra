@@ -1,11 +1,12 @@
 #!/bin/bash
 
-# Pre-Deployment Verification Script
-# Checks if all required files and configurations are in place
+# Acadistra Deployment Verification Script
+# This script checks all critical components before and after deployment
 
-echo "=========================================="
-echo "  Acadistra Pre-Deployment Verification"
-echo "=========================================="
+set -e
+
+echo "🚀 Acadistra Deployment Verification"
+echo "===================================="
 echo ""
 
 # Colors
@@ -14,187 +15,210 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-ERRORS=0
-WARNINGS=0
-
-# Function to check file exists
-check_file() {
-    if [ -f "$1" ]; then
-        echo -e "${GREEN}✓${NC} $1"
-    else
-        echo -e "${RED}✗${NC} $1 - MISSING"
-        ((ERRORS++))
-    fi
+# Check functions
+check_pass() {
+    echo -e "${GREEN}✓${NC} $1"
 }
 
-# Function to check directory exists
-check_dir() {
-    if [ -d "$1" ]; then
-        echo -e "${GREEN}✓${NC} $1/"
-    else
-        echo -e "${RED}✗${NC} $1/ - MISSING"
-        ((ERRORS++))
-    fi
+check_fail() {
+    echo -e "${RED}✗${NC} $1"
+    exit 1
 }
 
-echo "Checking Required Files:"
-echo "----------------------------------------"
+check_warn() {
+    echo -e "${YELLOW}⚠${NC} $1"
+}
 
-# Core deployment files
-check_file "docker-compose.prod.yml"
-check_file "Caddyfile"
-check_file "deploy.sh"
-check_file "health-check.sh"
-check_file "Makefile"
-check_file "README.md"
-check_file "LICENSE"
-
-# Backend files
-echo ""
-echo "Backend Files:"
-check_file "backend/Dockerfile"
-check_file "backend/.dockerignore"
-check_file "backend/go.mod"
-check_file "backend/cmd/api/main.go"
-check_dir "backend/migrations"
-
-# Frontend files
-echo ""
-echo "Frontend Files:"
-check_file "frontend/Dockerfile"
-check_file "frontend/.dockerignore"
-check_file "frontend/package.json"
-check_file "frontend/next.config.js"
-check_file "frontend/src/app/api/health/route.ts"
-
-# Scripts
-echo ""
-echo "Scripts:"
-check_file "scripts/backup.sh"
-check_file "scripts/init-databases.sql"
-
-# Documentation
-echo ""
-echo "Documentation:"
-check_file "QUICKSTART.md"
-check_file "DEPLOYMENT.md"
-check_file "DEPLOYMENT_CHECKLIST_CLEAN.md"
-check_file "PRODUCTION_CHECKLIST.md"
-check_file "TROUBLESHOOTING.md"
-check_file "SECURITY.md"
-check_file "CONTRIBUTING.md"
-check_file "CHANGELOG.md"
-
-# Check if scripts are executable
-echo ""
-echo "Checking Script Permissions:"
-echo "----------------------------------------"
-
-for script in deploy.sh health-check.sh scripts/backup.sh; do
-    if [ -x "$script" ]; then
-        echo -e "${GREEN}✓${NC} $script is executable"
-    else
-        echo -e "${YELLOW}⚠${NC} $script is not executable"
-        echo "  Run: chmod +x $script"
-        ((WARNINGS++))
-    fi
-done
-
-# Check for .env.production
-echo ""
-echo "Checking Configuration:"
-echo "----------------------------------------"
-
-if [ -f ".env.production" ]; then
-    echo -e "${GREEN}✓${NC} .env.production exists"
+# 1. Check .env file
+echo "1. Checking environment configuration..."
+if [ -f ".env" ]; then
+    check_pass ".env file exists"
     
-    # Check if it has default values
-    if grep -q "CHANGE_THIS" .env.production 2>/dev/null; then
-        echo -e "${YELLOW}⚠${NC} .env.production contains default values"
-        echo "  Update passwords before deployment!"
-        ((WARNINGS++))
+    # Check critical variables
+    if grep -q "NEXT_PUBLIC_API_URL=https://acadistra.com" .env; then
+        check_pass "NEXT_PUBLIC_API_URL correctly set"
+    else
+        check_fail "NEXT_PUBLIC_API_URL not set to https://acadistra.com"
+    fi
+    
+    if grep -q "JWT_SECRET=" .env && [ ${#JWT_SECRET} -ge 32 ] 2>/dev/null; then
+        check_pass "JWT_SECRET configured"
+    else
+        check_warn "JWT_SECRET may be too short (should be 32+ characters)"
     fi
 else
-    echo -e "${YELLOW}⚠${NC} .env.production not found"
-    echo "  Will be created during deployment"
+    check_fail ".env file not found"
 fi
-
-# Check Docker
 echo ""
-echo "Checking System Requirements:"
-echo "----------------------------------------"
 
+# 2. Check Docker
+echo "2. Checking Docker..."
 if command -v docker &> /dev/null; then
-    echo -e "${GREEN}✓${NC} Docker is installed"
-    docker --version
+    check_pass "Docker installed"
+    
+    if docker compose version &> /dev/null; then
+        check_pass "Docker Compose installed"
+    else
+        check_fail "Docker Compose not installed"
+    fi
 else
-    echo -e "${YELLOW}⚠${NC} Docker not found"
-    echo "  Will be installed during deployment"
-    ((WARNINGS++))
+    check_fail "Docker not installed"
 fi
-
-if docker compose version &> /dev/null 2>&1; then
-    echo -e "${GREEN}✓${NC} Docker Compose is available"
-else
-    echo -e "${YELLOW}⚠${NC} Docker Compose not found"
-    echo "  Required for deployment"
-    ((WARNINGS++))
-fi
-
-# Check disk space
 echo ""
-echo "Checking Resources:"
-echo "----------------------------------------"
 
-DISK_AVAIL=$(df -BG . | tail -1 | awk '{print $4}' | sed 's/G//')
-if [ "$DISK_AVAIL" -gt 20 ]; then
-    echo -e "${GREEN}✓${NC} Sufficient disk space: ${DISK_AVAIL}GB available"
+# 3. Check Caddyfile
+echo "3. Checking Caddyfile..."
+if [ -f "Caddyfile" ]; then
+    check_pass "Caddyfile exists"
+    
+    if grep -q "handle /api/\*" Caddyfile; then
+        check_pass "API routing configured"
+    else
+        check_fail "API routing not found in Caddyfile"
+    fi
+    
+    if grep -q "reverse_proxy backend:8080" Caddyfile; then
+        check_pass "Backend proxy configured"
+    else
+        check_fail "Backend proxy not configured"
+    fi
 else
-    echo -e "${YELLOW}⚠${NC} Low disk space: ${DISK_AVAIL}GB available"
-    echo "  Recommended: 20GB+"
-    ((WARNINGS++))
+    check_fail "Caddyfile not found"
+fi
+echo ""
+
+# 4. Check docker-compose.prod.yml
+echo "4. Checking docker-compose.prod.yml..."
+if [ -f "docker-compose.prod.yml" ]; then
+    check_pass "docker-compose.prod.yml exists"
+    
+    # Check services
+    for service in postgres redis minio backend frontend caddy; do
+        if grep -q "$service:" docker-compose.prod.yml; then
+            check_pass "$service service defined"
+        else
+            check_fail "$service service not found"
+        fi
+    done
+else
+    check_fail "docker-compose.prod.yml not found"
+fi
+echo ""
+
+# 5. Check frontend configuration
+echo "5. Checking frontend configuration..."
+if [ -f "frontend/next.config.js" ]; then
+    check_pass "next.config.js exists"
+    
+    if grep -q "output: 'standalone'" frontend/next.config.js; then
+        check_pass "Standalone output configured"
+    else
+        check_warn "Standalone output not configured (may cause issues)"
+    fi
 fi
 
-MEMORY=$(free -g | grep Mem | awk '{print $2}')
-if [ "$MEMORY" -ge 2 ]; then
-    echo -e "${GREEN}✓${NC} Sufficient memory: ${MEMORY}GB"
-else
-    echo -e "${YELLOW}⚠${NC} Low memory: ${MEMORY}GB"
-    echo "  Recommended: 2GB+"
-    ((WARNINGS++))
+if [ -f "frontend/src/services/api.ts" ]; then
+    check_pass "api.ts exists"
+    
+    if grep -q "config.url.startsWith('/api/v1')" frontend/src/services/api.ts; then
+        check_pass "API interceptor configured"
+    else
+        check_fail "API interceptor not found or misconfigured"
+    fi
 fi
+echo ""
+
+# 6. Check backend configuration
+echo "6. Checking backend configuration..."
+if [ -f "backend/Dockerfile" ]; then
+    check_pass "Backend Dockerfile exists"
+fi
+
+if [ -f "backend/cmd/api/main.go" ]; then
+    check_pass "Backend main.go exists"
+fi
+echo ""
+
+# 7. DNS Check (if online)
+echo "7. Checking DNS configuration..."
+if command -v nslookup &> /dev/null; then
+    if nslookup acadistra.com &> /dev/null; then
+        IP=$(nslookup acadistra.com | grep -A1 "Name:" | grep "Address:" | awk '{print $2}' | head -1)
+        if [ "$IP" == "185.208.207.16" ]; then
+            check_pass "DNS points to correct IP (185.208.207.16)"
+        else
+            check_warn "DNS points to $IP (expected 185.208.207.16)"
+        fi
+    else
+        check_warn "Cannot resolve acadistra.com (DNS may not be configured yet)"
+    fi
+else
+    check_warn "nslookup not available, skipping DNS check"
+fi
+echo ""
+
+# 8. Check if services are running (if deployed)
+echo "8. Checking running services..."
+if docker ps &> /dev/null; then
+    RUNNING=$(docker ps --format '{{.Names}}' | grep acadistra | wc -l)
+    if [ $RUNNING -gt 0 ]; then
+        check_pass "$RUNNING Acadistra containers running"
+        
+        # Check specific containers
+        for container in acadistra_postgres acadistra_redis acadistra_backend acadistra_frontend acadistra_caddy; do
+            if docker ps --format '{{.Names}}' | grep -q "$container"; then
+                STATUS=$(docker inspect --format='{{.State.Health.Status}}' $container 2>/dev/null || echo "no-healthcheck")
+                if [ "$STATUS" == "healthy" ] || [ "$STATUS" == "no-healthcheck" ]; then
+                    check_pass "$container is running"
+                else
+                    check_warn "$container is running but not healthy (status: $STATUS)"
+                fi
+            fi
+        done
+    else
+        check_warn "No Acadistra containers running (not deployed yet)"
+    fi
+else
+    check_warn "Cannot check running containers (Docker not accessible)"
+fi
+echo ""
+
+# 9. Health check (if deployed)
+echo "9. Checking application health..."
+if command -v curl &> /dev/null; then
+    # Check if running locally
+    if curl -s http://localhost:8080/health &> /dev/null; then
+        HEALTH=$(curl -s http://localhost:8080/health)
+        if echo "$HEALTH" | grep -q "ok"; then
+            check_pass "Backend health check passed (local)"
+        else
+            check_warn "Backend health check failed (local)"
+        fi
+    fi
+    
+    # Check if deployed
+    if curl -s https://acadistra.com/api/v1/health &> /dev/null; then
+        HEALTH=$(curl -s https://acadistra.com/api/v1/health)
+        if echo "$HEALTH" | grep -q "ok"; then
+            check_pass "Backend health check passed (production)"
+        else
+            check_warn "Backend health check failed (production)"
+        fi
+    fi
+else
+    check_warn "curl not available, skipping health checks"
+fi
+echo ""
 
 # Summary
+echo "===================================="
+echo "✅ Verification Complete!"
 echo ""
-echo "=========================================="
-echo "  Verification Summary"
-echo "=========================================="
+echo "Next steps:"
+echo "1. If not deployed yet, run: docker compose -f docker-compose.prod.yml up -d --build"
+echo "2. Run migrations: docker exec acadistra_backend ./main migrate"
+echo "3. Seed admin: docker exec acadistra_backend ./main seed-admin"
+echo "4. Seed subjects: docker exec acadistra_backend ./main seed-standard-subjects"
+echo "5. Access: https://acadistra.com"
+echo "6. Login: sysadmin@school.ug / Admin@123"
 echo ""
-
-if [ $ERRORS -eq 0 ] && [ $WARNINGS -eq 0 ]; then
-    echo -e "${GREEN}✓ All checks passed!${NC}"
-    echo ""
-    echo "System is ready for deployment."
-    echo ""
-    echo "Next steps:"
-    echo "  1. Review PRODUCTION_CHECKLIST.md"
-    echo "  2. Run: ./deploy.sh"
-    echo "  3. Follow QUICKSTART.md"
-    echo ""
-elif [ $ERRORS -eq 0 ]; then
-    echo -e "${YELLOW}⚠ $WARNINGS warning(s) found${NC}"
-    echo ""
-    echo "System can be deployed, but review warnings above."
-    echo ""
-else
-    echo -e "${RED}✗ $ERRORS error(s) found${NC}"
-    if [ $WARNINGS -gt 0 ]; then
-        echo -e "${YELLOW}⚠ $WARNINGS warning(s) found${NC}"
-    fi
-    echo ""
-    echo "Please fix errors before deployment."
-    echo ""
-    exit 1
-fi
-
-echo "=========================================="

@@ -22,7 +22,7 @@ export default function BudgetDetailPage() {
 
   const fetchBudget = async () => {
     try {
-      const response = await api.get(`/budgets/${params.id}`);
+      const response = await api.get(`/api/v1/budgets/${params.id}`);
       setBudget(response.data);
     } catch (error) {
       toast.error('Failed to load budget');

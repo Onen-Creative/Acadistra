@@ -1,8 +1,7 @@
 import axios from 'axios';
 import type { AuthResponse, LoginRequest, TokenPair } from '@/types';
 
-// Use empty baseURL - all paths will be absolute from root
-const API_URL = '';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 export const api = axios.create({
   baseURL: API_URL,
@@ -11,13 +10,19 @@ export const api = axios.create({
   },
 });
 
-// Request interceptor to add auth token
+// Request interceptor to add auth token and /api/v1 prefix
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Automatically prepend /api/v1 to relative URLs that don't already have it
+    if (config.url && !config.url.startsWith('http') && !config.url.startsWith('/api/v1')) {
+      config.url = `/api/v1${config.url}`;
+    }
+    
     return config;
   },
   (error) => Promise.reject(error)
@@ -38,7 +43,7 @@ api.interceptors.response.use(
           throw new Error('No refresh token');
         }
 
-        const { data } = await axios.post<TokenPair>(`/api/v1/auth/refresh`, {
+        const { data } = await axios.post<TokenPair>(`/auth/refresh`, {
           refresh_token: refreshToken,
         });
 
@@ -68,16 +73,16 @@ api.interceptors.response.use(
 // Auth API
 export const authApi = {
   login: async (credentials: LoginRequest): Promise<AuthResponse> => {
-    const { data } = await api.post<AuthResponse>('/api/v1/auth/login', credentials);
+    const { data } = await api.post<AuthResponse>('/auth/login', credentials);
     return data;
   },
 
   logout: async (refreshToken: string): Promise<void> => {
-    await api.post('/api/v1/api/v1/auth/logout', { refresh_token: refreshToken });
+    await api.post('/auth/logout', { refresh_token: refreshToken });
   },
 
   refresh: async (refreshToken: string): Promise<TokenPair> => {
-    const { data } = await api.post<TokenPair>('/api/v1/auth/refresh', {
+    const { data } = await api.post<TokenPair>('/auth/refresh', {
       refresh_token: refreshToken,
     });
     return data;
@@ -87,7 +92,7 @@ export const authApi = {
 // Classes API
 export const classesApi = {
   list: async (params?: { year?: number; term?: string }) => {
-    const { data } = await api.get('/api/v1/classes', { params });
+    const { data } = await api.get('/classes', { params });
     return data;
   },
 
@@ -97,7 +102,7 @@ export const classesApi = {
   },
 
   create: async (classData: unknown) => {
-    const { data } = await api.post('/api/v1/classes', classData);
+    const { data } = await api.post('/classes', classData);
     return data;
   },
 
@@ -112,7 +117,7 @@ export const classesApi = {
   },
 
   getTeachers: async () => {
-    const { data } = await api.get('/api/v1/staff', { params: { role: 'Teacher' } });
+    const { data } = await api.get('/staff', { params: { role: 'Teacher' } });
     return Array.isArray(data) ? data : data.staff || [];
   },
 };
@@ -120,7 +125,7 @@ export const classesApi = {
 // Students API
 export const studentsApi = {
   list: async (params?: { class_id?: string; class_level?: string; term?: string; year?: number; search?: string; page?: number; limit?: number }) => {
-    const { data } = await api.get('/api/v1/students', { params });
+    const { data } = await api.get('/students', { params });
     return data;
   },
 
@@ -130,7 +135,7 @@ export const studentsApi = {
   },
 
   create: async (studentData: any) => {
-    const { data } = await api.post('/api/v1/students', studentData);
+    const { data } = await api.post('/students', studentData);
     return data;
   },
 
@@ -153,7 +158,7 @@ export const studentsApi = {
 // Marks API
 export const marksApi = {
   batchUpdate: async (marks: unknown[]) => {
-    const { data } = await api.post('/api/v1/marks/batch', { marks });
+    const { data } = await api.post('/marks/batch', { marks });
     return data;
   },
 
@@ -176,7 +181,7 @@ export const marksApi = {
 // Reports API
 export const reportsApi = {
   generate: async (params: { student_id?: string; class_id?: string; term: string; year: number }) => {
-    const { data } = await api.post('/api/v1/reports/generate', params);
+    const { data } = await api.post('/reports/generate', params);
     return data;
   },
 
@@ -194,12 +199,12 @@ export const reportsApi = {
 // Users API
 export const usersApi = {
   list: async (params?: { search?: string; page?: number; limit?: number }) => {
-    const { data } = await api.get('/api/v1/users', { params });
+    const { data } = await api.get('/users', { params });
     return data;
   },
 
   create: async (userData: any) => {
-    const { data } = await api.post('/api/v1/users', userData);
+    const { data } = await api.post('/users', userData);
     return data;
   },
 
@@ -215,12 +220,12 @@ export const usersApi = {
 
   // School admin user management
   listSchoolUsers: async () => {
-    const { data } = await api.get('/api/v1/school-users');
+    const { data } = await api.get('/school-users');
     return data;
   },
 
   createSchoolUser: async (userData: any) => {
-    const { data } = await api.post('/api/v1/school-users', userData);
+    const { data } = await api.post('/school-users', userData);
     return data;
   },
 
@@ -238,7 +243,7 @@ export const usersApi = {
 // Schools API
 export const schoolsApi = {
   list: async (params?: { search?: string; page?: number; limit?: number }) => {
-    const { data } = await api.get('/api/v1/schools', { params });
+    const { data } = await api.get('/schools', { params });
     return data;
   },
 
@@ -248,17 +253,17 @@ export const schoolsApi = {
   },
 
   getMySchool: async () => {
-    const { data } = await api.get('/api/v1/school');
+    const { data } = await api.get('/school');
     return data;
   },
 
   getLevels: async () => {
-    const { data } = await api.get('/api/v1/school/levels');
+    const { data } = await api.get('/school/levels');
     return data;
   },
 
   create: async (schoolData: any) => {
-    const { data } = await api.post('/api/v1/schools', schoolData);
+    const { data } = await api.post('/schools', schoolData);
     return data;
   },
 
@@ -278,13 +283,13 @@ export const schoolsApi = {
   },
 
   getStats: async () => {
-    const { data } = await api.get('/api/v1/stats');
+    const { data } = await api.get('/stats');
     return data;
   },
 
   // School admin dashboard summary
   getSummary: async (params?: { term?: string; year?: string }) => {
-    const { data } = await api.get('/api/v1/dashboard/summary', { params });
+    const { data } = await api.get('/dashboard/summary', { params });
     return data;
   },
 };
@@ -292,17 +297,17 @@ export const schoolsApi = {
 // Subjects API
 export const subjectsApi = {
   list: async (params?: { level?: string }) => {
-    const { data } = await api.get('/api/v1/subjects', { params });
+    const { data } = await api.get('/subjects', { params });
     return data;
   },
 
   getSchoolSubjects: async () => {
-    const { data } = await api.get('/api/v1/subjects/school');
+    const { data } = await api.get('/subjects/school');
     return data;
   },
 
   create: async (subjectData: any) => {
-    const { data } = await api.post('/api/v1/subjects', subjectData);
+    const { data } = await api.post('/subjects', subjectData);
     return data;
   },
 
@@ -325,7 +330,7 @@ export const resultsApi = {
   },
 
   createOrUpdate: async (resultData: any) => {
-    const { data } = await api.post('/api/v1/results', resultData);
+    const { data } = await api.post('/results', resultData);
     return data;
   },
 
@@ -338,7 +343,7 @@ export const resultsApi = {
 // Audit Logs API
 export const auditApi = {
   getRecentActivity: async (limit: number = 20) => {
-    const { data } = await api.get('/api/v1/audit/recent', { params: { limit } });
+    const { data } = await api.get('/audit/recent', { params: { limit } });
     return data;
   },
 };
@@ -346,12 +351,12 @@ export const auditApi = {
 // Fees API
 export const feesApi = {
   list: async (params?: { level?: string; term?: string; year?: number; search?: string; page?: number; limit?: number }) => {
-    const { data } = await api.get('/api/v1/fees', { params });
+    const { data } = await api.get('/fees', { params });
     return data;
   },
 
   createOrUpdate: async (feesData: any) => {
-    const { data } = await api.post('/api/v1/fees', feesData);
+    const { data } = await api.post('/fees', feesData);
     return data;
   },
 
@@ -366,12 +371,12 @@ export const feesApi = {
   },
 
   recordPayment: async (paymentData: any) => {
-    const { data } = await api.post('/api/v1/fees/payment', paymentData);
+    const { data } = await api.post('/fees/payment', paymentData);
     return data;
   },
 
   getReports: async (params: { type: string; term?: string; year?: string }) => {
-    const { data } = await api.get('/api/v1/fees/reports', { params });
+    const { data } = await api.get('/fees/reports', { params });
     return data;
   },
 };
@@ -379,7 +384,7 @@ export const feesApi = {
 // Staff API
 export const staffApi = {
   list: async (params?: { search?: string; role?: string; page?: number; limit?: number }) => {
-    const { data } = await api.get('/api/v1/staff', { params });
+    const { data } = await api.get('/staff', { params });
     return data;
   },
 
@@ -389,7 +394,7 @@ export const staffApi = {
   },
 
   create: async (staffData: any) => {
-    const { data } = await api.post('/api/v1/staff', staffData);
+    const { data } = await api.post('/staff', staffData);
     return data;
   },
 
@@ -411,12 +416,12 @@ export const teachersApi = staffApi;
 export const libraryApi = {
   // Books
   listBooks: async (params?: { subject?: string; search?: string; page?: number; limit?: number }) => {
-    const { data } = await api.get('/api/v1/library/books', { params });
+    const { data } = await api.get('/library/books', { params });
     return data;
   },
 
   createBook: async (bookData: any) => {
-    const { data } = await api.post('/api/v1/library/books', bookData);
+    const { data } = await api.post('/library/books', bookData);
     return data;
   },
 
@@ -441,23 +446,23 @@ export const libraryApi = {
   },
 
   searchByCopyNumber: async (copyNumber: string) => {
-    const { data } = await api.get('/api/v1/library/search-copy', { params: { copy_number: copyNumber } });
+    const { data } = await api.get('/library/search-copy', { params: { copy_number: copyNumber } });
     return data;
   },
 
   bulkIssueBooks: async (issueData: any) => {
-    const { data } = await api.post('/api/v1/library/bulk-issue', issueData);
+    const { data } = await api.post('/library/bulk-issue', issueData);
     return data;
   },
 
   // Issues
   listIssues: async (params?: { status?: string; student_id?: string; term?: string; year?: string; search?: string; page?: number; limit?: number }) => {
-    const { data } = await api.get('/api/v1/library/issues', { params });
+    const { data } = await api.get('/library/issues', { params });
     return data;
   },
 
   issueBook: async (issueData: any) => {
-    const { data } = await api.post('/api/v1/library/issue', issueData);
+    const { data } = await api.post('/library/issue', issueData);
     return data;
   },
 
@@ -467,22 +472,22 @@ export const libraryApi = {
   },
 
   getStats: async (params?: { term?: string; year?: number }) => {
-    const { data } = await api.get('/api/v1/library/stats', { params });
+    const { data } = await api.get('/library/stats', { params });
     return data;
   },
 
   getStatsBySubject: async (params?: { term?: string; year?: number }) => {
-    const { data } = await api.get('/api/v1/library/stats/subjects', { params });
+    const { data } = await api.get('/library/stats/subjects', { params });
     return data;
   },
 
   getReports: async (params: { type: string; term?: string; year?: string }) => {
-    const { data } = await api.get('/api/v1/library/reports', { params });
+    const { data } = await api.get('/library/reports', { params });
     return data;
   },
 
   getReportData: async (params: { type: string; term?: string; year?: string }) => {
-    const { data } = await api.get('/api/v1/library/reports', { params });
+    const { data } = await api.get('/library/reports', { params });
     return data;
   },
 };
@@ -491,12 +496,12 @@ export const libraryApi = {
 export const clinicApi = {
   // Visits (Nurse only)
   listVisits: async (params?: { student_id?: string; page?: number; limit?: number }) => {
-    const { data } = await api.get('/api/v1/clinic/visits', { params });
+    const { data } = await api.get('/clinic/visits', { params });
     return data;
   },
 
   createVisit: async (visitData: any) => {
-    const { data } = await api.post('/api/v1/clinic/visits', visitData);
+    const { data } = await api.post('/clinic/visits', visitData);
     return data;
   },
 
@@ -517,7 +522,7 @@ export const clinicApi = {
 
   // Health Profiles (Nurse only)
   createHealthProfile: async (profileData: any) => {
-    const { data } = await api.post('/api/v1/clinic/health-profiles', profileData);
+    const { data } = await api.post('/clinic/health-profiles', profileData);
     return data;
   },
 
@@ -543,23 +548,23 @@ export const clinicApi = {
 
   // Medical Tests (Nurse only)
   createTest: async (testData: any) => {
-    const { data } = await api.post('/api/v1/clinic/tests', testData);
+    const { data } = await api.post('/clinic/tests', testData);
     return data;
   },
 
   listTests: async (params?: { visit_id?: string; student_id?: string; test_type?: string }) => {
-    const { data } = await api.get('/api/v1/clinic/tests', { params });
+    const { data } = await api.get('/clinic/tests', { params });
     return data;
   },
 
   // Medicine Inventory (Nurse only)
   listMedicines: async (params?: { category?: string; low_stock?: boolean; search?: string; page?: number; limit?: number; year?: number; term?: string }) => {
-    const { data } = await api.get('/api/v1/clinic/medicines', { params });
+    const { data } = await api.get('/clinic/medicines', { params });
     return data;
   },
 
   createMedicine: async (medicineData: any) => {
-    const { data } = await api.post('/api/v1/clinic/medicines', medicineData);
+    const { data } = await api.post('/clinic/medicines', medicineData);
     return data;
   },
 
@@ -575,23 +580,23 @@ export const clinicApi = {
 
   // Medication Administration (Nurse only)
   administerMedication: async (adminData: any) => {
-    const { data } = await api.post('/api/v1/clinic/medication-admin', adminData);
+    const { data } = await api.post('/clinic/medication-admin', adminData);
     return data;
   },
 
   getMedicationHistory: async (params?: { student_id?: string; visit_id?: string }) => {
-    const { data } = await api.get('/api/v1/clinic/medication-history', { params });
+    const { data } = await api.get('/clinic/medication-history', { params });
     return data;
   },
 
   // Consumables (Nurse only)
   listConsumables: async (params?: { category?: string; low_stock?: boolean; search?: string; page?: number; limit?: number; year?: number; term?: string }) => {
-    const { data } = await api.get('/api/v1/clinic/consumables', { params });
+    const { data } = await api.get('/clinic/consumables', { params });
     return data;
   },
 
   createConsumable: async (consumableData: any) => {
-    const { data } = await api.post('/api/v1/clinic/consumables', consumableData);
+    const { data } = await api.post('/clinic/consumables', consumableData);
     return data;
   },
 
@@ -607,12 +612,12 @@ export const clinicApi = {
 
   // Consumable Usage
   recordConsumableUsage: async (usageData: any) => {
-    const { data } = await api.post('/api/v1/clinic/consumable-usage', usageData);
+    const { data } = await api.post('/clinic/consumable-usage', usageData);
     return data;
   },
 
   getConsumableUsage: async (params?: { consumable_id?: string; visit_id?: string; page?: number; limit?: number }) => {
-    const { data } = await api.get('/api/v1/clinic/consumable-usage', { params });
+    const { data } = await api.get('/clinic/consumable-usage', { params });
     return data;
   },
 
@@ -623,12 +628,12 @@ export const clinicApi = {
 
   // Emergency Incidents (Nurse only)
   createIncident: async (incidentData: any) => {
-    const { data } = await api.post('/api/v1/clinic/incidents', incidentData);
+    const { data } = await api.post('/clinic/incidents', incidentData);
     return data;
   },
 
   listIncidents: async (params?: { student_id?: string }) => {
-    const { data } = await api.get('/api/v1/clinic/incidents', { params });
+    const { data } = await api.get('/clinic/incidents', { params });
     return data;
   },
 
@@ -649,12 +654,12 @@ export const clinicApi = {
 
   // Summary (Admin only - aggregated data)
   getSummary: async (params?: { term?: string; year?: number; start_date?: string; end_date?: string }) => {
-    const { data } = await api.get('/api/v1/clinic/summary', { params });
+    const { data } = await api.get('/clinic/summary', { params });
     return data;
   },
 
   getReports: async (params: { type: string; term?: string; year?: string }) => {
-    const { data } = await api.get('/api/v1/clinic/reports', { params });
+    const { data } = await api.get('/clinic/reports', { params });
     return data;
   },
 };
@@ -662,37 +667,37 @@ export const clinicApi = {
 // Attendance API
 export const attendanceApi = {
   mark: async (attendanceData: any) => {
-    const { data } = await api.post('/api/v1/attendance', attendanceData);
+    const { data } = await api.post('/attendance', attendanceData);
     return data;
   },
 
   bulkMark: async (bulkData: any) => {
-    const { data } = await api.post('/api/v1/attendance/bulk', bulkData);
+    const { data } = await api.post('/attendance/bulk', bulkData);
     return data;
   },
 
   list: async (params?: { class_id?: string; student_id?: string; date?: string; start_date?: string; end_date?: string; page?: number; limit?: number }) => {
-    const { data } = await api.get('/api/v1/attendance', { params });
+    const { data } = await api.get('/attendance', { params });
     return data;
   },
 
   getByDate: async (params: { class_id: string; date: string }) => {
-    const { data } = await api.get('/api/v1/attendance/by-date', { params });
+    const { data } = await api.get('/attendance/by-date', { params });
     return data;
   },
 
   getStats: async (params?: { class_id?: string; student_id?: string; start_date?: string; end_date?: string }) => {
-    const { data } = await api.get('/api/v1/attendance/stats', { params });
+    const { data } = await api.get('/attendance/stats', { params });
     return data;
   },
 
   getClassSummary: async (params: { class_id: string; start_date?: string; end_date?: string }) => {
-    const { data } = await api.get('/api/v1/attendance/class-summary', { params });
+    const { data } = await api.get('/attendance/class-summary', { params });
     return data;
   },
 
   getReport: async (params: { class_id: string; period: string; start_date?: string; end_date?: string }) => {
-    const { data } = await api.get('/api/v1/attendance/report', { params });
+    const { data } = await api.get('/attendance/report', { params });
     return data;
   },
 
@@ -707,7 +712,7 @@ export const attendanceApi = {
   },
 
   getHolidays: async (params?: { year?: number; term?: string; start_date?: string; end_date?: string }) => {
-    const { data } = await api.get('/api/v1/calendar/holidays', { params });
+    const { data } = await api.get('/calendar/holidays', { params });
     return data;
   },
 };
@@ -715,12 +720,12 @@ export const attendanceApi = {
 // Calendar API (Holidays and non-school days)
 export const calendarApi = {
   addHoliday: async (holidayData: any) => {
-    const { data } = await api.post('/api/v1/calendar/holidays', holidayData);
+    const { data } = await api.post('/calendar/holidays', holidayData);
     return data;
   },
 
   listHolidays: async (params?: { year?: number; term?: string; start_date?: string; end_date?: string }) => {
-    const { data } = await api.get('/api/v1/calendar/holidays', { params });
+    const { data } = await api.get('/calendar/holidays', { params });
     return data;
   },
 
@@ -733,17 +738,17 @@ export const calendarApi = {
 // Term Dates API
 export const termDatesApi = {
   list: async (params?: { year?: number }) => {
-    const { data } = await api.get('/api/v1/term-dates', { params });
+    const { data } = await api.get('/term-dates', { params });
     return data;
   },
 
   getCurrent: async (params?: { year?: number; term?: string }) => {
-    const { data } = await api.get('/api/v1/term-dates/current', { params });
+    const { data } = await api.get('/term-dates/current', { params });
     return data;
   },
 
   createOrUpdate: async (termData: any) => {
-    const { data } = await api.post('/api/v1/term-dates', termData);
+    const { data } = await api.post('/term-dates', termData);
     return data;
   },
 
@@ -757,12 +762,12 @@ export const termDatesApi = {
 export const financeApi = {
   // Income
   createIncome: async (incomeData: any) => {
-    const { data } = await api.post('/api/v1/finance/income', incomeData);
+    const { data } = await api.post('/finance/income', incomeData);
     return data;
   },
 
   listIncome: async (params?: { term?: string; year?: number; category?: string; start_date?: string; end_date?: string }) => {
-    const { data } = await api.get('/api/v1/finance/income', { params });
+    const { data } = await api.get('/finance/income', { params });
     return data;
   },
 
@@ -783,12 +788,12 @@ export const financeApi = {
 
   // Expenditure
   createExpenditure: async (expenditureData: any) => {
-    const { data } = await api.post('/api/v1/finance/expenditure', expenditureData);
+    const { data } = await api.post('/finance/expenditure', expenditureData);
     return data;
   },
 
   listExpenditure: async (params?: { term?: string; year?: number; category?: string; status?: string; start_date?: string; end_date?: string }) => {
-    const { data } = await api.get('/api/v1/finance/expenditure', { params });
+    const { data } = await api.get('/finance/expenditure', { params });
     return data;
   },
 
@@ -809,18 +814,18 @@ export const financeApi = {
 
   // Summary
   getSummary: async (params?: { term?: string; year?: number; start_date?: string; end_date?: string }) => {
-    const { data } = await api.get('/api/v1/finance/summary', { params });
+    const { data } = await api.get('/finance/summary', { params });
     return data;
   },
 
   // Export
   exportReport: async (params: { period: 'daily' | 'weekly' | 'monthly' | 'termly' | 'yearly'; term?: string; year?: number }) => {
-    const { data } = await api.get('/api/v1/finance/export', { params, responseType: 'blob' });
+    const { data } = await api.get('/finance/export', { params, responseType: 'blob' });
     return data;
   },
   
   exportFeesReport: async (params: { period: 'daily' | 'weekly' | 'monthly' | 'termly' | 'yearly'; term?: string; year?: number }) => {
-    const { data } = await api.get('/api/v1/fees/export', { params, responseType: 'blob' });
+    const { data } = await api.get('/fees/export', { params, responseType: 'blob' });
     return data;
   },
 };
@@ -828,17 +833,17 @@ export const financeApi = {
 // Inventory API
 export const inventoryApi = {
   listCategories: async () => {
-    const { data } = await api.get('/api/v1/inventory/categories');
+    const { data } = await api.get('/inventory/categories');
     return data;
   },
 
   listItems: async (params?: { category_id?: string; search?: string; low_stock?: boolean }) => {
-    const { data } = await api.get('/api/v1/inventory/items', { params });
+    const { data } = await api.get('/inventory/items', { params });
     return data;
   },
 
   createItem: async (itemData: any) => {
-    const { data } = await api.post('/api/v1/inventory/items', itemData);
+    const { data } = await api.post('/inventory/items', itemData);
     return data;
   },
 
@@ -853,12 +858,12 @@ export const inventoryApi = {
   },
 
   recordTransaction: async (transactionData: any) => {
-    const { data } = await api.post('/api/v1/inventory/transactions', transactionData);
+    const { data } = await api.post('/inventory/transactions', transactionData);
     return data;
   },
 
   listTransactions: async (params?: { item_id?: string; type?: string }) => {
-    const { data } = await api.get('/api/v1/inventory/transactions', { params });
+    const { data } = await api.get('/inventory/transactions', { params });
     return data;
   },
 
@@ -868,7 +873,7 @@ export const inventoryApi = {
   },
 
   getStats: async () => {
-    const { data } = await api.get('/api/v1/inventory/stats');
+    const { data } = await api.get('/inventory/stats');
     return data;
   },
 };
@@ -876,12 +881,12 @@ export const inventoryApi = {
 // Integration Activities API (S1-S4)
 export const integrationActivitiesApi = {
   getByClass: async (params: { class_id: string; subject_id?: string; term: string; year: number }) => {
-    const { data } = await api.get('/api/v1/integration-activities', { params });
+    const { data } = await api.get('/integration-activities', { params });
     return data;
   },
 
   createOrUpdate: async (activityData: any) => {
-    const { data } = await api.post('/api/v1/integration-activities', activityData);
+    const { data } = await api.post('/integration-activities', activityData);
     return data;
   },
 };

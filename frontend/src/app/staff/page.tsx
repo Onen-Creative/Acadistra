@@ -69,9 +69,10 @@ export default function StaffPage() {
       const params = new URLSearchParams()
       if (selectedRole) params.append('role', selectedRole)
       const response = await api.get(`/staff?${params.toString()}`)
-      setStaff(response.data || [])
+      setStaff(Array.isArray(response.data) ? response.data : [])
     } catch (error: any) {
       console.error('Failed to fetch staff:', error)
+      setStaff([])
       if (error.response?.status !== 401) {
         toast.error('Failed to load staff')
       }

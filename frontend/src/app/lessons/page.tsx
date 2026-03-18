@@ -68,7 +68,7 @@ export default function LessonMonitoringPage() {
 
   const fetchSubjects = async () => {
     try {
-      const response = await api.get('/api/v1/lessons/subjects');
+      const response = await api.get('/lessons/subjects');
       setSubjects(response.data || []);
     } catch (error) {
       console.error('Failed to fetch subjects:', error);
@@ -91,7 +91,7 @@ export default function LessonMonitoringPage() {
 
   const fetchStats = async () => {
     try {
-      const response = await api.get('/api/v1/lessons/stats?period=today');
+      const response = await api.get('/lessons/stats?period=today');
       setStats(response.data);
     } catch (error) {
       console.error('Failed to fetch stats:', error);
@@ -102,7 +102,7 @@ export default function LessonMonitoringPage() {
     e.preventDefault();
     const loadingToast = toast.loading('Saving lesson...');
     try {
-      await api.post('/api/v1/lessons', formData);
+      await api.post('/lessons', formData);
       toast.success('✅ Lesson recorded successfully!', { id: loadingToast });
       setShowModal(false);
       setFormData({ class_id: '', subject_id: '', teacher_id: '', lesson_date: new Date().toISOString().split('T')[0], lesson_time: '', duration_minutes: 40, topic: '', sub_topic: '', status: 'completed', reason_missed: '', notes: '' });
