@@ -82,7 +82,7 @@ export default function PaymentReceipt({ payment, studentFees, onClose }: Paymen
             {school?.logo_url && (
               <div className="flex justify-center mb-2">
                 <img 
-                  src={school.logo_url.startsWith('http') ? school.logo_url : `http://localhost:8080${school.logo_url}`} 
+                  src={school.logo_url.startsWith('http') ? school.logo_url : `${process.env.NEXT_PUBLIC_API_URL || ''}${school.logo_url}`} 
                   alt="School Logo" 
                   className="h-12 w-12 object-contain" 
                 />
