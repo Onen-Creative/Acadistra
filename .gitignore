@@ -82,3 +82,4 @@ MOBILE_MONEY_INTEGRATION.md
 # Temporary migration scripts
 migrate-now.sh
 vps-migrate.sh
+migrate.sh
