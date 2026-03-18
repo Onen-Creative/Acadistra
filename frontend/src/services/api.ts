@@ -833,17 +833,17 @@ export const financeApi = {
 // Inventory API
 export const inventoryApi = {
   listCategories: async () => {
-    const { data } = await api.get('/inventory/categories');
+    const { data } = await api.get('/api/v1/inventory/categories');
     return data;
   },
 
   listItems: async (params?: { category_id?: string; search?: string; low_stock?: boolean }) => {
-    const { data } = await api.get('/inventory/items', { params });
+    const { data } = await api.get('/api/v1/inventory/items', { params });
     return data;
   },
 
   createItem: async (itemData: any) => {
-    const { data } = await api.post('/inventory/items', itemData);
+    const { data } = await api.post('/api/v1/inventory/items', itemData);
     return data;
   },
 
@@ -858,12 +858,12 @@ export const inventoryApi = {
   },
 
   recordTransaction: async (transactionData: any) => {
-    const { data } = await api.post('/inventory/transactions', transactionData);
+    const { data } = await api.post('/api/v1/inventory/transactions', transactionData);
     return data;
   },
 
   listTransactions: async (params?: { item_id?: string; type?: string }) => {
-    const { data } = await api.get('/inventory/transactions', { params });
+    const { data } = await api.get('/api/v1/inventory/transactions', { params });
     return data;
   },
 
@@ -873,7 +873,7 @@ export const inventoryApi = {
   },
 
   getStats: async () => {
-    const { data } = await api.get('/inventory/stats');
+    const { data } = await api.get('/api/v1/inventory/stats');
     return data;
   },
 };
