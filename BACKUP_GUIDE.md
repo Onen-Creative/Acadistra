@@ -1,215 +1,303 @@
-# ACADISTRA BACKUP SYSTEM
+# COMPLETE BACKUP SYSTEM SETUP
 
-## 📦 Setup (One-Time)
+## 🎯 Overview
 
-### On VPS, run:
+This backup system provides:
+- ✅ **Automatic daily backups** on VPS (database + uploaded files)
+- ✅ **Local storage** on VPS (keeps 30 days)
+- ✅ **Optional remote sync** to another server
+- ✅ **Easy download** to local machine anytime
+- ✅ **Compressed backups** to save space
+
+---
+
+## 📦 Setup on VPS
+
+### Step 1: Deploy Backup Scripts
 
 ```bash
 cd /root/acadistra
 
-# Create backup script
-cat > backup.sh << 'EOF'
-[PASTE BACKUP SCRIPT CONTENT HERE]
-EOF
+# Pull latest code (includes backup scripts)
+git pull origin main
 
-# Create restore script
-cat > restore.sh << 'EOF'
-[PASTE RESTORE SCRIPT CONTENT HERE]
-EOF
-
-# Make executable
-chmod +x backup.sh restore.sh
+# Make scripts executable
+chmod +x backup-enhanced.sh restore.sh
 
 # Test backup
-./backup.sh
+./backup-enhanced.sh
 ```
 
----
-
-## 🔄 Manual Backup
-
-Anytime you want to backup:
-
-```bash
-cd /root/acadistra
-./backup.sh
-```
-
-Backups are saved to: `/root/acadistra/backups/`
-
----
-
-## ⏰ Automated Daily Backups
-
-### Set up cron job (runs daily at 2 AM):
+### Step 2: Set Up Automated Daily Backups
 
 ```bash
 # Open crontab
 crontab -e
 
-# Add this line:
-0 2 * * * /root/acadistra/backup.sh >> /root/acadistra/backups/backup.log 2>&1
+# Add this line (runs daily at 2 AM):
+0 2 * * * /root/acadistra/backup-enhanced.sh >> /root/acadistra/backups/backup.log 2>&1
 
-# Save and exit
+# Save and exit (Ctrl+X, Y, Enter)
 ```
 
-### Verify cron job:
+### Step 3: Verify Cron Job
+
 ```bash
+# List cron jobs
 crontab -l
+
+# Check if backup ran (next day)
+cat /root/acadistra/backups/backup.log
 ```
 
 ---
 
-## 🔙 Restore from Backup
+## 💾 What Gets Backed Up
 
-### List available backups:
+1. **Database** - All tables and data
+   - File: `acadistra_backup_YYYYMMDD_HHMMSS.sql.gz`
+   
+2. **Uploaded Files** - Logos, student photos, documents
+   - File: `uploads_backup_YYYYMMDD_HHMMSS.tar.gz`
+
+---
+
+## 📥 Download Backups to Local Machine
+
+### Option 1: Using Download Script (Recommended)
+
+On your **local machine**:
+
 ```bash
-cd /root/acadistra
-ls -lh backups/
+cd "/home/od/workspace/programming/school management system"
+
+# Make download script executable
+chmod +x download-backups.sh
+
+# Run it
+./download-backups.sh
 ```
 
-### Restore:
+Follow the prompts to:
+- Download latest backup only
+- Download all backups
+- Download backups from specific date
+
+### Option 2: Manual Download via SCP
+
 ```bash
-./restore.sh
+# Download latest database backup
+scp root@185.208.207.16:/root/acadistra/backups/acadistra_backup_*.sql.gz ./
+
+# Download latest uploads backup
+scp root@185.208.207.16:/root/acadistra/backups/uploads_backup_*.tar.gz ./
+
+# Download all backups
+scp root@185.208.207.16:/root/acadistra/backups/*.gz ./backups-from-vps/
 ```
 
-Follow the prompts to select which backup to restore.
+### Option 3: Using rsync (Faster for Multiple Files)
+
+```bash
+# Sync all backups
+rsync -avz --progress root@185.208.207.16:/root/acadistra/backups/ ./backups-from-vps/
+```
+
+---
+
+## 🔄 Restore Backup Locally
+
+After downloading a backup to your local machine:
+
+```bash
+# Extract backup
+gunzip acadistra_backup_20260318_020000.sql.gz
+
+# Restore to local PostgreSQL
+psql -U postgres -d acadistra < acadistra_backup_20260318_020000.sql
+
+# Or create new database first
+createdb -U postgres acadistra
+psql -U postgres -d acadistra < acadistra_backup_20260318_020000.sql
+```
+
+---
+
+## 🌐 Optional: Remote Backup Server
+
+For extra safety, sync backups to another server automatically.
+
+### Setup SSH Key Authentication
+
+On VPS:
+```bash
+# Generate SSH key (if not exists)
+ssh-keygen -t rsa -b 4096
+
+# Copy to backup server
+ssh-copy-id user@backup-server.com
+```
+
+### Configure Remote Backup
+
+On VPS, create config file:
+```bash
+cat > /root/acadistra/backup-config.sh << 'EOF'
+export REMOTE_BACKUP_ENABLED=true
+export REMOTE_HOST="backup-server.com"
+export REMOTE_USER="backupuser"
+export REMOTE_PATH="/backups/acadistra"
+EOF
+```
+
+Update crontab:
+```bash
+crontab -e
+
+# Change to:
+0 2 * * * source /root/acadistra/backup-config.sh && /root/acadistra/backup-enhanced.sh >> /root/acadistra/backups/backup.log 2>&1
+```
 
 ---
 
 ## 📊 Backup Management
 
-### Check backup size:
+### Check Backup Status
+
 ```bash
+# List all backups
+ls -lh /root/acadistra/backups/
+
+# Check total size
 du -sh /root/acadistra/backups/
+
+# Count backups
+ls -1 /root/acadistra/backups/*.sql.gz | wc -l
+
+# View backup log
+tail -f /root/acadistra/backups/backup.log
 ```
 
-### List all backups:
+### Manual Backup Anytime
+
 ```bash
-ls -lh /root/acadistra/backups/*.sql.gz
+cd /root/acadistra
+./backup-enhanced.sh
 ```
 
-### Delete old backups manually:
-```bash
-# Delete backups older than 30 days
-find /root/acadistra/backups/ -name "*.sql.gz" -mtime +30 -delete
-```
+### Delete Old Backups Manually
 
-### Keep only last 10 backups:
 ```bash
+# Delete backups older than 60 days
+find /root/acadistra/backups/ -name "*.gz" -mtime +60 -delete
+
+# Keep only last 10 backups
 cd /root/acadistra/backups
 ls -t acadistra_backup_*.sql.gz | tail -n +11 | xargs rm -f
 ```
 
 ---
 
-## 💾 Backup to External Storage (Recommended)
+## 🔐 Backup Security
 
-### Option 1: Copy to another server via SCP
+### Encrypt Backups
+
 ```bash
-scp /root/acadistra/backups/acadistra_backup_*.sql.gz user@backup-server:/backups/
+# Encrypt a backup
+gpg -c /root/acadistra/backups/acadistra_backup_20260318_020000.sql.gz
+
+# Decrypt when needed
+gpg -d acadistra_backup_20260318_020000.sql.gz.gpg > acadistra_backup_20260318_020000.sql.gz
 ```
 
-### Option 2: Upload to cloud storage (AWS S3)
-```bash
-# Install AWS CLI
-apt install awscli
+### Secure Backup Transfer
 
-# Configure
-aws configure
-
-# Upload
-aws s3 cp /root/acadistra/backups/ s3://your-bucket/acadistra-backups/ --recursive
-```
-
-### Option 3: Sync to Dropbox/Google Drive
-```bash
-# Install rclone
-curl https://rclone.org/install.sh | sudo bash
-
-# Configure
-rclone config
-
-# Sync backups
-rclone sync /root/acadistra/backups/ dropbox:acadistra-backups/
-```
+Already using SSH/SCP which is encrypted by default.
 
 ---
 
-## 🚨 Emergency Restore
+## 📅 Backup Schedule
 
-If system is broken and you need to restore:
+| Time | Action | Retention |
+|------|--------|-----------|
+| Daily 2 AM | Full backup (database + uploads) | 30 days on VPS |
+| On-demand | Manual backup anytime | Until manually deleted |
+| Weekly | Download to local machine (recommended) | Keep indefinitely |
 
-```bash
-cd /root/acadistra
+---
 
-# Stop services
-docker compose -f docker-compose.prod.yml down
+## 🚨 Disaster Recovery
 
-# Start only PostgreSQL
-docker compose -f docker-compose.prod.yml up -d postgres
+### Scenario 1: VPS Crashes
 
-# Wait for PostgreSQL
-sleep 10
+1. Download latest backup from local machine (if you've been downloading regularly)
+2. Or restore from remote backup server (if configured)
+3. Deploy to new VPS
+4. Restore backup
 
-# Restore
-./restore.sh
+### Scenario 2: Accidental Data Deletion
 
-# Start all services
-docker compose -f docker-compose.prod.yml up -d
-```
+1. Stop making changes immediately
+2. Run restore script on VPS: `./restore.sh`
+3. Select backup from before deletion
+4. Verify data is restored
+
+### Scenario 3: Need to Test Locally
+
+1. Download backup: `./download-backups.sh`
+2. Restore to local database
+3. Test changes locally
+4. Deploy to VPS when ready
 
 ---
 
 ## ✅ Best Practices
 
-1. **Daily automated backups** - Set up cron job
-2. **Keep 30 days of backups** - Automatic cleanup
-3. **Test restores monthly** - Verify backups work
-4. **Off-site backups** - Copy to cloud storage weekly
-5. **Before major changes** - Always backup first
+1. **Test restores monthly** - Verify backups actually work
+2. **Download weekly** - Keep local copies on your machine
+3. **Monitor backup logs** - Check for failures
+4. **Keep 30 days on VPS** - Automatic cleanup
+5. **Keep 90+ days locally** - Long-term retention
+6. **Use remote backup** - Extra safety layer
+7. **Backup before major changes** - Always!
 
 ---
 
 ## 📋 Quick Commands
 
 ```bash
-# Manual backup
-./backup.sh
+# VPS - Manual backup
+cd /root/acadistra && ./backup-enhanced.sh
 
-# Restore from backup
-./restore.sh
+# VPS - Restore backup
+cd /root/acadistra && ./restore.sh
 
-# List backups
-ls -lh backups/
+# VPS - List backups
+ls -lh /root/acadistra/backups/
 
-# Check backup size
-du -sh backups/
+# VPS - Check backup log
+tail -f /root/acadistra/backups/backup.log
 
-# View backup log
-tail -f backups/backup.log
+# Local - Download backups
+./download-backups.sh
+
+# Local - Download latest only
+scp root@185.208.207.16:/root/acadistra/backups/acadistra_backup_*.sql.gz ./
 ```
 
 ---
 
-## 🔐 Backup Security
+## 🎯 Summary
 
-### Encrypt backups:
-```bash
-# Backup and encrypt
-./backup.sh
-gpg -c /root/acadistra/backups/acadistra_backup_YYYYMMDD_HHMMSS.sql.gz
+**Automated:**
+- ✅ Daily backups at 2 AM
+- ✅ Keeps 30 days on VPS
+- ✅ Compresses to save space
+- ✅ Logs all activity
 
-# Decrypt when needed
-gpg -d backup.sql.gz.gpg > backup.sql.gz
-```
+**Manual:**
+- ✅ Download to local machine anytime
+- ✅ Restore with one command
+- ✅ Sync to remote server (optional)
 
----
-
-## 📞 Support
-
-If restore fails:
-1. Check PostgreSQL is running: `docker ps | grep postgres`
-2. Check backup file exists: `ls -lh backups/`
-3. Check logs: `docker logs acadistra_postgres`
-4. Try safety backup: Located in `backups/before_restore_*.sql.gz`
+**You're protected!** 🛡️
