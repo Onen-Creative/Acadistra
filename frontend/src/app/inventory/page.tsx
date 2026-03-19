@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { DashboardLayout } from '@/components/DashboardLayout'
 import { PageHeader } from '@/components/ui/BeautifulComponents'
@@ -26,19 +26,10 @@ export default function InventoryPage() {
     setToast({ isOpen: true, title, message, type })
   }
 
-  const { data: categories, isLoading: categoriesLoading, error: categoriesError } = useQuery({
+  const { data: categories } = useQuery({
     queryKey: ['inventory-categories'],
     queryFn: () => inventoryApi.listCategories(),
   })
-
-  useEffect(() => {
-    if (categoriesError) {
-      console.error('Categories error:', categoriesError)
-    }
-    if (categories) {
-      console.log('Categories loaded:', categories)
-    }
-  }, [categories, categoriesError])
 
   const { data: items, isLoading } = useQuery({
     queryKey: ['inventory-items', selectedCategory, search, showLowStock],

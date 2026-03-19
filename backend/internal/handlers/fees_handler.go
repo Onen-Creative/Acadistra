@@ -188,6 +188,47 @@ func (h *FeesHandler) CreateOrUpdateStudentFees(c *gin.Context) {
 	c.JSON(http.StatusOK, fees)
 }
 
+// Update student fees
+func (h *FeesHandler) UpdateStudentFees(c *gin.Context) {
+	id := c.Param("id")
+	schoolID := c.GetString("tenant_school_id")
+
+	var fees models.StudentFees
+	if err := h.db.Where("id = ? AND school_id = ?", id, schoolID).First(&fees).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Fees record not found"})
+		return
+	}
+
+	var req struct {
+		TotalFees    float64            `json:"total_fees" binding:"required"`
+		FeeBreakdown map[string]float64 `json:"fee_breakdown"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	feeBreakdown := models.JSONB{}
+	if req.FeeBreakdown != nil {
+		for k, v := range req.FeeBreakdown {
+			feeBreakdown[k] = v
+		}
+	}
+
+	fees.TotalFees = req.TotalFees
+	fees.FeeBreakdown = feeBreakdown
+	fees.Outstanding = req.TotalFees - fees.AmountPaid
+
+	if err := h.db.Save(&fees).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ws.GlobalHub.Broadcast("fees:updated", fees, schoolID)
+	c.JSON(http.StatusOK, fees)
+}
+
 // Record payment
 func (h *FeesHandler) RecordPayment(c *gin.Context) {
 	var req struct {

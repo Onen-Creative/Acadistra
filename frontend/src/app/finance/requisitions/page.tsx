@@ -15,6 +15,7 @@ export default function RequisitionsPage() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [approveBudgetId, setApproveBudgetId] = useState('');
@@ -105,6 +106,31 @@ export default function RequisitionsPage() {
       fetchStats();
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to create requisition', { id: loadingToast });
+    }
+  };
+
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const loadingToast = toast.loading('Updating requisition...');
+    try {
+      const payload = {
+        department: formData.department,
+        category: formData.category,
+        title: formData.title,
+        description: formData.description,
+        justification: formData.justification,
+        priority: formData.priority,
+        budget_id: formData.budget_id || null,
+        items: formData.items
+      };
+      await api.put(`/api/v1/requisitions/${selectedRequisition.id}`, payload);
+      toast.success('✅ Requisition updated successfully!', { id: loadingToast });
+      setShowEditDialog(false);
+      setSelectedRequisition(null);
+      fetchRequisitions();
+      fetchStats();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to update requisition', { id: loadingToast });
     }
   };
 
@@ -335,6 +361,22 @@ export default function RequisitionsPage() {
                       <td className="px-3 md:px-6 py-4 text-center">
                         {req.status === 'pending' && (user?.role === 'bursar' || user?.role === 'school_admin') && (
                           <div className="flex flex-col md:flex-row justify-center gap-1 md:gap-2">
+                            {user?.role === 'school_admin' && (
+                              <button onClick={() => { 
+                                setSelectedRequisition(req);
+                                setFormData({
+                                  department: req.department,
+                                  category: req.category,
+                                  title: req.title,
+                                  description: req.description,
+                                  justification: req.justification || '',
+                                  priority: req.priority,
+                                  budget_id: req.budget_id || '',
+                                  items: req.items || [{ item_name: '', quantity: 1, unit: 'pieces', unit_price: '', specifications: '' }]
+                                });
+                                setShowEditDialog(true);
+                              }} className="bg-blue-500 text-white px-2 py-1 rounded text-xs hover:bg-blue-600">✏️ Edit</button>
+                            )}
                             <button onClick={() => { setSelectedRequisition(req); setShowApproveDialog(true); }} className="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600">✓ Approve</button>
                             <button onClick={() => { setSelectedRequisition(req); setShowRejectDialog(true); }} className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600">✗ Reject</button>
                           </div>
@@ -441,6 +483,46 @@ export default function RequisitionsPage() {
                 <div className="flex gap-3">
                   <button type="submit" className="flex-1 bg-purple-500 text-white py-2 rounded-lg hover:bg-purple-600 text-sm md:text-base">Submit Requisition</button>
                   <button type="button" onClick={() => setShowModal(false)} className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 text-sm md:text-base">Cancel</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Dialog */}
+        {showEditDialog && selectedRequisition && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+              <h3 className="text-xl font-bold mb-4">Edit Requisition</h3>
+              <form onSubmit={handleEdit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Department *</label>
+                    <input type="text" value={formData.department} onChange={(e) => setFormData({...formData, department: e.target.value})} required className="w-full border rounded-lg px-3 py-2" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Category *</label>
+                    <select value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} required className="w-full border rounded-lg px-3 py-2">
+                      <option value="">Select</option>
+                      <option value="Supplies">Supplies</option>
+                      <option value="Equipment">Equipment</option>
+                      <option value="Services">Services</option>
+                      <option value="Maintenance">Maintenance</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Title *</label>
+                  <input type="text" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} required className="w-full border rounded-lg px-3 py-2" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Description *</label>
+                  <textarea value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} required rows={3} className="w-full border rounded-lg px-3 py-2" />
+                </div>
+                <div className="flex gap-3">
+                  <button type="submit" className="flex-1 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">Update</button>
+                  <button type="button" onClick={() => { setShowEditDialog(false); setSelectedRequisition(null); }} className="flex-1 bg-gray-300 py-2 rounded-lg hover:bg-gray-400">Cancel</button>
                 </div>
               </form>
             </div>

@@ -1,10 +1,11 @@
 'use client'
 
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { notifications } from '@mantine/notifications'
-import { GraduationCap, Mail, Lock, ArrowRight, Sparkles, BookOpen, DollarSign, Users, BarChart3, Shield, Zap } from 'lucide-react'
+import { GraduationCap, Mail, Lock, ArrowRight, Sparkles, BookOpen, DollarSign, Users, BarChart3, Shield, Zap, Eye, EyeOff } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 const loginSchema = z.object({
@@ -15,6 +16,7 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>
 
 export default function LoginPage() {
+  const [showPassword, setShowPassword] = useState(false)
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
   })
@@ -187,13 +189,31 @@ export default function LoginPage() {
                   <Lock className="w-4 h-4 text-indigo-500" />
                   Password
                 </label>
-                <input
-                  type="password"
-                  {...register('password')}
-                  placeholder="••••••••"
-                  className="w-full px-4 py-3.5 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition-all duration-300 bg-white hover:border-gray-300"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    {...register('password')}
+                    placeholder="••••••••"
+                    className="w-full px-4 py-3.5 pr-12 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition-all duration-300 bg-white hover:border-gray-300"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-indigo-600 transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
                 {errors.password && <p className="text-red-500 text-sm animate-shake">{errors.password.message}</p>}
+                <div className="text-right">
+                  <button
+                    type="button"
+                    onClick={() => router.push('/reset-password')}
+                    className="text-sm text-indigo-600 hover:text-indigo-700 font-medium hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
               </div>
 
               <button

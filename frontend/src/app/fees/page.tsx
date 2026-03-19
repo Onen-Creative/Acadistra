@@ -18,6 +18,7 @@ export default function FeesPage() {
   const [year, setYear] = useState(new Date().getFullYear())
   const [loading, setLoading] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showEditFeeModal, setShowEditFeeModal] = useState(false)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [selectedFee, setSelectedFee] = useState<any>(null)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
@@ -126,6 +127,31 @@ export default function FeesPage() {
       loadFees()
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to create fees')
+    }
+  }
+
+  const handleEditFee = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const feeBreakdown: {[key: string]: number} = {}
+    let totalFees = 0
+    feeItems.forEach(item => {
+      if (item.category && item.amount > 0) {
+        feeBreakdown[item.category] = item.amount
+        totalFees += item.amount
+      }
+    })
+    try {
+      await api.put(`/api/v1/fees/${selectedFee.id}`, {
+        total_fees: totalFees,
+        fee_breakdown: feeBreakdown
+      })
+      toast.success('Fees updated successfully')
+      setShowEditFeeModal(false)
+      setSelectedFee(null)
+      setFeeItems([{category: '', amount: 0}])
+      loadFees()
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to update fees')
     }
   }
 
@@ -401,6 +427,11 @@ export default function FeesPage() {
                         <div className="flex justify-center gap-2 flex-wrap">
                           <button onClick={() => { setSelectedFeeDetails(fee); setShowDetailsModal(true) }} className="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600 whitespace-nowrap">Details</button>
                           <button onClick={() => { 
+                            setSelectedFee(fee);
+                            setFeeItems(Object.entries(fee.fee_breakdown || {}).map(([category, amount]: [string, any]) => ({ category, amount })));
+                            setShowEditFeeModal(true);
+                          }} className="bg-yellow-500 text-white px-3 py-1 rounded text-xs hover:bg-yellow-600 whitespace-nowrap">✏️ Edit</button>
+                          <button onClick={() => { 
                             setSelectedFee(fee)
                             // Auto-load payment items with fee breakdown
                             if (fee.fee_breakdown) {
@@ -534,6 +565,54 @@ export default function FeesPage() {
                 <div className="flex gap-3">
                   <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Create Fees Record</button>
                   <button type="button" onClick={() => { setShowAddModal(false); setFeeItems([{category: '', amount: 0}]) }} className="flex-1 bg-gray-300 py-2 rounded-lg hover:bg-gray-400">Cancel</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Fee Modal */}
+        {showEditFeeModal && selectedFee && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+              <h3 className="text-lg font-bold mb-4">Edit Fees for {selectedFee.student?.first_name} {selectedFee.student?.last_name}</h3>
+              <form onSubmit={handleEditFee} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Fee Breakdown</label>
+                  <div className="space-y-3">
+                    {feeItems.map((item, index) => (
+                      <div key={index} className="flex gap-2 items-center">
+                        <select value={item.category} onChange={(e) => { const newItems = [...feeItems]; newItems[index].category = e.target.value; setFeeItems(newItems); }} className="flex-1 border rounded-lg px-3 py-2" required>
+                          <option value="">Select fee type</option>
+                          <option value="Tuition">Tuition</option>
+                          <option value="Uniform">Uniform</option>
+                          <option value="Medical">Medical</option>
+                          <option value="Boarding">Boarding</option>
+                          <option value="Transport">Transport</option>
+                          <option value="Meals">Meals</option>
+                          <option value="Books">Books</option>
+                          <option value="Sports">Sports</option>
+                          <option value="Development">Development</option>
+                          <option value="Other">Other</option>
+                        </select>
+                        <input type="number" placeholder="Amount" value={item.amount || ''} onChange={(e) => { const newItems = [...feeItems]; newItems[index].amount = parseFloat(e.target.value) || 0; setFeeItems(newItems); }} className="w-40 border rounded-lg px-3 py-2" required min="0" />
+                        {feeItems.length > 1 && (
+                          <button type="button" onClick={() => setFeeItems(feeItems.filter((_, i) => i !== index))} className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600">✕</button>
+                        )}
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => setFeeItems([...feeItems, {category: '', amount: 0}])} className="text-blue-600 text-sm font-medium hover:text-blue-700">+ Add Fee Type</button>
+                  </div>
+                  <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-gray-700">Total Fees:</span>
+                      <span className="text-2xl font-bold text-blue-600">UGX {feeItems.reduce((sum, item) => sum + (item.amount || 0), 0).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Update Fees</button>
+                  <button type="button" onClick={() => { setShowEditFeeModal(false); setSelectedFee(null); setFeeItems([{category: '', amount: 0}]); }} className="flex-1 bg-gray-300 py-2 rounded-lg hover:bg-gray-400">Cancel</button>
                 </div>
               </form>
             </div>

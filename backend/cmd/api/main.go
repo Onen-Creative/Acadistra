@@ -480,6 +480,7 @@ func main() {
 			{
 				bursar.GET("/fees", feesHandler.ListStudentFees)
 				bursar.POST("/fees", feesHandler.CreateOrUpdateStudentFees)
+				bursar.PUT("/fees/:id", feesHandler.UpdateStudentFees)
 				bursar.GET("/fees/:id", feesHandler.GetStudentFeesDetails)
 				bursar.DELETE("/fees/:id", feesHandler.DeleteStudentFees)
 				bursar.POST("/fees/payment", feesHandler.RecordPayment)
