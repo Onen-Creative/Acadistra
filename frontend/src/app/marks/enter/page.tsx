@@ -402,21 +402,139 @@ export default function MarksEntryPage() {
               </p>
             </div>
 
-            <div className="overflow-x-auto -mx-6 sm:mx-0">
-              <table className="w-full min-w-[640px]">
+            {/* Mobile Excel-like View */}
+            <div className="block lg:hidden space-y-2">
+              {studentsData?.students?.map((student: any, index: number) => {
+                const studentMarks = marks[student.id] || (isAdvanced ? { mark: 0 } : (['S1', 'S2', 'S3', 'S4'].includes(classLevel) ? { exam: 0 } : { ca: 0, exam: 0 }))
+                const total = isAdvanced ? (studentMarks.mark || 0) : (['S1', 'S2', 'S3', 'S4'].includes(classLevel) ? (studentMarks.exam || 0) : ((studentMarks.ca || 0) + (studentMarks.exam || 0)))
+                const hasExisting = !!existingMarks[student.id]
+                const canEdit = isAdmin || !hasExisting
+                
+                return (
+                  <div key={student.id} className={`border-2 rounded-lg p-3 ${hasExisting ? 'bg-yellow-50 border-yellow-300' : 'bg-white border-gray-200'}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded">{index + 1}</span>
+                        <span className="font-semibold text-sm">{student.first_name} {student.last_name}</span>
+                      </div>
+                      {hasExisting && <span className="text-xs text-amber-600 font-medium">✓ Saved</span>}
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      {isAdvanced ? (
+                        <div className="col-span-2">
+                          <label className="text-xs font-medium text-gray-600 block mb-1">{labels.mark}</label>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            min="0"
+                            max={100}
+                            step="0.1"
+                            value={studentMarks.mark || ''}
+                            onChange={(e) => {
+                              const value = parseFloat(e.target.value) || 0
+                              if (value <= 100) {
+                                setMarks(prev => ({ ...prev, [student.id]: { mark: value } }))
+                              }
+                            }}
+                            disabled={!canEdit}
+                            className={`w-full px-3 py-2.5 border-2 rounded-lg text-center text-lg font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none ${canEdit ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100 cursor-not-allowed'}`}
+                            placeholder="0"
+                          />
+                        </div>
+                      ) : ['S1', 'S2', 'S3', 'S4'].includes(classLevel) ? (
+                        <div className="col-span-2">
+                          <label className="text-xs font-medium text-gray-600 block mb-1">{labels.exam}</label>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            min="0"
+                            max={80}
+                            step="0.1"
+                            value={studentMarks.exam || ''}
+                            onChange={(e) => {
+                              const value = parseFloat(e.target.value) || 0
+                              if (value <= 80) {
+                                setMarks(prev => ({ ...prev, [student.id]: { exam: value } }))
+                              }
+                            }}
+                            disabled={!canEdit}
+                            className={`w-full px-3 py-2.5 border-2 rounded-lg text-center text-lg font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none ${canEdit ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100 cursor-not-allowed'}`}
+                            placeholder="0"
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          <div>
+                            <label className="text-xs font-medium text-gray-600 block mb-1">{labels.ca} (/{maxMarks.ca})</label>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              min="0"
+                              max={maxMarks.ca}
+                              step="0.1"
+                              value={studentMarks.ca || ''}
+                              onChange={(e) => {
+                                const value = parseFloat(e.target.value) || 0
+                                if (value <= maxMarks.ca!) {
+                                  setMarks(prev => ({ ...prev, [student.id]: { ...prev[student.id], ca: value } }))
+                                }
+                              }}
+                              disabled={!canEdit}
+                              className={`w-full px-3 py-2.5 border-2 rounded-lg text-center text-lg font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none ${canEdit ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100 cursor-not-allowed'}`}
+                              placeholder="0"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-600 block mb-1">{labels.exam} (/{maxMarks.exam})</label>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              min="0"
+                              max={maxMarks.exam}
+                              step="0.1"
+                              value={studentMarks.exam || ''}
+                              onChange={(e) => {
+                                const value = parseFloat(e.target.value) || 0
+                                if (value <= maxMarks.exam!) {
+                                  setMarks(prev => ({ ...prev, [student.id]: { ...prev[student.id], exam: value } }))
+                                }
+                              }}
+                              disabled={!canEdit}
+                              className={`w-full px-3 py-2.5 border-2 rounded-lg text-center text-lg font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none ${canEdit ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100 cursor-not-allowed'}`}
+                              placeholder="0"
+                            />
+                          </div>
+                          <div className="col-span-2 mt-1">
+                            <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg p-2 text-center">
+                              <span className="text-xs text-blue-700 font-medium">Total: </span>
+                              <span className="text-xl font-bold text-blue-900">{total.toFixed(1)}</span>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden lg:block overflow-x-auto">
+              <table className="w-full">
                 <thead>
                   <tr className="border-b-2 border-gray-200">
-                    <th className="text-left py-3 px-2 sm:px-4 font-semibold text-gray-700 w-8 sm:w-12 text-xs sm:text-sm">#</th>
-                    <th className="text-left py-3 px-2 sm:px-4 font-semibold text-gray-700 text-xs sm:text-sm">Student Name</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 w-12">#</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Student Name</th>
                     {isAdvanced ? (
-                      <th className="text-center py-3 px-2 sm:px-4 font-semibold text-gray-700 w-32 sm:w-48 text-xs sm:text-sm">{labels.mark}</th>
+                      <th className="text-center py-3 px-4 font-semibold text-gray-700 w-48">{labels.mark}</th>
                     ) : ['S1', 'S2', 'S3', 'S4'].includes(classLevel) ? (
-                      <th className="text-center py-3 px-2 sm:px-4 font-semibold text-gray-700 w-32 sm:w-48 text-xs sm:text-sm">{labels.exam}</th>
+                      <th className="text-center py-3 px-4 font-semibold text-gray-700 w-48">{labels.exam}</th>
                     ) : (
                       <>
-                        <th className="text-center py-3 px-2 sm:px-4 font-semibold text-gray-700 w-24 sm:w-32 text-xs sm:text-sm">{labels.ca}</th>
-                        <th className="text-center py-3 px-2 sm:px-4 font-semibold text-gray-700 w-24 sm:w-32 text-xs sm:text-sm">{labels.exam}</th>
-                        <th className="text-center py-3 px-2 sm:px-4 font-semibold text-gray-700 w-20 sm:w-24 text-xs sm:text-sm">Total</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-700 w-32">{labels.ca}</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-700 w-32">{labels.exam}</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-700 w-24">Total</th>
                       </>
                     )}
                   </tr>
@@ -430,14 +548,13 @@ export default function MarksEntryPage() {
                     
                     return (
                       <tr key={student.id} className={`border-b border-gray-100 ${hasExisting ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
-                        <td className="py-3 px-2 sm:px-4 text-gray-600 text-xs sm:text-sm">{index + 1}</td>
-                        <td className="py-3 px-2 sm:px-4 font-medium text-xs sm:text-sm">
-                          <span className="hidden sm:inline">{student.first_name} {student.middle_name ? student.middle_name + ' ' : ''}{student.last_name}</span>
-                          <span className="sm:hidden">{student.first_name} {student.last_name}</span>
-                          {hasExisting && <span className="ml-1 sm:ml-2 text-xs text-amber-600">✓</span>}
+                        <td className="py-3 px-4 text-gray-600">{index + 1}</td>
+                        <td className="py-3 px-4 font-medium">
+                          {student.first_name} {student.middle_name ? student.middle_name + ' ' : ''}{student.last_name}
+                          {hasExisting && <span className="ml-2 text-xs text-amber-600">✓</span>}
                         </td>
                         {isAdvanced ? (
-                          <td className="py-3 px-2 sm:px-4">
+                          <td className="py-3 px-4">
                             <input
                               type="number"
                               min="0"
@@ -447,21 +564,16 @@ export default function MarksEntryPage() {
                               onChange={(e) => {
                                 const value = parseFloat(e.target.value) || 0
                                 if (value <= 100) {
-                                  setMarks(prev => ({
-                                    ...prev,
-                                    [student.id]: { mark: value }
-                                  }))
+                                  setMarks(prev => ({ ...prev, [student.id]: { mark: value } }))
                                 }
                               }}
                               disabled={!canEdit}
-                              className={`w-full px-2 sm:px-3 py-1 sm:py-2 border-2 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none text-center text-sm ${
-                                canEdit ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100 cursor-not-allowed'
-                              }`}
+                              className={`w-full px-3 py-2 border-2 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none text-center ${canEdit ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100 cursor-not-allowed'}`}
                               placeholder="0"
                             />
                           </td>
                         ) : ['S1', 'S2', 'S3', 'S4'].includes(classLevel) ? (
-                          <td className="py-3 px-2 sm:px-4">
+                          <td className="py-3 px-4">
                             <input
                               type="number"
                               min="0"
@@ -471,22 +583,17 @@ export default function MarksEntryPage() {
                               onChange={(e) => {
                                 const value = parseFloat(e.target.value) || 0
                                 if (value <= 80) {
-                                  setMarks(prev => ({
-                                    ...prev,
-                                    [student.id]: { exam: value }
-                                  }))
+                                  setMarks(prev => ({ ...prev, [student.id]: { exam: value } }))
                                 }
                               }}
                               disabled={!canEdit}
-                              className={`w-full px-2 sm:px-3 py-1 sm:py-2 border-2 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none text-center text-sm ${
-                                canEdit ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100 cursor-not-allowed'
-                              }`}
+                              className={`w-full px-3 py-2 border-2 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none text-center ${canEdit ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100 cursor-not-allowed'}`}
                               placeholder="0"
                             />
                           </td>
                         ) : (
                           <>
-                            <td className="py-3 px-2 sm:px-4">
+                            <td className="py-3 px-4">
                               <input
                                 type="number"
                                 min="0"
@@ -496,20 +603,15 @@ export default function MarksEntryPage() {
                                 onChange={(e) => {
                                   const value = parseFloat(e.target.value) || 0
                                   if (value <= maxMarks.ca!) {
-                                    setMarks(prev => ({
-                                      ...prev,
-                                      [student.id]: { ...prev[student.id], ca: value }
-                                    }))
+                                    setMarks(prev => ({ ...prev, [student.id]: { ...prev[student.id], ca: value } }))
                                   }
                                 }}
                                 disabled={!canEdit}
-                                className={`w-full px-2 sm:px-3 py-1 sm:py-2 border-2 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none text-center text-sm ${
-                                  canEdit ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100 cursor-not-allowed'
-                                }`}
+                                className={`w-full px-3 py-2 border-2 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none text-center ${canEdit ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100 cursor-not-allowed'}`}
                                 placeholder="0"
                               />
                             </td>
-                            <td className="py-3 px-2 sm:px-4">
+                            <td className="py-3 px-4">
                               <input
                                 type="number"
                                 min="0"
@@ -519,20 +621,15 @@ export default function MarksEntryPage() {
                                 onChange={(e) => {
                                   const value = parseFloat(e.target.value) || 0
                                   if (value <= maxMarks.exam!) {
-                                    setMarks(prev => ({
-                                      ...prev,
-                                      [student.id]: { ...prev[student.id], exam: value }
-                                    }))
+                                    setMarks(prev => ({ ...prev, [student.id]: { ...prev[student.id], exam: value } }))
                                   }
                                 }}
                                 disabled={!canEdit}
-                                className={`w-full px-2 sm:px-3 py-1 sm:py-2 border-2 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none text-center text-sm ${
-                                  canEdit ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100 cursor-not-allowed'
-                                }`}
+                                className={`w-full px-3 py-2 border-2 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none text-center ${canEdit ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100 cursor-not-allowed'}`}
                                 placeholder="0"
                               />
                             </td>
-                            <td className="py-3 px-2 sm:px-4 text-center font-bold text-sm sm:text-lg">
+                            <td className="py-3 px-4 text-center font-bold text-lg">
                               {total.toFixed(1)}
                             </td>
                           </>

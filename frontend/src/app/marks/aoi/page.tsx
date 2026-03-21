@@ -17,6 +17,7 @@ export default function AOIMarksEntryPage() {
   const [aoiMarks, setAoiMarks] = useState<Record<string, { activity1?: number; activity2?: number; activity3?: number; activity4?: number; activity5?: number }>>({})
   const [userRole, setUserRole] = useState('')
   const [hasExistingMarks, setHasExistingMarks] = useState(false)
+  const [selectedActivity, setSelectedActivity] = useState(1)
 
   useEffect(() => {
     const userData = localStorage.getItem('user')
@@ -212,19 +213,96 @@ export default function AOIMarksEntryPage() {
               </div>
             )}
 
-            <div className="overflow-x-auto -mx-6 sm:mx-0">
-              <table className="w-full min-w-[800px] border-collapse">
+            {/* Mobile Excel-like View - One Activity at a Time */}
+            <div className="block lg:hidden">
+              {/* Activity Selector */}
+              <div className="mb-4 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl p-4 shadow-lg">
+                <p className="text-white text-sm font-medium mb-3 text-center">Select Activity to Enter Marks</p>
+                <div className="grid grid-cols-5 gap-2">
+                  {[1, 2, 3, 4, 5].map((actNum) => (
+                    <button
+                      key={actNum}
+                      onClick={() => setSelectedActivity(actNum)}
+                      className={`py-3 rounded-lg font-bold text-sm transition-all ${
+                        selectedActivity === actNum
+                          ? 'bg-white text-blue-600 shadow-lg scale-105'
+                          : 'bg-white/20 text-white hover:bg-white/30'
+                      }`}
+                    >
+                      A{actNum}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Students List for Selected Activity */}
+              <div className="space-y-2">
+                {studentsData?.students?.map((student: any, index: number) => {
+                  const studentMarks = aoiMarks[student.id] || {}
+                  const activities = [studentMarks.activity1, studentMarks.activity2, studentMarks.activity3, studentMarks.activity4, studentMarks.activity5]
+                    .filter((v): v is number => v !== undefined && v !== null && typeof v === 'number' && !isNaN(v))
+                  const avg = activities.length > 0 ? activities.reduce((sum, v) => sum + v, 0) / activities.length : 0
+                  const outOf20 = ((avg / 3) * 20).toFixed(2)
+                  const canEdit = !hasExistingMarks || userRole === 'school_admin'
+                  const currentActivityValue = studentMarks[`activity${selectedActivity}` as keyof typeof studentMarks]
+                  
+                  return (
+                    <div key={student.id} className="bg-white border-2 border-gray-200 rounded-lg p-3 shadow-sm">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2 flex-1">
+                          <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded">{index + 1}</span>
+                          <span className="font-semibold text-sm truncate">{student.first_name} {student.last_name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-blue-600 font-medium">{avg.toFixed(1)} avg</span>
+                          <span className="text-xs text-green-600 font-bold bg-green-50 px-2 py-1 rounded">{outOf20}/20</span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm font-semibold text-gray-700 whitespace-nowrap">
+                          Activity {selectedActivity}:
+                        </label>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          min="0"
+                          max="3"
+                          step="0.5"
+                          value={currentActivityValue || ''}
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value) || 0
+                            if (value <= 3) {
+                              setAoiMarks(prev => ({ ...prev, [student.id]: { ...prev[student.id], [`activity${selectedActivity}`]: value } }))
+                            }
+                          }}
+                          disabled={!canEdit}
+                          className={`flex-1 px-4 py-3 border-2 rounded-lg text-center text-xl font-bold focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none ${
+                            canEdit ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100 cursor-not-allowed'
+                          }`}
+                          placeholder="0-3"
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden lg:block overflow-x-auto">
+              <table className="w-full border-collapse">
                 <thead>
                   <tr className="bg-gray-50">
-                    <th className="text-left py-3 px-2 sm:px-4 font-semibold text-gray-700 border-r-2 border-gray-300 text-xs sm:text-sm">#</th>
-                    <th className="text-left py-3 px-2 sm:px-4 font-semibold text-gray-700 border-r-2 border-gray-300 text-xs sm:text-sm">Student Name</th>
-                    <th className="text-center py-3 px-1 sm:px-2 font-semibold text-gray-700 border-r border-gray-200 text-xs sm:text-sm">Act 1</th>
-                    <th className="text-center py-3 px-1 sm:px-2 font-semibold text-gray-700 border-r border-gray-200 text-xs sm:text-sm">Act 2</th>
-                    <th className="text-center py-3 px-1 sm:px-2 font-semibold text-gray-700 border-r border-gray-200 text-xs sm:text-sm">Act 3</th>
-                    <th className="text-center py-3 px-1 sm:px-2 font-semibold text-gray-700 border-r border-gray-200 text-xs sm:text-sm">Act 4</th>
-                    <th className="text-center py-3 px-1 sm:px-2 font-semibold text-gray-700 border-r-2 border-gray-300 text-xs sm:text-sm">Act 5</th>
-                    <th className="text-center py-3 px-2 sm:px-4 font-semibold text-gray-700 bg-blue-50 border-r-2 border-gray-300 text-xs sm:text-sm">Avg</th>
-                    <th className="text-center py-3 px-2 sm:px-4 font-semibold text-gray-700 bg-green-50 text-xs sm:text-sm">Out of 20</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 border-r-2 border-gray-300">#</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 border-r-2 border-gray-300">Student Name</th>
+                    <th className="text-center py-3 px-2 font-semibold text-gray-700 border-r border-gray-200">Act 1</th>
+                    <th className="text-center py-3 px-2 font-semibold text-gray-700 border-r border-gray-200">Act 2</th>
+                    <th className="text-center py-3 px-2 font-semibold text-gray-700 border-r border-gray-200">Act 3</th>
+                    <th className="text-center py-3 px-2 font-semibold text-gray-700 border-r border-gray-200">Act 4</th>
+                    <th className="text-center py-3 px-2 font-semibold text-gray-700 border-r-2 border-gray-300">Act 5</th>
+                    <th className="text-center py-3 px-4 font-semibold text-gray-700 bg-blue-50 border-r-2 border-gray-300">Avg</th>
+                    <th className="text-center py-3 px-4 font-semibold text-gray-700 bg-green-50">Out of 20</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -234,16 +312,16 @@ export default function AOIMarksEntryPage() {
                       .filter((v): v is number => v !== undefined && v !== null && typeof v === 'number' && !isNaN(v))
                     const avg = activities.length > 0 ? activities.reduce((sum, v) => sum + v, 0) / activities.length : 0
                     const outOf20 = ((avg / 3) * 20).toFixed(2)
+                    const canEdit = !hasExistingMarks || userRole === 'school_admin'
                     
                     return (
                       <tr key={student.id} className="border-b border-gray-200 hover:bg-gray-50">
-                        <td className="py-3 px-2 sm:px-4 text-gray-600 border-r-2 border-gray-300 text-xs sm:text-sm">{index + 1}</td>
-                        <td className="py-3 px-2 sm:px-4 font-medium border-r-2 border-gray-300 text-xs sm:text-sm">
-                          <span className="hidden sm:inline">{student.first_name} {student.middle_name ? student.middle_name + ' ' : ''}{student.last_name}</span>
-                          <span className="sm:hidden">{student.first_name} {student.last_name}</span>
+                        <td className="py-3 px-4 text-gray-600 border-r-2 border-gray-300">{index + 1}</td>
+                        <td className="py-3 px-4 font-medium border-r-2 border-gray-300">
+                          {student.first_name} {student.middle_name ? student.middle_name + ' ' : ''}{student.last_name}
                         </td>
                         {[1, 2, 3, 4, 5].map((actNum) => (
-                          <td key={actNum} className="py-2 px-1 sm:px-2 text-center border-r border-gray-200">
+                          <td key={actNum} className="py-2 px-2 text-center border-r border-gray-200">
                             <input
                               type="number"
                               min="0"
@@ -253,22 +331,19 @@ export default function AOIMarksEntryPage() {
                               onChange={(e) => {
                                 const value = parseFloat(e.target.value) || 0
                                 if (value <= 3) {
-                                  setAoiMarks(prev => ({
-                                    ...prev,
-                                    [student.id]: { ...prev[student.id], [`activity${actNum}`]: value }
-                                  }))
+                                  setAoiMarks(prev => ({ ...prev, [student.id]: { ...prev[student.id], [`activity${actNum}`]: value } }))
                                 }
                               }}
-                              disabled={hasExistingMarks && userRole !== 'school_admin'}
-                              className="w-full px-1 sm:px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                              disabled={!canEdit}
+                              className={`w-full px-2 py-1 text-center border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent ${canEdit ? 'bg-white' : 'bg-gray-100 cursor-not-allowed'}`}
                               placeholder="0-3"
                             />
                           </td>
                         ))}
-                        <td className="py-3 px-2 sm:px-4 text-center font-semibold text-blue-700 bg-blue-50 border-r-2 border-gray-300 text-xs sm:text-sm">
+                        <td className="py-3 px-4 text-center font-semibold text-blue-700 bg-blue-50 border-r-2 border-gray-300">
                           {avg.toFixed(2)}
                         </td>
-                        <td className="py-3 px-2 sm:px-4 text-center font-bold text-green-700 bg-green-50 text-xs sm:text-sm">
+                        <td className="py-3 px-4 text-center font-bold text-green-700 bg-green-50">
                           {outOf20}
                         </td>
                       </tr>
