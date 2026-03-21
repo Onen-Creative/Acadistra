@@ -235,7 +235,7 @@ export default function UsersPage() {
                   icon="📧"
                   required
                   error={errors.email?.message}
-                  placeholder="user@school.ug"
+                  placeholder="user@acadistra.com"
                 />
                 <FormSelect
                   {...register('role')}

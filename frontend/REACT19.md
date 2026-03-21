@@ -303,7 +303,7 @@ npm install
 npm run dev
 
 # Access at http://localhost:5173
-# Login: admin@school.ug / Admin@123
+# Login: admin@acadistra.com / Admin@123
 ```
 
 **Experience the future of school management with React 19!** ⚡🎓

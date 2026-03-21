@@ -143,7 +143,7 @@ docker exec acadistra_caddy caddy list-certificates
 
 ### 3. Login Test
 1. Open browser: https://acadistra.com
-2. Login with: `sysadmin@school.ug` / `Admin@123`
+2. Login with: `sysadmin@acadistra.com` / `Admin@123`
 3. Verify dashboard loads
 4. Check browser console for errors
 5. Verify API calls go to `/api/v1/*`
@@ -153,7 +153,7 @@ docker exec acadistra_caddy caddy list-certificates
 # Test authentication
 curl -X POST https://acadistra.com/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"sysadmin@school.ug","password":"Admin@123"}'
+  -d '{"email":"sysadmin@acadistra.com","password":"Admin@123"}'
 # Expected: JWT tokens
 
 # Test protected endpoint (use token from above)

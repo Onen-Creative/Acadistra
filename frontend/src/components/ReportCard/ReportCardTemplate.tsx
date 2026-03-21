@@ -144,7 +144,7 @@ export const ReportCardTemplate: React.FC<ReportCardProps> = ({
               </p>
               <p style={{ fontSize: '10px', color: '#4b5563', margin: '1px 0' }}>{school?.address || 'Tororo, Uganda'}</p>
               <p style={{ fontSize: '10px', color: '#4b5563', margin: '1px 0' }}>
-                Tel: {school?.phone || '+256700000000'} | Email: {school?.contact_email || 'info@tanna.ug'}
+                Tel: {school?.phone || '+256700000000'} | Email: {school?.contact_email || 'info@acadistra.com'}
               </p>
               <div style={{ 
                 marginTop: '6px', 

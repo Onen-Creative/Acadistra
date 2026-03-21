@@ -241,7 +241,7 @@ docker exec acadistra_postgres psql -U acadistra -d acadistra -c "SELECT pg_size
 ## 🎓 Default Credentials
 
 **System Admin:**
-- Email: `sysadmin@school.ug`
+- Email: `sysadmin@acadistra.com`
 - Password: `Admin@123`
 
 **⚠️ IMPORTANT:** Change this password immediately after first login!

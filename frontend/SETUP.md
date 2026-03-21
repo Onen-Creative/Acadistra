@@ -63,7 +63,7 @@ npm run dev
 
 ### **4. Access Application**
 - **Frontend**: http://localhost:5173
-- **Login**: admin@school.ug / Admin@123
+- **Login**: admin@acadistra.com / Admin@123
 
 ## 🎨 **Key Features Showcase**
 

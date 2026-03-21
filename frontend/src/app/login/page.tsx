@@ -178,7 +178,7 @@ export default function LoginPage() {
                 <input
                   type="text"
                   {...register('identifier')}
-                  placeholder="email@school.ug or 0700123456"
+                  placeholder="email@acadistra.com or 0700123456"
                   className="w-full px-4 py-3.5 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition-all duration-300 bg-white hover:border-gray-300"
                 />
                 {errors.identifier && <p className="text-red-500 text-sm animate-shake">{errors.identifier.message}</p>}

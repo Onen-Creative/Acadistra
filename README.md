@@ -10,7 +10,7 @@ cd acadistra
 ./deploy.sh
 ```
 
-Access at http://localhost:3000 with `sysadmin@school.ug` / `Admin@123`
+Access at http://localhost:3000 with `sysadmin@acadistra.com` / `Admin@123`
 
 📖 **[Full Quick Start Guide](QUICKSTART.md)** | 📋 **[Deployment Checklist](DEPLOYMENT_CHECKLIST_CLEAN.md)**
 
@@ -159,6 +159,9 @@ docker stats
 - 📋 [Deployment Guide](DEPLOYMENT.md)
 - 🏗️ [System Architecture](SYSTEM_ARCHITECTURE.md)
 - 📝 [API Documentation](http://localhost:8080/swagger/index.html)
+- 📧 Email: support@acadistra.com
+- 🔒 Security: security@acadistra.com
+- 💼 Sales: sales@acadistra.com
 
 ## License
 

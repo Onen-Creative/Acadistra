@@ -30,7 +30,7 @@ Point these A records to your server IP:
 ## Post-Deployment
 
 - [ ] Access frontend at http://localhost:3000
-- [ ] Login with sysadmin@school.ug / Admin@123
+- [ ] Login with sysadmin@acadistra.com / Admin@123
 - [ ] Create first school
 - [ ] Create school admin user
 - [ ] Test basic functionality

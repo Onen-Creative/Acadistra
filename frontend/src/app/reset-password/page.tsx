@@ -54,7 +54,7 @@ export default function ResetPasswordPage() {
                 <input
                   type="email"
                   {...register('email')}
-                  placeholder="your.email@school.ug"
+                  placeholder="your.email@acadistra.com"
                   className="w-full px-4 py-3.5 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition-all duration-300"
                 />
                 {errors.email && <p className="text-red-500 text-sm">{errors.email.message}</p>}

@@ -175,7 +175,7 @@
 **Request:**
 ```json
 {
-  "email": "user@school.ug",
+  "email": "user@acadistra.com",
   "password": "password"
 }
 ```
@@ -187,7 +187,7 @@
   "refresh_token": "refresh_token",
   "user": {
     "id": "uuid",
-    "email": "user@school.ug",
+    "email": "user@acadistra.com",
     "role": "teacher"
   }
 }

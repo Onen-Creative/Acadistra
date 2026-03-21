@@ -216,7 +216,7 @@ export default function EditStudentPage() {
                 type="email"
                 label="Email"
                 icon="📧"
-                placeholder="student@example.com"
+                placeholder="student@acadistra.com"
               />
               <FormInput
                 {...register('phone')}

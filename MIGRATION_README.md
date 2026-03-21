@@ -42,7 +42,7 @@ You will be prompted to confirm by typing `YES`.
 - **NEW: lesson_records, budgets, requisitions, inventory (9 tables)**
 
 **Initial Data:**
-- System Admin: `sysadmin@school.ug` / `Admin@123`
+- System Admin: `sysadmin@acadistra.com` / `Admin@123`
 - Standard Subjects: All UNEB/NCDC subjects for ECCE → S6
 
 ## After Migration
@@ -50,7 +50,7 @@ You will be prompted to confirm by typing `YES`.
 ### Test the System
 
 1. **Login**: https://acadistra.com
-   - Email: `sysadmin@school.ug`
+   - Email: `sysadmin@acadistra.com`
    - Password: `Admin@123`
 
 2. **Verify Pages Load:**

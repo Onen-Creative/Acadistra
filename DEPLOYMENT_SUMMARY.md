@@ -86,7 +86,7 @@ cd acadistra
 - MinIO Console: http://localhost:9001
 
 ### Default Credentials
-- Email: `sysadmin@school.ug`
+- Email: `sysadmin@acadistra.com`
 - Password: `Admin@123`
 - ⚠️ Change immediately after first login!
 

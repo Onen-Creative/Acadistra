@@ -224,7 +224,7 @@ chmod +x deploy.sh
 ### 7.2 Login
 
 **Default Admin Credentials:**
-- Email: `sysadmin@school.ug`
+- Email: `sysadmin@acadistra.com`
 - Password: `Admin@123`
 
 **⚠️ IMPORTANT: Change password immediately after first login!**
@@ -298,7 +298,7 @@ ls -lh ~/acadistra-backups/
 
 ### 10.1 Login as Admin
 - Go to your website
-- Login with: `sysadmin@school.ug` / `Admin@123`
+- Login with: `sysadmin@acadistra.com` / `Admin@123`
 
 ### 10.2 Create School
 - Click "Schools" in sidebar
@@ -393,7 +393,7 @@ Press `Ctrl + C` to exit logs.
 
 ### Access System
 - **Website:** `https://yourschool.com` or `http://YOUR_IP:3000`
-- **Admin:** `sysadmin@school.ug` / `Admin@123`
+- **Admin:** `sysadmin@acadistra.com` / `Admin@123`
 
 ### Server Commands
 ```bash

@@ -178,7 +178,7 @@ export function MobileMoneyPayment({ studentFeesId, outstandingAmount, studentNa
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  placeholder="parent@example.com"
+                  placeholder="parent@acadistra.com"
                 />
               </div>
 

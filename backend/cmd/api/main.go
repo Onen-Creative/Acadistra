@@ -779,7 +779,7 @@ func seedAdmin(db *gorm.DB, cfg *config.Config) {
 	// Create system admin without school assignment
 	sysAdmin := &models.User{
 		SchoolID: nil,
-		Email:    "sysadmin@school.ug",
+		Email:    "sysadmin@acadistra.com",
 		FullName: "System Administrator",
 		Role:     "system_admin",
 		IsActive: true,
@@ -789,7 +789,7 @@ func seedAdmin(db *gorm.DB, cfg *config.Config) {
 		log.Fatal("Failed to create system admin:", err)
 	}
 
-	log.Println("System Admin created: sysadmin@school.ug / Admin@123")
+	log.Println("System Admin created: sysadmin@acadistra.com / Admin@123")
 	log.Println("Other users (school admin, teachers, etc.) should be created through the school management interface")
 }
 

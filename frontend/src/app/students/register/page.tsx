@@ -324,7 +324,7 @@ export default function StudentRegistrationPage() {
                   type="email"
                   label="Email"
                   icon="📧"
-                  placeholder="student@example.com"
+                  placeholder="student@acadistra.com"
                 />
                 <FormInput
                   {...register('phone')}
@@ -411,7 +411,7 @@ export default function StudentRegistrationPage() {
                   type="email"
                   label="Email Address"
                   icon="📧"
-                  placeholder="guardian@example.com"
+                  placeholder="guardian@acadistra.com"
                 />
                 <FormInput
                   {...register('guardian_occupation')}

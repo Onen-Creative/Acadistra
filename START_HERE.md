@@ -37,7 +37,7 @@ Type `YES` when prompted. Takes 5-10 minutes.
 ### What Gets Created
 - **All 65 tables** from scratch
 - **9 new tables**: lesson_records, budgets, budget_transfers, requisitions, requisition_items, requisition_approval_flows, inventory_categories, inventory_items, inventory_transactions
-- **Admin user**: sysadmin@school.ug / Admin@123
+- **Admin user**: sysadmin@acadistra.com / Admin@123
 - **Standard subjects**: All UNEB/NCDC subjects (ECCE → S6)
 
 ### After Migration
@@ -84,7 +84,7 @@ Format: `acadistra_full_backup_YYYYMMDD_HHMMSS.sql`
 After migration completes:
 - ✅ 65+ tables created
 - ✅ No 500 errors on lessons/budget/requisitions/inventory pages
-- ✅ Can login with sysadmin@school.ug
+- ✅ Can login with sysadmin@acadistra.com
 - ✅ All services running (check with `docker compose ps`)
 - ✅ Backend logs show no errors
 

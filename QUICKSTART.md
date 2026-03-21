@@ -32,7 +32,7 @@ That's it! The script will:
 - **MinIO Console**: http://localhost:9001
 
 **Default Login**:
-- Email: `sysadmin@school.ug`
+- Email: `sysadmin@acadistra.com`
 - Password: `Admin@123`
 
 ## 🏫 Create Your First School
