@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"fmt"
+	"log"
 	"net/http"
 	"sort"
 	"strconv"
@@ -10,15 +12,20 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/school-system/backend/internal/models"
+	"github.com/school-system/backend/internal/services"
 	"gorm.io/gorm"
 )
 
 type ClinicHandler struct {
-	db *gorm.DB
+	db           *gorm.DB
+	emailService *services.EmailService
 }
 
-func NewClinicHandler(db *gorm.DB) *ClinicHandler {
-	return &ClinicHandler{db: db}
+func NewClinicHandler(db *gorm.DB, emailService *services.EmailService) *ClinicHandler {
+	return &ClinicHandler{
+		db:           db,
+		emailService: emailService,
+	}
 }
 
 // ============ HEALTH PROFILES ============
@@ -212,6 +219,26 @@ func (h *ClinicHandler) CreateVisit(c *gin.Context) {
 	
 	// Load student details
 	h.db.Preload("Student").First(&req.ClinicVisit, req.ClinicVisit.ID)
+	
+	// Send health alert email if serious condition
+	if req.ClinicVisit.Outcome == "referred" || req.ClinicVisit.Outcome == "emergency" || req.ClinicVisit.Outcome == "sent_home" {
+		go func(studentID uuid.UUID, symptoms string, visitDate time.Time) {
+			var student models.Student
+			if err := h.db.First(&student, studentID).Error; err == nil {
+				var guardians []models.Guardian
+				h.db.Where("student_id = ?", studentID).Find(&guardians)
+				
+				studentName := fmt.Sprintf("%s %s", student.FirstName, student.LastName)
+				for _, guardian := range guardians {
+					if guardian.Email != "" {
+						if err := h.emailService.SendHealthAlert(guardian.Email, studentName, symptoms, visitDate.Format("2006-01-02")); err != nil {
+							log.Printf("Failed to send health alert: %v", err)
+						}
+					}
+				}
+			}
+		}(req.ClinicVisit.StudentID, req.ClinicVisit.Symptoms, req.ClinicVisit.VisitDate)
+	}
 	
 	c.JSON(http.StatusCreated, req.ClinicVisit)
 }

@@ -252,7 +252,7 @@ echo ""
 echo "Summary:"
 echo "  • Database: Fresh installation with $TOTAL_TABLES tables"
 echo "  • Backup: $BACKUP_FILE"
-echo "  • Admin: sysadmin@school.ug / Admin@123"
+echo "  • Admin: admin@acadistra.com / Admin@123"
 echo "  • Status: All services running"
 echo ""
 

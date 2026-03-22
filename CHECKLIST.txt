@@ -36,7 +36,7 @@ VERIFICATION:
         Expected: All services "Up"
 
 [ ] 15. Test website: https://acadistra.com
-        Login: sysadmin@school.ug / Admin@123
+        Login: admin@acadistra.com / Admin@123
 
 [ ] 16. Test pages (no 500 errors):
         - Lessons page

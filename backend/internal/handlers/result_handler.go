@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"net/http"
 	"strings"
@@ -10,15 +11,20 @@ import (
 	"github.com/google/uuid"
 	"github.com/school-system/backend/internal/grading"
 	"github.com/school-system/backend/internal/models"
+	"github.com/school-system/backend/internal/services"
 	"gorm.io/gorm"
 )
 
 type ResultHandler struct {
-	db *gorm.DB
+	db           *gorm.DB
+	emailService *services.EmailService
 }
 
-func NewResultHandler(db *gorm.DB) *ResultHandler {
-	return &ResultHandler{db: db}
+func NewResultHandler(db *gorm.DB, emailService *services.EmailService) *ResultHandler {
+	return &ResultHandler{
+		db:           db,
+		emailService: emailService,
+	}
 }
 
 func (h *ResultHandler) GetByStudent(c *gin.Context) {
@@ -558,6 +564,27 @@ func (h *ResultHandler) CreateOrUpdate(c *gin.Context) {
 			return
 		}
 	}
+	
+	// Send grade alert email to guardians
+	go func(studentID, subjectID uuid.UUID, grade, term string, year int) {
+		var student models.Student
+		if err := h.db.First(&student, studentID).Error; err == nil {
+			var subject models.StandardSubject
+			h.db.First(&subject, subjectID)
+			
+			var guardians []models.Guardian
+			h.db.Where("student_id = ?", studentID).Find(&guardians)
+			
+			studentName := fmt.Sprintf("%s %s", student.FirstName, student.LastName)
+			for _, guardian := range guardians {
+				if guardian.Email != "" {
+					if err := h.emailService.SendGradeAlert(guardian.Email, studentName, subject.Name, grade, fmt.Sprintf("%s %d", term, year)); err != nil {
+						log.Printf("Failed to send grade alert: %v", err)
+					}
+				}
+			}
+		}
+	}(studentID, subjectID, gradeResult.FinalGrade, req.Term, req.Year)
 	
 	c.JSON(http.StatusOK, result)
 }

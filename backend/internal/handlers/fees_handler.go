@@ -2,23 +2,29 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/school-system/backend/internal/models"
+	"github.com/school-system/backend/internal/services"
 	"github.com/school-system/backend/internal/utils"
 	ws "github.com/school-system/backend/internal/websocket"
 	"gorm.io/gorm"
 )
 
 type FeesHandler struct {
-	db *gorm.DB
+	db           *gorm.DB
+	emailService *services.EmailService
 }
 
-func NewFeesHandler(db *gorm.DB) *FeesHandler {
-	return &FeesHandler{db: db}
+func NewFeesHandler(db *gorm.DB, emailService *services.EmailService) *FeesHandler {
+	return &FeesHandler{
+		db:           db,
+		emailService: emailService,
+	}
 }
 
 // List student fees for a term/year
@@ -170,6 +176,24 @@ func (h *FeesHandler) CreateOrUpdateStudentFees(c *gin.Context) {
 			return
 		}
 		ws.GlobalHub.Broadcast("fees:created", fees, schoolID)
+		
+		// Send fees invoice email to guardians
+		go func(studentID uuid.UUID, totalFees float64, term string, year int) {
+			var student models.Student
+			if err := h.db.First(&student, studentID).Error; err == nil {
+				var guardians []models.Guardian
+				h.db.Where("student_id = ?", studentID).Find(&guardians)
+				
+				studentName := fmt.Sprintf("%s %s", student.FirstName, student.LastName)
+				for _, guardian := range guardians {
+					if guardian.Email != "" {
+						if err := h.emailService.SendFeesInvoice(guardian.Email, studentName, totalFees, 0, totalFees, term, fmt.Sprintf("%d", year)); err != nil {
+							log.Printf("Failed to send fees invoice: %v", err)
+						}
+					}
+				}
+			}
+		}(studentID, req.TotalFees, req.Term, req.Year)
 	} else if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -373,6 +397,21 @@ func (h *FeesHandler) RecordPayment(c *gin.Context) {
 	}
 
 	ws.GlobalHub.Broadcast("fees:payment:recorded", gin.H{"payment": payment, "updated_fees": studentFees}, studentFees.SchoolID.String())
+	
+	// Send payment confirmation email to guardians
+	go func(studentID uuid.UUID, studentName string, amount float64, outstanding float64) {
+		var guardians []models.Guardian
+		h.db.Where("student_id = ?", studentID).Find(&guardians)
+		
+		for _, guardian := range guardians {
+			if guardian.Email != "" {
+				if err := h.emailService.SendPaymentConfirmation(guardian.Email, studentName, fmt.Sprintf("%.2f", amount), req.PaymentMethod, req.ReceiptNo); err != nil {
+					log.Printf("Failed to send payment confirmation: %v", err)
+				}
+			}
+		}
+	}(studentFees.StudentID, studentName, req.Amount, studentFees.Outstanding)
+	
 	c.JSON(http.StatusOK, gin.H{"payment": payment, "updated_fees": studentFees, "income_created": true})
 }
 

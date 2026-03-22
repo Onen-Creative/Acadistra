@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 
@@ -8,18 +9,28 @@ import (
 	"github.com/google/uuid"
 	"github.com/school-system/backend/internal/models"
 	"github.com/school-system/backend/internal/services"
+	"github.com/school-system/backend/internal/utils"
 	"gorm.io/gorm"
 )
 
 type UserHandler struct {
-	db          *gorm.DB
-	authService *services.AuthService
+	db           *gorm.DB
+	authService  *services.AuthService
+	emailService *services.EmailService
 }
 
 func NewUserHandler(db *gorm.DB, authService *services.AuthService) *UserHandler {
 	return &UserHandler{
 		db:          db,
 		authService: authService,
+	}
+}
+
+func NewUserHandlerWithEmail(db *gorm.DB, authService *services.AuthService, emailService *services.EmailService) *UserHandler {
+	return &UserHandler{
+		db:           db,
+		authService:  authService,
+		emailService: emailService,
 	}
 }
 
@@ -92,6 +103,12 @@ func (h *UserHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	
+	// Validate email format
+	if err := utils.ValidateEmailFormat(req.Email); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	// System admin can only create school_admin
 	if req.Role != "school_admin" {
@@ -123,20 +140,32 @@ func (h *UserHandler) Create(c *gin.Context) {
 		return
 	}
 
+	// Send welcome email if email service is available
+	if h.emailService != nil {
+		schoolName := "Acadistra"
+		if user.School != nil {
+			schoolName = user.School.Name
+		}
+		go func(email, name, role, school, password string) {
+			if err := h.emailService.SendWelcomeEmail(email, name, role, school, password); err != nil {
+				log.Printf("Failed to send welcome email to %s: %v", email, err)
+				
+				// Create admin notification for email failure
+				notification := models.Notification{
+					Type:     "email_failure",
+					Category: "system",
+					Title:    "Email Delivery Failed",
+					Message:  "Failed to send welcome email to " + email,
+				}
+				h.db.Create(&notification)
+			}
+		}(user.Email, user.FullName, user.Role, schoolName, req.Password)
+	}
+
 	c.JSON(http.StatusCreated, user)
 }
 
 func (h *UserHandler) Get(c *gin.Context) {
-	id := c.Param("id")
-	var user models.User
-	if err := h.db.Preload("School").First(&user, "id = ?", id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
-		return
-	}
-	c.JSON(http.StatusOK, user)
-}
-
-func (h *UserHandler) GetSchoolUser(c *gin.Context) {
 	id := c.Param("id")
 	schoolID := c.GetString("tenant_school_id")
 	var user models.User
@@ -230,6 +259,12 @@ func (h *UserHandler) CreateSchoolUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	
+	// Validate email format
+	if err := utils.ValidateEmailFormat(req.Email); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	if req.Role == "system_admin" || req.Role == "school_admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot create system_admin or school_admin users"})
@@ -263,7 +298,51 @@ func (h *UserHandler) CreateSchoolUser(c *gin.Context) {
 		return
 	}
 
+	// Send welcome email if email service is available
+	if h.emailService != nil {
+		schoolUUID, _ := uuid.Parse(schoolID)
+		var school models.School
+		h.db.First(&school, "id = ?", schoolUUID)
+		schoolName := "Acadistra"
+		if school.ID != uuid.Nil {
+			schoolName = school.Name
+		}
+		go func(email, name, role, schoolN, password string) {
+			if err := h.emailService.SendWelcomeEmail(email, name, role, schoolN, password); err != nil {
+				log.Printf("Failed to send welcome email to %s: %v", email, err)
+				
+				// Create admin notification for email failure
+				notification := models.Notification{
+					Type:     "email_failure",
+					Category: "system",
+					Title:    "Email Delivery Failed",
+					Message:  "Failed to send welcome email to " + email,
+				}
+				h.db.Create(&notification)
+			}
+		}(user.Email, user.FullName, user.Role, schoolName, req.Password)
+	}
+
 	c.JSON(http.StatusCreated, user)
+}
+
+func (h *UserHandler) GetSchoolUser(c *gin.Context) {
+	id := c.Param("id")
+	schoolID := c.GetString("tenant_school_id")
+	var user models.User
+	if err := h.db.Preload("School").Where("id = ? AND school_id = ?", id, schoolID).First(&user).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+	type UserResponse struct {
+		models.User
+		SchoolName string `json:"school_name"`
+	}
+	schoolName := "System"
+	if user.School != nil {
+		schoolName = user.School.Name
+	}
+	c.JSON(http.StatusOK, UserResponse{User: user, SchoolName: schoolName})
 }
 
 func (h *UserHandler) UpdateSchoolUser(c *gin.Context) {

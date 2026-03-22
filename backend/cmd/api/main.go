@@ -109,6 +109,25 @@ func main() {
 		c.JSON(200, gin.H{"message": "Standard subjects seeded successfully"})
 	})
 
+	// Services
+	authService := services.NewAuthService(db, cfg)
+	emailService := services.NewEmailService(
+		os.Getenv("SMTP_HOST"),
+		587,
+		os.Getenv("SMTP_USER"),
+		os.Getenv("SMTP_PASSWORD"),
+		os.Getenv("SMTP_FROM"),
+		db,
+	)
+	
+	// Start email queue processor in background
+	go emailService.ProcessEmailQueue()
+
+	// Password reset endpoints (public)
+	passwordResetHandler := handlers.NewPasswordResetHandler(db, emailService, authService)
+	r.POST("/api/v1/auth/password-reset/request", passwordResetHandler.RequestPasswordReset)
+	r.POST("/api/v1/auth/password-reset/confirm", passwordResetHandler.ConfirmPasswordReset)
+
 	// Metrics
 	if cfg.Monitoring.PrometheusEnabled {
 		r.GET("/metrics", gin.WrapH(promhttp.Handler()))
@@ -121,32 +140,29 @@ func main() {
 	r.GET("/socket.io/*any", gin.WrapH(socketServer))
 	r.POST("/socket.io/*any", gin.WrapH(socketServer))
 
-	// Services
-	authService := services.NewAuthService(db, cfg)
-
 	// Handlers
 	authHandler := handlers.NewAuthHandler(authService)
-	userHandler := handlers.NewUserHandler(db, authService)
+	userHandler := handlers.NewUserHandlerWithEmail(db, authService, emailService)
 	schoolHandler := handlers.NewSchoolHandler(db)
 	classHandler := handlers.NewClassHandler(db)
 	studentHandler := handlers.NewStudentHandler(db)
 	guardianHandler := handlers.NewGuardianHandler(db)
-	registrationHandler := handlers.NewRegistrationHandler(db)
+	registrationHandler := handlers.NewRegistrationHandler(db, emailService)
 	subjectHandler := handlers.NewSubjectHandler(db)
-	resultHandler := handlers.NewResultHandler(db)
+	resultHandler := handlers.NewResultHandler(db, emailService)
 	uploadHandler := handlers.NewUploadHandler(db)
 	auditHandler := handlers.NewAuditHandler(db)
-	feesHandler := handlers.NewFeesHandler(db)
+	feesHandler := handlers.NewFeesHandler(db, emailService)
 	libraryHandler := handlers.NewLibraryHandler(db)
 	staffHandler := handlers.NewStaffHandler(db)
 	websocketHandler := handlers.NewWebSocketHandler(authService)
-	attendanceHandler := handlers.NewAttendanceHandler(db)
+	attendanceHandler := handlers.NewAttendanceHandler(db, emailService)
 	termDatesHandler := handlers.NewTermDatesHandler(db)
 	bulkImportXLSXHandler := handlers.NewBulkImportXLSXHandler(db)
 	financeHandler := handlers.NewFinanceHandler(db)
 	inventoryHandler := handlers.NewInventoryHandler(db)
 	payrollService := services.NewPayrollService(db)
-	payrollHandler := handlers.NewPayrollHandler(payrollService)
+	payrollHandler := handlers.NewPayrollHandler(payrollService, emailService)
 	marksExportHandler := handlers.NewMarksExportHandler(db)
 	systemReportsHandler := handlers.NewSystemReportsHandler(db)
 	settingsHandler := handlers.NewSettingsHandler(db)
@@ -160,13 +176,6 @@ func main() {
 		os.Getenv("AFRICASTALKING_API_KEY"),
 		os.Getenv("AFRICASTALKING_USERNAME"),
 		os.Getenv("AFRICASTALKING_SENDER_ID"),
-	)
-	emailService := services.NewEmailService(
-		os.Getenv("SMTP_HOST"),
-		587,
-		os.Getenv("SMTP_USERNAME"),
-		os.Getenv("SMTP_PASSWORD"),
-		os.Getenv("SMTP_FROM"),
 	)
 	notificationService := services.NewNotificationService(db, smsService, emailService)
 	_ = notificationService // Will be used for creating notifications
@@ -263,6 +272,14 @@ func main() {
 				// System settings
 				sysAdmin.GET("/settings", settingsHandler.GetSettings)
 				sysAdmin.PUT("/settings", settingsHandler.UpdateSettings)
+				
+				// Email monitoring
+				emailMonitorHandler := handlers.NewEmailMonitorHandler(db, emailService)
+				sysAdmin.GET("/email-queue/stats", emailMonitorHandler.GetEmailQueueStats)
+				sysAdmin.GET("/email-queue", emailMonitorHandler.ListQueuedEmails)
+				sysAdmin.GET("/email-queue/:id", emailMonitorHandler.GetEmailDetails)
+				sysAdmin.POST("/email-queue/:id/retry", emailMonitorHandler.RetryFailedEmail)
+				sysAdmin.POST("/email-queue/:id/cancel", emailMonitorHandler.CancelQueuedEmail)
 				
 				// System reports
 				sysAdmin.GET("/reports/system/schools", systemReportsHandler.GenerateSchoolsReport)
@@ -515,7 +532,7 @@ func main() {
 			})
 			{
 				budgetHandler := handlers.NewBudgetHandler(db)
-				requisitionHandler := handlers.NewRequisitionHandler(db)
+				requisitionHandler := handlers.NewRequisitionHandler(db, emailService)
 				
 				// Budget routes
 				budget.POST("/budgets", budgetHandler.CreateBudget)
@@ -543,7 +560,7 @@ func main() {
 				c.Next()
 			})
 			{
-				requisitionHandler := handlers.NewRequisitionHandler(db)
+				requisitionHandler := handlers.NewRequisitionHandler(db, emailService)
 				requisitions.POST("/requisitions", requisitionHandler.CreateRequisition)
 				requisitions.GET("/requisitions", requisitionHandler.ListRequisitions)
 				requisitions.GET("/requisitions/:id", requisitionHandler.GetRequisition)
@@ -615,7 +632,7 @@ func main() {
 				c.Next()
 			})
 			{
-				clinicHandler := handlers.NewClinicHandler(db)
+				clinicHandler := handlers.NewClinicHandler(db, emailService)
 				
 				// Health Profiles
 				nurse.POST("/health-profiles", clinicHandler.CreateHealthProfile)
@@ -761,6 +778,11 @@ func handleCommand(cmd string) {
 
 	case "seed-standard-subjects":
 		seedStandardSubjects(db)
+
+	case "fix-constraints":
+		// Drop old constraints that cause migration issues
+		db.Exec("ALTER TABLE staff DROP CONSTRAINT IF EXISTS uni_staff_email")
+		log.Println("Fixed database constraints")
 
 	default:
 	}

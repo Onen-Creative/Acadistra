@@ -127,7 +127,7 @@ docker logs acadistra_backend | grep -i error
 Visit: https://acadistra.com
 
 Login:
-  Email: sysadmin@school.ug
+  Email: admin@acadistra.com
   Password: Admin@123
 
 Test these pages (should NOT show 500 errors):

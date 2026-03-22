@@ -19,7 +19,7 @@ type Staff struct {
 	Gender             string     `gorm:"type:varchar(10)" json:"gender"`
 	Nationality        string     `gorm:"type:varchar(100);default:'Ugandan'" json:"nationality"`
 	NationalID         string     `gorm:"type:varchar(50)" json:"national_id"`
-	Email              string     `gorm:"type:varchar(255)" json:"email"`
+	Email              string     `gorm:"type:varchar(255);index" json:"email"`
 	Phone              string     `gorm:"type:varchar(50);not null" json:"phone"`
 	AlternativePhone   string     `gorm:"type:varchar(50)" json:"alternative_phone"`
 	Address            string     `gorm:"type:text" json:"address"`
@@ -92,6 +92,10 @@ type StaffLeave struct {
 	Approver     *User      `gorm:"foreignKey:ApprovedBy" json:"approver,omitempty"`
 }
 
+func (StaffLeave) TableName() string {
+	return "staff_leave"
+}
+
 // StaffAttendance tracks daily staff attendance
 type StaffAttendance struct {
 	BaseModel
@@ -105,6 +109,10 @@ type StaffAttendance struct {
 	MarkedBy   uuid.UUID `gorm:"type:char(36)" json:"marked_by"`
 	Staff      *Staff    `gorm:"foreignKey:StaffID" json:"staff,omitempty"`
 	School     *School   `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
+}
+
+func (StaffAttendance) TableName() string {
+	return "staff_attendance"
 }
 
 // StaffDocument stores staff-related documents
@@ -121,4 +129,8 @@ type StaffDocument struct {
 	Notes        string    `gorm:"type:text" json:"notes"`
 	Staff        *Staff    `gorm:"foreignKey:StaffID" json:"staff,omitempty"`
 	School       *School   `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
+}
+
+func (StaffDocument) TableName() string {
+	return "staff_document"
 }

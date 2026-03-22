@@ -3,6 +3,7 @@ package database
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/school-system/backend/internal/config"
 	"github.com/school-system/backend/internal/models"
@@ -44,10 +45,44 @@ func maskPassword(dsn string) string {
 func Migrate(db *gorm.DB) error {
 	log.Println("Running migrations...")
 	
+	// LEGACY CLEANUP: Remove old uni_staff_email constraint if it exists
+	// This constraint was removed from the Staff model but may exist in older databases
+	// The DO block safely drops it only if it exists
+	db.Exec(`
+		DO $$ 
+		BEGIN
+			IF EXISTS (
+				SELECT 1 FROM information_schema.table_constraints 
+				WHERE constraint_name = 'uni_staff_email' AND table_name = 'staff'
+			) THEN
+				ALTER TABLE staff DROP CONSTRAINT uni_staff_email;
+			END IF;
+		END $$;
+	`)
+	
+	// Migrate Staff-related tables separately to handle legacy constraint issues gracefully
+	// This approach ensures that if GORM tries to drop the old constraint and fails,
+	// we can catch and ignore that specific error without affecting other migrations
+	if !db.Migrator().HasTable(&models.Staff{}) {
+		// Table doesn't exist, let GORM create it
+		if err := db.Migrator().CreateTable(&models.Staff{}, &models.StaffLeave{}, &models.StaffAttendance{}, &models.StaffDocument{}); err != nil {
+			return fmt.Errorf("failed to create staff tables: %w", err)
+		}
+	} else {
+		// Table exists, only add missing columns (don't manage constraints)
+		if err := db.Migrator().AutoMigrate(&models.Staff{}, &models.StaffLeave{}, &models.StaffAttendance{}, &models.StaffDocument{}); err != nil {
+			// If error is about uni_staff_email constraint, ignore it (legacy issue)
+			if !strings.Contains(err.Error(), "uni_staff_email") {
+				return fmt.Errorf("failed to migrate staff tables: %w", err)
+			}
+			log.Println("Ignored legacy uni_staff_email constraint error")
+		}
+	}
+	
 	err := db.AutoMigrate(
 		&models.School{},
 		&models.User{},
-		&models.Staff{},
+		// &models.Staff{}, // Migrated separately above
 		&models.TeacherProfile{},
 		&models.Class{},
 		&models.Student{},
@@ -69,9 +104,10 @@ func Migrate(db *gorm.DB) error {
 		&models.BookIssue{},
 		&models.BulkIssue{},
 		&models.BulkIssueItem{},
-		&models.StaffLeave{},
-		&models.StaffAttendance{},
-		&models.StaffDocument{},
+		// Staff models migrated separately above
+		// &models.StaffLeave{},
+		// &models.StaffAttendance{},
+		// &models.StaffDocument{},
 		&models.TeacherSubject{},
 		&models.StudentHealthProfile{},
 		&models.ClinicVisit{},
@@ -101,6 +137,10 @@ func Migrate(db *gorm.DB) error {
 		&models.PayrollPayment{},
 		&models.MarksImport{},
 		&models.IntegrationActivity{},
+		&models.EmailQueue{},
+		&models.PasswordReset{},
+		&models.BulkImport{},
+		&models.WebVital{},
 		// Lesson Monitoring
 		&models.LessonRecord{},
 		// Budget & Requisitions
@@ -115,8 +155,16 @@ func Migrate(db *gorm.DB) error {
 		&models.InventoryTransaction{},
 	)
 	if err != nil {
-		return err
+		// Only ignore the uni_staff_email constraint error if it's about the constraint not existing
+		// This is a legacy issue from older versions of the model
+		if strings.Contains(err.Error(), "uni_staff_email") && strings.Contains(err.Error(), "does not exist") {
+			log.Println("Info: Skipped legacy uni_staff_email constraint (already removed)")
+		} else {
+			return err
+		}
 	}
+
+	log.Println("Migration completed successfully")
 
 	// Add performance indexes
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")

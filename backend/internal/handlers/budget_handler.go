@@ -1,13 +1,15 @@
 package handlers
 
 import (
+	"fmt"
+	"log"
 	"net/http"
 	"time"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"github.com/school-system/backend/internal/models"
+	"github.com/school-system/backend/internal/services"
 )
 
 func getCurrentTerm() string {
@@ -152,11 +154,15 @@ func (h *BudgetHandler) GetBudgetSummary(c *gin.Context) {
 }
 
 type RequisitionHandler struct {
-	db *gorm.DB
+	db           *gorm.DB
+	emailService *services.EmailService
 }
 
-func NewRequisitionHandler(db *gorm.DB) *RequisitionHandler {
-	return &RequisitionHandler{db: db}
+func NewRequisitionHandler(db *gorm.DB, emailService *services.EmailService) *RequisitionHandler {
+	return &RequisitionHandler{
+		db:           db,
+		emailService: emailService,
+	}
 }
 
 // CreateRequisition creates a new requisition request
@@ -250,6 +256,16 @@ func (h *RequisitionHandler) CreateRequisition(c *gin.Context) {
 
 	// Load items for response
 	h.db.Preload("Items").First(&requisition, requisition.ID)
+	
+	// Send requisition confirmation email
+	go func(reqID uuid.UUID, reqNo string) {
+		var req models.Requisition
+		if err := h.db.Preload("Requester").First(&req, reqID).Error; err == nil && req.Requester != nil && req.Requester.Email != "" {
+			if err := h.emailService.SendRequisitionStatusEmail(req.Requester.Email, reqNo, "submitted", "Your requisition has been submitted and is pending approval."); err != nil {
+				log.Printf("Failed to send requisition confirmation: %v", err)
+			}
+		}
+	}(requisition.ID, reqNo)
 
 	c.JSON(http.StatusCreated, requisition)
 }
@@ -349,6 +365,16 @@ func (h *RequisitionHandler) ApproveRequisition(c *gin.Context) {
 	}
 
 	tx.Commit()
+	
+	// Send approval notification email
+	go func(reqID uuid.UUID, reqNo string) {
+		var req models.Requisition
+		if err := h.db.Preload("Requester").First(&req, reqID).Error; err == nil && req.Requester != nil && req.Requester.Email != "" {
+			if err := h.emailService.SendRequisitionStatusEmail(req.Requester.Email, reqNo, "approved", requisition.ApprovalNotes); err != nil {
+				log.Printf("Failed to send requisition approval email: %v", err)
+			}
+		}
+	}(requisition.ID, requisition.RequisitionNo)
 
 	c.JSON(http.StatusOK, requisition)
 }
@@ -390,6 +416,16 @@ func (h *RequisitionHandler) RejectRequisition(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reject requisition"})
 		return
 	}
+	
+	// Send rejection notification email
+	go func(reqID uuid.UUID, reqNo string, reason string) {
+		var req models.Requisition
+		if err := h.db.Preload("Requester").First(&req, reqID).Error; err == nil && req.Requester != nil && req.Requester.Email != "" {
+			if err := h.emailService.SendRequisitionStatusEmail(req.Requester.Email, reqNo, "rejected", reason); err != nil {
+				log.Printf("Failed to send requisition rejection email: %v", err)
+			}
+		}
+	}(requisition.ID, requisition.RequisitionNo, req.Notes)
 
 	c.JSON(http.StatusOK, requisition)
 }

@@ -330,14 +330,42 @@ func (h *StaffHandler) DeleteStaff(c *gin.Context) {
 
 // CreateLeaveRequest creates a leave request
 func (h *StaffHandler) CreateLeaveRequest(c *gin.Context) {
-	var leave models.StaffLeave
-	if err := c.ShouldBindJSON(&leave); err != nil {
+	var req struct {
+		StaffID   string `json:"staff_id" binding:"required"`
+		LeaveType string `json:"leave_type" binding:"required"`
+		StartDate string `json:"start_date" binding:"required"`
+		EndDate   string `json:"end_date" binding:"required"`
+		Days      int    `json:"days" binding:"required"`
+		Reason    string `json:"reason" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	schoolID := c.GetString("school_id")
-	leave.SchoolID = uuid.MustParse(schoolID)
+	startDate, err := time.Parse("2006-01-02", req.StartDate)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid start_date format"})
+		return
+	}
+	endDate, err := time.Parse("2006-01-02", req.EndDate)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid end_date format"})
+		return
+	}
+
+	leave := models.StaffLeave{
+		StaffID:   uuid.MustParse(req.StaffID),
+		SchoolID:  uuid.MustParse(schoolID),
+		LeaveType: req.LeaveType,
+		StartDate: startDate,
+		EndDate:   endDate,
+		Days:      req.Days,
+		Reason:    req.Reason,
+		Status:    "pending",
+	}
 
 	if err := h.DB.Create(&leave).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create leave request"})
@@ -416,16 +444,48 @@ func (h *StaffHandler) ApproveLeave(c *gin.Context) {
 
 // MarkStaffAttendance marks staff attendance
 func (h *StaffHandler) MarkStaffAttendance(c *gin.Context) {
-	var attendance models.StaffAttendance
-	if err := c.ShouldBindJSON(&attendance); err != nil {
+	var req struct {
+		StaffID  string `json:"staff_id" binding:"required"`
+		Date     string `json:"date" binding:"required"`
+		CheckIn  string `json:"check_in"`
+		CheckOut string `json:"check_out"`
+		Status   string `json:"status" binding:"required"`
+		Remarks  string `json:"remarks"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	schoolID := c.GetString("school_id")
 	userID := c.GetString("user_id")
-	attendance.SchoolID = uuid.MustParse(schoolID)
-	attendance.MarkedBy = uuid.MustParse(userID)
+
+	date, err := time.Parse("2006-01-02", req.Date)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid date format"})
+		return
+	}
+
+	attendance := models.StaffAttendance{
+		StaffID:  uuid.MustParse(req.StaffID),
+		SchoolID: uuid.MustParse(schoolID),
+		Date:     date,
+		Status:   req.Status,
+		Remarks:  req.Remarks,
+		MarkedBy: uuid.MustParse(userID),
+	}
+
+	if req.CheckIn != "" {
+		if checkIn, err := time.Parse(time.RFC3339, req.CheckIn); err == nil {
+			attendance.CheckIn = &checkIn
+		}
+	}
+	if req.CheckOut != "" {
+		if checkOut, err := time.Parse(time.RFC3339, req.CheckOut); err == nil {
+			attendance.CheckOut = &checkOut
+		}
+	}
 
 	if err := h.DB.Create(&attendance).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark attendance"})

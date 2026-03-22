@@ -128,8 +128,17 @@ export default function StaffPage() {
     <DashboardLayout>
       <div className="space-y-6">
         <div className="bg-gradient-to-r from-indigo-600 to-purple-700 rounded-xl shadow-lg p-8 text-white">
-          <h1 className="text-3xl font-bold mb-2">Staff Management</h1>
-          <p className="text-indigo-100">Manage all school staff members</p>
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">Staff Management</h1>
+              <p className="text-indigo-100">Manage all school staff members</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => router.push('/staff/leave')} className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-medium">📅 Leave</button>
+              <button onClick={() => router.push('/staff/attendance')} className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-medium">✓ Attendance</button>
+              <button onClick={() => router.push('/staff/documents')} className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-medium">📄 Documents</button>
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

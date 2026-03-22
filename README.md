@@ -10,7 +10,7 @@ cd acadistra
 ./deploy.sh
 ```
 
-Access at http://localhost:3000 with `sysadmin@acadistra.com` / `Admin@123`
+Access at http://localhost:3000 with `admin@acadistra.com` / `Admin@123`
 
 📖 **[Full Quick Start Guide](QUICKSTART.md)** | 📋 **[Deployment Checklist](DEPLOYMENT_CHECKLIST_CLEAN.md)**
 

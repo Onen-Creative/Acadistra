@@ -1,63 +1,52 @@
 # Acadistra Official Contact Information
 
-## Official Email Domain
-**@acadistra.com**
+## Official Email Address
+**admin@acadistra.com** - Primary system email for all communications
 
-## Contact Emails
+## Email Configuration
 
-### General Support
-- **Email**: support@acadistra.com
-- **Purpose**: General inquiries, technical support, and customer service
+**Service**: Cloudflare Email Routing + Gmail SMTP
+- Domain: acadistra.com
+- Status: ✅ Active and verified
+- Receiving & Sending: Enabled
 
-### Security
-- **Email**: security@acadistra.com
-- **Purpose**: Security vulnerabilities, data privacy concerns, and security incidents
-
-### Sales & Business
-- **Email**: sales@acadistra.com
-- **Purpose**: New school inquiries, pricing, demos, and partnerships
-
-### System Administration
-- **Email**: sysadmin@acadistra.com
-- **Purpose**: Default system administrator account (change after first login)
+**SMTP Settings** (for application integration):
+```
+Host: smtp.gmail.com
+Port: 587
+Username: onendavid23@gmail.com
+Password: [App Password]
+From: admin@acadistra.com
+TLS: Enabled
+```
 
 ## Default Login Credentials
 
 ### System Administrator
-- **Email**: sysadmin@acadistra.com
+- **Email**: admin@acadistra.com
 - **Password**: Admin@123
 - **Note**: Change password immediately after first login
 
-## Email Placeholders in Forms
+## Email Routing
 
-All email input placeholders now use the @acadistra.com domain:
-- User registration: `user@acadistra.com`
-- Student registration: `student@acadistra.com`
-- Guardian/Parent: `parent@acadistra.com`
-- Staff: `staff@acadistra.com`
-
-## Report Cards & Receipts
-
-Default fallback email for schools without configured email:
-- **Default**: info@acadistra.com
-
-## Email Configuration for Schools
-
-Each school can configure their own contact email in:
-- **Settings** → **School Information** → **Contact Email**
-
-This email will appear on:
-- Report cards
-- Fee receipts
-- Requisition receipts
-- Official communications
+All emails sent to @acadistra.com forward to:
+- onendavid23@gmail.com
 
 ## Support Channels
 
-1. **Email Support**: support@acadistra.com
-2. **Documentation**: [Quick Start Guide](QUICKSTART.md)
-3. **API Docs**: http://localhost:8080/swagger/index.html
-4. **GitHub Issues**: For bug reports and feature requests
+- **General Support**: admin@acadistra.com
+- **System Notifications**: admin@acadistra.com
+- **Administrative Alerts**: admin@acadistra.com
+- **Documentation**: [Quick Start Guide](QUICKSTART.md)
+- **API Docs**: http://localhost:8080/swagger/index.html
+
+## Security Notes
+
+- ✅ Email verified and tested
+- ✅ SMTP configured with App Password
+- ✅ SPF and DKIM records configured
+- ✅ Catch-all enabled for domain
+- ✅ 2FA enabled on Gmail account
 
 ---
 

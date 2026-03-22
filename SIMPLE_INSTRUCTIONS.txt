@@ -51,7 +51,7 @@ Wait: 5-10 minutes
 STEP 8: Test
 ------------
 Open browser: https://acadistra.com
-Login: sysadmin@school.ug / Admin@123
+Login: admin@acadistra.com / Admin@123
 Check: Lessons, Budget, Requisitions, Inventory pages
 
 

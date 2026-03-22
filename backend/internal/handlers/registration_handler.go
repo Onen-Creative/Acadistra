@@ -2,24 +2,31 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/school-system/backend/internal/models"
+	"github.com/school-system/backend/internal/services"
 	"github.com/school-system/backend/internal/utils"
 	ws "github.com/school-system/backend/internal/websocket"
 	"gorm.io/gorm"
 )
 
 type RegistrationHandler struct {
-	db *gorm.DB
+	db           *gorm.DB
+	emailService *services.EmailService
 }
 
-func NewRegistrationHandler(db *gorm.DB) *RegistrationHandler {
-	return &RegistrationHandler{db: db}
+func NewRegistrationHandler(db *gorm.DB, emailService *services.EmailService) *RegistrationHandler {
+	return &RegistrationHandler{
+		db:           db,
+		emailService: emailService,
+	}
 }
 
 type GuardianInput struct {
@@ -301,6 +308,21 @@ func (h *RegistrationHandler) RegisterStudent(c *gin.Context) {
 	}
 
 	ws.GlobalHub.Broadcast("student:registered", student, school.ID.String())
+	
+	// Send registration confirmation email to guardians
+	go func(studentID uuid.UUID, studentName, admissionNo, schoolName string) {
+		var guardians []models.Guardian
+		h.db.Where("student_id = ?", studentID).Find(&guardians)
+		
+		for _, guardian := range guardians {
+			if guardian.Email != "" {
+				if err := h.emailService.SendRegistrationConfirmation(guardian.Email, studentName, admissionNo, schoolName); err != nil {
+					log.Printf("Failed to send registration confirmation: %v", err)
+				}
+			}
+		}
+	}(student.ID, fmt.Sprintf("%s %s", student.FirstName, student.LastName), student.AdmissionNo, school.Name)
+	
 	c.JSON(http.StatusCreated, gin.H{
 		"message":   "Student registered successfully",
 		"student":   student,

@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -11,11 +13,15 @@ import (
 )
 
 type PayrollHandler struct {
-	service *services.PayrollService
+	service      *services.PayrollService
+	emailService *services.EmailService
 }
 
-func NewPayrollHandler(service *services.PayrollService) *PayrollHandler {
-	return &PayrollHandler{service: service}
+func NewPayrollHandler(service *services.PayrollService, emailService *services.EmailService) *PayrollHandler {
+	return &PayrollHandler{
+		service:      service,
+		emailService: emailService,
+	}
 }
 
 // POST /api/payroll/salary-structures
@@ -213,6 +219,23 @@ func (h *PayrollHandler) MarkPaymentPaid(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	
+	// Send payroll notification email
+	go func(paymentID uint) {
+		payment, err := h.service.GetPayslip(paymentID)
+		if err == nil && payment.User != nil && payment.User.Email != "" {
+			monthName := time.Month(payment.PayrollRun.Month).String()
+			if err := h.emailService.SendPayrollNotification(
+				payment.User.Email,
+				payment.User.FullName,
+				monthName,
+				fmt.Sprintf("%d", payment.PayrollRun.Year),
+				fmt.Sprintf("%.2f", payment.NetSalary),
+			); err != nil {
+				log.Printf("Failed to send payroll notification: %v", err)
+			}
+		}
+	}(uint(id))
 
 	c.JSON(http.StatusOK, gin.H{"message": "Payment marked as paid and expenditure recorded"})
 }

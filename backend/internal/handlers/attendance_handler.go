@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -8,15 +10,20 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/school-system/backend/internal/models"
+	"github.com/school-system/backend/internal/services"
 	"gorm.io/gorm"
 )
 
 type AttendanceHandler struct {
-	db *gorm.DB
+	db           *gorm.DB
+	emailService *services.EmailService
 }
 
-func NewAttendanceHandler(db *gorm.DB) *AttendanceHandler {
-	return &AttendanceHandler{db: db}
+func NewAttendanceHandler(db *gorm.DB, emailService *services.EmailService) *AttendanceHandler {
+	return &AttendanceHandler{
+		db:           db,
+		emailService: emailService,
+	}
 }
 
 // getDefaultRemark returns default remark based on attendance status
@@ -121,6 +128,29 @@ func (h *AttendanceHandler) MarkAttendance(c *gin.Context) {
 	}
 
 	h.db.Preload("Student").First(&attendance, attendance.ID)
+	
+	// Send attendance alert if absent
+	if attendance.Status == "absent" && attendance.Student != nil {
+		go func(studentID uuid.UUID, studentName string) {
+			var guardians []models.Guardian
+			h.db.Where("student_id = ?", studentID).Find(&guardians)
+			
+			for _, guardian := range guardians {
+				if guardian.Email != "" {
+					// Get attendance stats
+					var presentCount int64
+					h.db.Model(&models.Attendance{}).Where("student_id = ? AND status = 'present'", studentID).Count(&presentCount)
+					var totalDays int64
+					h.db.Model(&models.Attendance{}).Where("student_id = ?", studentID).Count(&totalDays)
+					
+					if err := h.emailService.SendAttendanceAlert(guardian.Email, studentName, time.Now().Format("2006-01-02"), int(presentCount), int(totalDays)); err != nil {
+						log.Printf("Failed to send attendance alert: %v", err)
+					}
+				}
+			}
+		}(attendance.StudentID, fmt.Sprintf("%s %s", attendance.Student.FirstName, attendance.Student.LastName))
+	}
+	
 	c.JSON(http.StatusCreated, attendance)
 }
 

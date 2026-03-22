@@ -347,3 +347,13 @@ func (s *AuthService) CreateUser(user *models.User, password string) error {
 func (s *AuthService) LogAudit(userID uuid.UUID, action, resourceType string, resourceID uuid.UUID, before, after models.JSONB, ip string) {
 	s.auditService.Log(userID, action, resourceType, resourceID, before, after, ip)
 }
+
+func (s *AuthService) UpdatePassword(user *models.User, newPassword string) error {
+	hash, err := s.HashPassword(newPassword)
+	if err != nil {
+		return err
+	}
+
+	user.PasswordHash = hash
+	return s.db.Save(user).Error
+}

@@ -891,4 +891,183 @@ export const integrationActivitiesApi = {
   },
 };
 
+// Payroll API
+export const payrollApi = {
+  // Salary Structures
+  listSalaryStructures: async () => {
+    const { data } = await api.get('/payroll/salary-structures');
+    return data;
+  },
+
+  getSalaryStructure: async (userId: string) => {
+    const { data } = await api.get(`/payroll/salary-structures/user/${userId}`);
+    return data;
+  },
+
+  createSalaryStructure: async (salaryData: any) => {
+    const { data } = await api.post('/payroll/salary-structures', salaryData);
+    return data;
+  },
+
+  updateSalaryStructure: async (id: string, salaryData: any) => {
+    const { data } = await api.put(`/payroll/salary-structures/${id}`, salaryData);
+    return data;
+  },
+
+  deleteSalaryStructure: async (id: string) => {
+    const { data } = await api.delete(`/payroll/salary-structures/${id}`);
+    return data;
+  },
+
+  // Payroll Processing
+  processPayroll: async (payrollData: { month: number; year: number }) => {
+    const { data } = await api.post('/payroll/process', payrollData);
+    return data;
+  },
+
+  listPayrollRuns: async () => {
+    const { data } = await api.get('/payroll/runs');
+    return data;
+  },
+
+  getPayrollRun: async (id: string) => {
+    const { data } = await api.get(`/payroll/runs/${id}`);
+    return data;
+  },
+
+  markPaymentPaid: async (paymentId: string, paymentData: { method: string; ref?: string }) => {
+    const { data } = await api.post(`/payroll/payments/${paymentId}/mark-paid`, paymentData);
+    return data;
+  },
+
+  getPayslip: async (paymentId: string) => {
+    const { data } = await api.get(`/payroll/payslip/${paymentId}`);
+    return data;
+  },
+
+  getSummary: async (year: number) => {
+    const { data } = await api.get(`/payroll/summary/${year}`);
+    return data;
+  },
+};
+
+// Budget API
+export const budgetApi = {
+  list: async (params?: { year?: number; term?: string; status?: string }) => {
+    const { data } = await api.get('/budgets', { params });
+    return data;
+  },
+
+  get: async (id: string) => {
+    const { data } = await api.get(`/budgets/${id}`);
+    return data;
+  },
+
+  create: async (budgetData: any) => {
+    const { data } = await api.post('/budgets', budgetData);
+    return data;
+  },
+
+  update: async (id: string, budgetData: any) => {
+    const { data } = await api.put(`/budgets/${id}`, budgetData);
+    return data;
+  },
+
+  delete: async (id: string) => {
+    const { data } = await api.delete(`/budgets/${id}`);
+    return data;
+  },
+
+  getSummary: async (params?: { year?: number; term?: string }) => {
+    const { data } = await api.get('/budgets/summary', { params });
+    return data;
+  },
+};
+
+// Requisitions API
+export const requisitionsApi = {
+  list: async (params?: { status?: string; department?: string; page?: number; limit?: number }) => {
+    const { data } = await api.get('/requisitions', { params });
+    return data;
+  },
+
+  get: async (id: string) => {
+    const { data } = await api.get(`/requisitions/${id}`);
+    return data;
+  },
+
+  create: async (requisitionData: any) => {
+    const { data } = await api.post('/requisitions', requisitionData);
+    return data;
+  },
+
+  update: async (id: string, requisitionData: any) => {
+    const { data } = await api.put(`/requisitions/${id}`, requisitionData);
+    return data;
+  },
+
+  delete: async (id: string) => {
+    const { data } = await api.delete(`/requisitions/${id}`);
+    return data;
+  },
+
+  approve: async (id: string, approvalData: { notes?: string }) => {
+    const { data } = await api.post(`/requisitions/${id}/approve`, approvalData);
+    return data;
+  },
+
+  reject: async (id: string, rejectionData: { reason: string }) => {
+    const { data } = await api.post(`/requisitions/${id}/reject`, rejectionData);
+    return data;
+  },
+
+  markPaid: async (id: string, paymentData: { payment_method: string; payment_reference?: string }) => {
+    const { data } = await api.post(`/requisitions/${id}/mark-paid`, paymentData);
+    return data;
+  },
+
+  getStats: async () => {
+    const { data } = await api.get('/requisitions/stats');
+    return data;
+  },
+};
+
+// Notifications API
+export const notificationsApi = {
+  list: async (params?: { page?: number; limit?: number; unread_only?: boolean }) => {
+    const { data } = await api.get('/notifications', { params });
+    return data;
+  },
+
+  getUnreadCount: async () => {
+    const { data } = await api.get('/notifications/unread-count');
+    return data;
+  },
+
+  markAsRead: async (id: string) => {
+    const { data } = await api.put(`/notifications/${id}/read`);
+    return data;
+  },
+
+  markAllAsRead: async () => {
+    const { data } = await api.put('/notifications/mark-all-read');
+    return data;
+  },
+
+  delete: async (id: string) => {
+    const { data } = await api.delete(`/notifications/${id}`);
+    return data;
+  },
+
+  getPreferences: async () => {
+    const { data } = await api.get('/notifications/preferences');
+    return data;
+  },
+
+  updatePreferences: async (preferences: any) => {
+    const { data } = await api.put('/notifications/preferences', preferences);
+    return data;
+  },
+};
+
 export default api;
