@@ -226,7 +226,7 @@ func (e *EmailService) SendPasswordResetEmail(to, userName, resetLink string) er
 <p>If you didn't request this, please ignore this email.</p>
 <p>Best regards,<br>Acadistra System</p>
 </div>
-<div class="footer"><p>&copy; 2024 Acadistra. All rights reserved.</p></div>
+<div class="footer"><p>&copy; {{.Year}} Acadistra. All rights reserved.</p></div>
 </div>
 </body>
 </html>`
@@ -236,6 +236,7 @@ func (e *EmailService) SendPasswordResetEmail(to, userName, resetLink string) er
 	t.Execute(&body, map[string]interface{}{
 		"UserName":  userName,
 		"ResetLink": resetLink,
+		"Year":      time.Now().Year(),
 	})
 
 	return e.QueueEmail(to, "Password Reset Request - Acadistra", body.String(), "password_reset", nil, 1)
@@ -263,7 +264,7 @@ func (e *EmailService) SendWelcomeEmail(to, userName, role, schoolName, tempPass
 <p>If you have any questions, contact your school administrator.</p>
 <p>Best regards,<br>Acadistra System</p>
 </div>
-<div class="footer"><p>&copy; 2024 Acadistra. All rights reserved.</p></div>
+<div class="footer"><p>&copy; {{.Year}} Acadistra. All rights reserved.</p></div>
 </div>
 </body>
 </html>`
@@ -276,6 +277,7 @@ func (e *EmailService) SendWelcomeEmail(to, userName, role, schoolName, tempPass
 		"Role":        role,
 		"SchoolName":  schoolName,
 		"TempPassword": tempPassword,
+		"Year":        time.Now().Year(),
 	})
 
 	return e.QueueEmail(to, "Welcome to Acadistra - Your Account is Ready", body.String(), "welcome", nil, 2)
@@ -315,7 +317,7 @@ func (e *EmailService) SendAttendanceAlert(to, studentName, date string, present
 {{end}}
 <p>Best regards,<br>School Administration</p>
 </div>
-<div class="footer"><p>&copy; 2024 Acadistra. All rights reserved.</p></div>
+<div class="footer"><p>&copy; {{.Year}} Acadistra. All rights reserved.</p></div>
 </div>
 </body>
 </html>`
@@ -328,6 +330,7 @@ func (e *EmailService) SendAttendanceAlert(to, studentName, date string, present
 		"PresentCount":   presentCount,
 		"TotalDays":      totalDays,
 		"AttendanceRate": fmt.Sprintf("%.1f", attendanceRate),
+		"Year":           time.Now().Year(),
 	})
 
 	return e.QueueEmail(to, fmt.Sprintf("Attendance Report - %s", studentName), body.String(), "attendance_alert", nil, 4)
@@ -352,7 +355,7 @@ func (e *EmailService) SendGradeAlert(to, studentName, subject, grade, term stri
 <p>Login to your parent portal to view detailed performance analytics and progress tracking.</p>
 <p>Best regards,<br>School Administration</p>
 </div>
-<div class="footer"><p>&copy; 2024 Acadistra. All rights reserved.</p></div>
+<div class="footer"><p>&copy; {{.Year}} Acadistra. All rights reserved.</p></div>
 </div>
 </body>
 </html>`
@@ -364,6 +367,7 @@ func (e *EmailService) SendGradeAlert(to, studentName, subject, grade, term stri
 		"Subject":     subject,
 		"Grade":       grade,
 		"Term":        term,
+		"Year":        time.Now().Year(),
 	})
 
 	return e.QueueEmail(to, fmt.Sprintf("Grade Alert - %s (%s)", subject, grade), body.String(), "grade_alert", nil, 4)
@@ -391,7 +395,7 @@ func (e *EmailService) SendPaymentConfirmation(to, studentName, amount, paymentM
 <p>Thank you for your payment. Your receipt has been saved to your account.</p>
 <p>Best regards,<br>School Administration</p>
 </div>
-<div class="footer"><p>&copy; 2024 Acadistra. All rights reserved.</p></div>
+<div class="footer"><p>&copy; {{.Year}} Acadistra. All rights reserved.</p></div>
 </div>
 </body>
 </html>`
@@ -403,6 +407,7 @@ func (e *EmailService) SendPaymentConfirmation(to, studentName, amount, paymentM
 		"Amount":        amount,
 		"PaymentMethod": paymentMethod,
 		"TransactionID": transactionID,
+		"Year":          time.Now().Year(),
 	})
 
 	return e.QueueEmail(to, "Payment Confirmation - Acadistra", body.String(), "payment_confirmation", nil, 2)
@@ -426,7 +431,7 @@ func (e *EmailService) SendHealthAlert(to, studentName, issue, date string) erro
 <p>Please contact the school clinic for more details or if you have any concerns.</p>
 <p>Best regards,<br>School Clinic</p>
 </div>
-<div class="footer"><p>&copy; 2024 Acadistra. All rights reserved.</p></div>
+<div class="footer"><p>&copy; {{.Year}} Acadistra. All rights reserved.</p></div>
 </div>
 </body>
 </html>`
@@ -437,6 +442,7 @@ func (e *EmailService) SendHealthAlert(to, studentName, issue, date string) erro
 		"StudentName": studentName,
 		"Issue":       issue,
 		"Date":        date,
+		"Year":        time.Now().Year(),
 	})
 
 	return e.QueueEmail(to, fmt.Sprintf("Health Alert - %s", studentName), body.String(), "health_alert", nil, 1)
@@ -462,7 +468,7 @@ func (e *EmailService) SendRequisitionStatusEmail(to, requisitionID, status, rea
 <p>Login to your dashboard to view more details.</p>
 <p>Best regards,<br>School Administration</p>
 </div>
-<div class="footer"><p>&copy; 2024 Acadistra. All rights reserved.</p></div>
+<div class="footer"><p>&copy; {{.Year}} Acadistra. All rights reserved.</p></div>
 </div>
 </body>
 </html>`
@@ -473,6 +479,7 @@ func (e *EmailService) SendRequisitionStatusEmail(to, requisitionID, status, rea
 		"RequisitionID": requisitionID,
 		"Status":        status,
 		"Reason":        reason,
+		"Year":          time.Now().Year(),
 	})
 
 	return e.QueueEmail(to, fmt.Sprintf("Requisition %s - %s", requisitionID, status), body.String(), "requisition_status", nil, 3)
@@ -497,7 +504,7 @@ func (e *EmailService) SendPayrollNotification(to, staffName, month, year, amoun
 <p>Your payslip is available in your dashboard. Please review it for accuracy.</p>
 <p>Best regards,<br>Human Resources</p>
 </div>
-<div class="footer"><p>&copy; 2024 Acadistra. All rights reserved.</p></div>
+<div class="footer"><p>&copy; {{.Year}} Acadistra. All rights reserved.</p></div>
 </div>
 </body>
 </html>`
@@ -537,7 +544,7 @@ func (e *EmailService) SendRegistrationConfirmation(to, studentName, admissionNu
 <p>Please keep the admission number for future reference. You can now access the parent portal to track your child's progress.</p>
 <p>Best regards,<br>School Administration</p>
 </div>
-<div class="footer"><p>&copy; 2024 Acadistra. All rights reserved.</p></div>
+<div class="footer"><p>&copy; {{.Year}} Acadistra. All rights reserved.</p></div>
 </div>
 </body>
 </html>`
@@ -548,6 +555,7 @@ func (e *EmailService) SendRegistrationConfirmation(to, studentName, admissionNu
 		"StudentName":     studentName,
 		"AdmissionNumber": admissionNumber,
 		"SchoolName":      schoolName,
+		"Year":            time.Now().Year(),
 	})
 
 	return e.QueueEmail(to, "Student Registration Confirmation - Acadistra", body.String(), "registration_confirmation", nil, 2)
