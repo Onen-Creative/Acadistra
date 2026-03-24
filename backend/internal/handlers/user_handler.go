@@ -266,12 +266,13 @@ func (h *UserHandler) CreateSchoolUser(c *gin.Context) {
 		return
 	}
 
-	if req.Role == "system_admin" || req.Role == "school_admin" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot create system_admin or school_admin users"})
+	// Prevent creating users for roles that should be created via staff registration
+	if req.Role == "teacher" || req.Role == "bursar" || req.Role == "librarian" || req.Role == "nurse" || req.Role == "store_keeper" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Users with role " + req.Role + " must be created via Staff Registration. Go to Staff > Register New Staff to create this user."})
 		return
 	}
 
-	allowedRoles := []string{"teacher", "bursar", "librarian", "nurse", "store_keeper", "security", "cleaner", "cook", "driver", "gardener", "maintenance", "receptionist"}
+	allowedRoles := []string{"security", "cleaner", "cook", "driver", "gardener", "maintenance", "receptionist"}
 	validRole := false
 	for _, role := range allowedRoles {
 		if req.Role == role {
@@ -280,7 +281,7 @@ func (h *UserHandler) CreateSchoolUser(c *gin.Context) {
 		}
 	}
 	if !validRole {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role. Allowed: teacher, bursar, librarian, nurse, store_keeper, security, cleaner, cook, driver, gardener, maintenance, receptionist"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role. For teachers, bursar, librarian, nurse, or store keeper, use Staff Registration. Other roles: security, cleaner, cook, driver, gardener, maintenance, receptionist"})
 		return
 	}
 
@@ -426,4 +427,52 @@ func (h *UserHandler) DeleteSchoolUser(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "User deleted"})
+}
+
+// ResetUserPassword allows school admin to reset a user's password
+func (h *UserHandler) ResetUserPassword(c *gin.Context) {
+	userID := c.Param("id")
+	schoolID := c.GetString("tenant_school_id")
+
+	var user models.User
+	if err := h.db.Where("id = ? AND school_id = ?", userID, schoolID).First(&user).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	var req struct {
+		NewPassword string `json:"new_password" binding:"required,min=8"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Update password
+	if err := h.authService.UpdatePassword(&user, req.NewPassword); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
+		return
+	}
+
+	// Send email notification to user with new password
+	if h.emailService != nil && user.Email != "" {
+		schoolUUID, _ := uuid.Parse(schoolID)
+		var school models.School
+		h.db.First(&school, "id = ?", schoolUUID)
+		schoolName := "Acadistra"
+		if school.ID != uuid.Nil {
+			schoolName = school.Name
+		}
+		go func(email, name, role, schoolN, password string) {
+			if err := h.emailService.SendWelcomeEmail(email, name, role, schoolN, password); err != nil {
+				log.Printf("Failed to send password reset email to %s: %v", email, err)
+			}
+		}(user.Email, user.FullName, user.Role, schoolName, req.NewPassword)
+	}
+
+	// Delete any pending password reset requests for this user
+	h.db.Where("user_id = ?", user.ID).Delete(&models.PasswordReset{})
+
+	c.JSON(http.StatusOK, gin.H{"message": "Password reset successfully. User has been notified via email."})
 }

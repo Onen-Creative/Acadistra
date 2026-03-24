@@ -222,7 +222,7 @@ func (e *EmailService) SendPasswordResetEmail(to, userName, resetLink string) er
 <p>Hello {{.UserName}},</p>
 <p>We received a request to reset your password. Click the button below to create a new password:</p>
 <a href="{{.ResetLink}}" class="button">Reset Password</a>
-<p>This link will expire in 24 hours.</p>
+<p>This link will expire in 1 hour.</p>
 <p>If you didn't request this, please ignore this email.</p>
 <p>Best regards,<br>Acadistra System</p>
 </div>
@@ -559,4 +559,45 @@ func (e *EmailService) SendRegistrationConfirmation(to, studentName, admissionNu
 	})
 
 	return e.QueueEmail(to, "Student Registration Confirmation - Acadistra", body.String(), "registration_confirmation", nil, 2)
+}
+
+// Password Reset Request to Admin Email
+func (e *EmailService) SendPasswordResetRequestToAdmin(to, adminName, userName, userEmail string) error {
+	tmpl := `
+<!DOCTYPE html>
+<html>
+<head><style>body{font-family:Arial,sans-serif}.container{max-width:600px;margin:0 auto;padding:20px}.header{background:#dc3545;color:white;padding:20px;text-align:center}.request-box{background:#fff3cd;border:1px solid #ffc107;padding:15px;border-radius:5px;margin:20px 0}.user-details{background:#f9f9f9;border:1px solid #ddd;padding:15px;border-radius:5px;margin:20px 0}.button{display:inline-block;background:#4F46E5;color:white;padding:12px 30px;text-decoration:none;border-radius:5px;margin:20px 0}.footer{text-align:center;color:#666;font-size:12px;margin-top:20px}</style></head>
+<body>
+<div class="container">
+<div class="header"><h1>Password Reset Request</h1></div>
+<div class="content">
+<p>Hello {{.AdminName}},</p>
+<div class="request-box">
+<p><strong>⚠️ Action Required:</strong> A user has requested a password reset.</p>
+</div>
+<div class="user-details">
+<p><strong>User Name:</strong> {{.UserName}}</p>
+<p><strong>Email:</strong> {{.UserEmail}}</p>
+<p><strong>Request Time:</strong> {{.RequestTime}}</p>
+</div>
+<p>Please log in to the admin dashboard to reset this user's password. The user will receive their new credentials via email once you complete the reset.</p>
+<a href="https://acadistra.com/dashboard/school-admin" class="button">Go to Admin Dashboard</a>
+<p>Best regards,<br>Acadistra System</p>
+</div>
+<div class="footer"><p>&copy; {{.Year}} Acadistra. All rights reserved.</p></div>
+</div>
+</body>
+</html>`
+
+	t, _ := template.New("passwordResetRequest").Parse(tmpl)
+	var body bytes.Buffer
+	t.Execute(&body, map[string]interface{}{
+		"AdminName":   adminName,
+		"UserName":    userName,
+		"UserEmail":   userEmail,
+		"RequestTime": time.Now().Format("2006-01-02 15:04:05"),
+		"Year":        time.Now().Year(),
+	})
+
+	return e.QueueEmail(to, "Password Reset Request - Action Required", body.String(), "password_reset_request", nil, 1)
 }

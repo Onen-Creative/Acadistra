@@ -2,25 +2,38 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/school-system/backend/internal/config"
 	"github.com/school-system/backend/internal/models"
+	"github.com/school-system/backend/internal/services"
 )
 
 type StaffHandler struct {
-	DB *gorm.DB
+	DB           *gorm.DB
+	authService  *services.AuthService
+	emailService *services.EmailService
 }
 
-func NewStaffHandler(db *gorm.DB) *StaffHandler {
-	return &StaffHandler{DB: db}
+func NewStaffHandler(db *gorm.DB, cfg *config.Config, emailService *services.EmailService) *StaffHandler {
+	return &StaffHandler{
+		DB:           db,
+		authService:  services.NewAuthService(db, cfg),
+		emailService: emailService,
+	}
 }
 
 // CreateStaff creates a new staff member
+// This is the PRIMARY method for creating users with system access (except school_admin)
+// Roles that get user accounts: Teacher, Bursar, Librarian, Nurse, Store Keeper
+// Other roles (Security, Cook, Cleaner, etc.) are for record-keeping only
 func (h *StaffHandler) CreateStaff(c *gin.Context) {
 	var req struct {
 		FirstName          string  `json:"first_name"`
@@ -67,6 +80,19 @@ func (h *StaffHandler) CreateStaff(c *gin.Context) {
 	schoolID := c.GetString("tenant_school_id")
 	if schoolID == "" {
 		schoolID = c.GetString("school_id")
+	}
+	if schoolID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "School ID not found"})
+		return
+	}
+
+	// Check if email already exists BEFORE starting transaction
+	if req.Email != "" {
+		var existingUser models.User
+		if err := h.DB.Where("email = ?", req.Email).First(&existingUser).Error; err == nil {
+			c.JSON(http.StatusConflict, gin.H{"error": "Email already exists"})
+			return
+		}
 	}
 
 	staff := models.Staff{
@@ -122,24 +148,166 @@ func (h *StaffHandler) CreateStaff(c *gin.Context) {
 		}
 	}
 
-	// Auto-generate employee_id if not provided
-	var maxEmployeeID string
-	h.DB.Model(&models.Staff{}).Where("school_id = ? AND employee_id LIKE 'STF%'", schoolID).
-		Order("employee_id DESC").Limit(1).Pluck("employee_id", &maxEmployeeID)
-	
-	nextNum := 1
-	if maxEmployeeID != "" {
-		// Extract number from STF0001 format
-		var num int
-		if _, err := fmt.Sscanf(maxEmployeeID, "STF%d", &num); err == nil {
-			nextNum = num + 1
+	// Get school to extract initials (before transaction)
+	var school models.School
+	if err := h.DB.First(&school, "id = ?", schoolID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "School not found"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch school: " + err.Error()})
+		}
+		return
+	}
+
+	// Generate school initials from school name
+	var schoolInitials string
+	for _, word := range strings.Fields(school.Name) {
+		if len(word) > 0 {
+			schoolInitials += strings.ToUpper(string(word[0]))
 		}
 	}
-	staff.EmployeeID = fmt.Sprintf("STF%04d", nextNum)
+	if schoolInitials == "" {
+		schoolInitials = "SCH"
+	}
 
-	if err := h.DB.Create(&staff).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create staff"})
+	// Auto-generate employee_id - use transaction to prevent race conditions
+	tx := h.DB.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Find last employee number for this school
+	var lastStaff models.Staff
+	var sequence int = 0
+	currentYear := time.Now().Year()
+	pattern := fmt.Sprintf("%s/STF/%d/%%", schoolInitials, currentYear)
+	if err := tx.Where("school_id = ? AND employee_id LIKE ?", schoolID, pattern).
+		Order("employee_id DESC").First(&lastStaff).Error; err == nil {
+		parts := strings.Split(lastStaff.EmployeeID, "/")
+		if len(parts) == 4 {
+			var num int
+			if _, scanErr := fmt.Sscanf(parts[3], "%d", &num); scanErr == nil {
+				sequence = num
+			}
+		}
+	}
+	sequence++
+	staff.EmployeeID = fmt.Sprintf("%s/STF/%d/%03d", schoolInitials, currentYear, sequence)
+
+	// Create staff record first
+	if err := tx.Create(&staff).Error; err != nil {
+		tx.Rollback()
+		if strings.Contains(err.Error(), "duplicate key") {
+			c.JSON(http.StatusConflict, gin.H{"error": "Staff record already exists"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create staff: " + err.Error()})
+		}
 		return
+	}
+
+	// Create User account if email is provided (after staff is created)
+	var defaultPassword string
+	if req.Email != "" {
+		// Map staff role to user role and default password
+		userRole := ""
+		defaultPassword := ""
+		
+		switch req.Role {
+		case "Teacher":
+			userRole = "teacher"
+			defaultPassword = "Teacher@123"
+		case "Bursar":
+			userRole = "bursar"
+			defaultPassword = "Bursar@123"
+		case "Librarian":
+			userRole = "librarian"
+			defaultPassword = "Librarian@123"
+		case "Nurse":
+			userRole = "nurse"
+			defaultPassword = "Nurse@123"
+		case "Store Keeper":
+			userRole = "store_keeper"
+			defaultPassword = "StoreKeeper@123"
+		default:
+			// Other roles don't get user accounts
+			userRole = ""
+		}
+		
+		// Only create user account for roles that need system access
+		if userRole != "" && defaultPassword != "" {
+			hashed, err := h.authService.HashPassword(defaultPassword)
+			if err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+				return
+			}
+			
+			schoolIDPtr := uuid.MustParse(schoolID)
+			fullName := req.FirstName
+			if req.MiddleName != "" {
+				fullName += " " + req.MiddleName
+			}
+			fullName += " " + req.LastName
+			
+			user := models.User{
+				SchoolID:     &schoolIDPtr,
+				Email:        req.Email,
+				FullName:     fullName,
+				Role:         userRole,
+				IsActive:     true,
+				PasswordHash: hashed,
+			}
+			if err := tx.Create(&user).Error; err != nil {
+				tx.Rollback()
+				if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "idx_users_email") {
+					c.JSON(http.StatusConflict, gin.H{"error": "Email already exists"})
+				} else {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user account: " + err.Error()})
+				}
+				return
+			}
+			// Update staff with user_id
+			staff.UserID = &user.ID
+			if err := tx.Save(&staff).Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to link user to staff"})
+				return
+			}
+		}
+	}
+
+	// Create TeacherProfile if role is Teacher (after staff and user are created)
+	if req.Role == "Teacher" {
+		teacherProfile := models.TeacherProfile{
+			StaffID:  staff.ID,
+			SchoolID: staff.SchoolID,
+		}
+		if err := tx.Create(&teacherProfile).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create teacher profile"})
+			return
+		}
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit transaction"})
+		return
+	}
+
+	// Send welcome email asynchronously if user account was created
+	if staff.UserID != nil && req.Email != "" {
+		go func(email, fullName, role, employeeID, defaultPassword string, schoolID uuid.UUID) {
+			// Get school name
+			var school models.School
+			if err := h.DB.First(&school, "id = ?", schoolID).Error; err == nil {
+				// Send welcome email with credentials
+				if err := h.emailService.SendWelcomeEmail(email, fullName, role, school.Name, defaultPassword); err != nil {
+					log.Printf("Failed to send welcome email to %s: %v", email, err)
+				}
+			}
+		}(req.Email, req.FirstName+" "+req.LastName, req.Role, staff.EmployeeID, defaultPassword, staff.SchoolID)
 	}
 
 	c.JSON(http.StatusCreated, staff)
@@ -177,6 +345,26 @@ func (h *StaffHandler) GetAllStaff(c *gin.Context) {
 	var staff []models.Staff
 	if err := query.Preload("User").Find(&staff).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch staff"})
+		return
+	}
+
+	// If role is Teacher, include teacher_profile_id
+	if role == "Teacher" {
+		type StaffWithProfile struct {
+			models.Staff
+			TeacherProfileID *string `json:"teacher_profile_id"`
+		}
+		result := make([]StaffWithProfile, 0, len(staff))
+		for _, s := range staff {
+			var teacherProfile models.TeacherProfile
+			swp := StaffWithProfile{Staff: s}
+			if err := h.DB.Where("staff_id = ?", s.ID).First(&teacherProfile).Error; err == nil {
+				profileID := teacherProfile.ID.String()
+				swp.TeacherProfileID = &profileID
+			}
+			result = append(result, swp)
+		}
+		c.JSON(http.StatusOK, result)
 		return
 	}
 
@@ -256,7 +444,7 @@ func (h *StaffHandler) UpdateStaff(c *gin.Context) {
 		return
 	}
 
-	// Update fields
+	// Update fields (employee_id is NOT updated - it's auto-generated and immutable)
 	staff.FirstName = req.FirstName
 	staff.MiddleName = req.MiddleName
 	staff.LastName = req.LastName

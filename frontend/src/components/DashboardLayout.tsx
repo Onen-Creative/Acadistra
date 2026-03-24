@@ -205,7 +205,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           { href: '/students', label: 'Students', icon: GraduationCap },
           { href: '/staff', label: 'Staff', icon: Users },
           { href: '/classes', label: 'Classes', icon: BookOpen },
-          { href: '/users', label: 'Users', icon: Users },
           { href: '/results', label: 'Results', icon: ClipboardList },
           { href: '/report-cards', label: 'Report Cards', icon: FileText },
           { href: '/attendance', label: 'Attendance', icon: Calendar },

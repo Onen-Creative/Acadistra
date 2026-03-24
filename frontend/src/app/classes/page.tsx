@@ -270,7 +270,10 @@ export default function ClassesPage() {
                     icon="👨‍🏫"
                     options={[
                       { value: '', label: 'Select Teacher (Optional)' },
-                      ...(teachersData?.map((t: any) => ({ value: t.id, label: `${t.first_name} ${t.last_name}` })) || [])
+                      ...(teachersData?.filter((t: any) => t.teacher_profile_id).map((t: any) => ({ 
+                        value: t.teacher_profile_id, 
+                        label: `${t.first_name} ${t.last_name}` 
+                      })) || [])
                     ]}
                   />
                 </FormSection>

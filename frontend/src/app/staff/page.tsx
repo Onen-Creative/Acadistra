@@ -8,6 +8,7 @@ import toast from 'react-hot-toast'
 
 interface Staff {
   id: string
+  user_id?: string
   employee_id: string
   first_name: string
   middle_name?: string
@@ -47,7 +48,7 @@ interface Staff {
   notes?: string
 }
 
-const ROLES = ['Teacher', 'Admin', 'Bursar', 'Librarian', 'Nurse', 'Security', 'Cook', 'Cleaner', 'Driver', 'Accountant', 'IT Support']
+const ROLES = ['Teacher', 'Admin', 'Bursar', 'Librarian', 'Nurse', 'Store Keeper', 'Security', 'Cook', 'Cleaner', 'Driver', 'Accountant', 'IT Support']
 const EMPLOYMENT_TYPES = ['Permanent', 'Contract', 'Part-time', 'Volunteer']
 
 export default function StaffPage() {
@@ -58,6 +59,11 @@ export default function StaffPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [viewingStaff, setViewingStaff] = useState<Staff | null>(null)
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null)
+  const [deletingStaff, setDeletingStaff] = useState<Staff | null>(null)
+  const [resetPasswordStaff, setResetPasswordStaff] = useState<Staff | null>(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [isResettingPassword, setIsResettingPassword] = useState(false)
 
   useEffect(() => {
     fetchStaff()
@@ -100,15 +106,59 @@ export default function StaffPage() {
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this staff member?')) return
+  const handleDelete = async (staff: Staff) => {
+    setIsDeleting(true)
     try {
-      await api.delete(`/staff/${id}`)
+      await api.delete(`/staff/${staff.id}`)
       toast.success('Staff deleted successfully')
+      setDeletingStaff(null)
       fetchStaff()
     } catch (error) {
       toast.error('Failed to delete staff')
+    } finally {
+      setIsDeleting(false)
     }
+  }
+
+  const handleResetPassword = async () => {
+    if (!resetPasswordStaff || !newPassword) return
+    if (!resetPasswordStaff.user_id) {
+      toast.error('This staff member does not have a user account')
+      return
+    }
+    setIsResettingPassword(true)
+    try {
+      await api.post(`/school-users/${resetPasswordStaff.user_id}/reset-password`, { new_password: newPassword })
+      toast.success('Password reset successfully. User will receive an email with new credentials.')
+      setResetPasswordStaff(null)
+      setNewPassword('')
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to reset password')
+    } finally {
+      setIsResettingPassword(false)
+    }
+  }
+
+  const exportToXLSX = () => {
+    const XLSX = require('xlsx')
+    const exportData = filteredStaff.map(s => ({
+      'Employee ID': s.employee_id,
+      'First Name': s.first_name,
+      'Middle Name': s.middle_name || '',
+      'Last Name': s.last_name,
+      'Email': s.email,
+      'Phone': s.phone,
+      'Role': s.role,
+      'Department': s.department || '',
+      'Employment Type': s.employment_type || '',
+      'Date Joined': s.date_joined ? new Date(s.date_joined).toLocaleDateString() : '',
+      'Salary': s.salary || '',
+      'Status': s.status
+    }))
+    const ws = XLSX.utils.json_to_sheet(exportData)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Staff')
+    XLSX.writeFile(wb, `staff_${selectedRole || 'all'}_${new Date().toISOString().split('T')[0]}.xlsx`)
   }
 
   const filteredStaff = staff.filter(s =>
@@ -185,6 +235,12 @@ export default function StaffPage() {
             >
               + Add Staff
             </button>
+            <button
+              onClick={exportToXLSX}
+              className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium"
+            >
+              📥 Export XLSX
+            </button>
           </div>
         </div>
 
@@ -238,9 +294,10 @@ export default function StaffPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right text-sm space-x-2">
-                        <button onClick={() => setViewingStaff(s)} className="text-blue-600 hover:text-blue-900">View</button>
-                        <button onClick={() => setEditingStaff(s)} className="text-indigo-600 hover:text-indigo-900">Edit</button>
-                        <button onClick={() => handleDelete(s.id)} className="text-red-600 hover:text-red-900">Delete</button>
+                        <button onClick={() => setViewingStaff(s)} className="text-blue-600 hover:text-blue-900 font-medium">View</button>
+                        <button onClick={() => setEditingStaff(s)} className="text-indigo-600 hover:text-indigo-900 font-medium">Edit</button>
+                        {s.user_id && <button onClick={() => setResetPasswordStaff(s)} className="text-orange-600 hover:text-orange-900 font-medium">Reset Password</button>}
+                        <button onClick={() => setDeletingStaff(s)} className="text-red-600 hover:text-red-900 font-medium">Delete</button>
                       </td>
                     </tr>
                   ))}
@@ -298,10 +355,10 @@ export default function StaffPage() {
 
       {editingStaff && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-              <h2 className="text-xl font-bold">Edit Staff</h2>
-              <button onClick={() => setEditingStaff(null)} className="text-gray-400 hover:text-gray-600">
+          <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-purple-700 text-white px-6 py-4 flex justify-between items-center rounded-t-xl">
+              <h2 className="text-xl font-bold">✏️ Edit Staff Member</h2>
+              <button onClick={() => setEditingStaff(null)} className="text-white hover:text-gray-200 transition-colors">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
@@ -364,10 +421,107 @@ export default function StaffPage() {
                 </div>
               </div>
               <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
-                <button type="button" onClick={() => setEditingStaff(null)} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Update</button>
+                <button type="button" onClick={() => setEditingStaff(null)} className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-colors">Cancel</button>
+                <button type="submit" className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium transition-colors">💾 Save Changes</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {deletingStaff && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-md shadow-2xl">
+            <div className="bg-gradient-to-r from-red-600 to-red-700 text-white px-6 py-4 rounded-t-xl">
+              <h2 className="text-xl font-bold">⚠️ Confirm Deletion</h2>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-700 mb-2">Are you sure you want to delete this staff member?</p>
+              <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                <p className="font-semibold text-gray-900">{deletingStaff.first_name} {deletingStaff.last_name}</p>
+                <p className="text-sm text-gray-600">{deletingStaff.employee_id} • {deletingStaff.role}</p>
+              </div>
+              <p className="text-sm text-red-600 font-medium">⚠️ This action cannot be undone.</p>
+            </div>
+            <div className="flex justify-end gap-3 px-6 pb-6">
+              <button
+                onClick={() => setDeletingStaff(null)}
+                disabled={isDeleting}
+                className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDelete(deletingStaff)}
+                disabled={isDeleting}
+                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {isDeleting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Deleting...
+                  </>
+                ) : (
+                  <>🗑️ Delete Staff</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {resetPasswordStaff && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-md shadow-2xl">
+            <div className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-4 rounded-t-xl">
+              <h2 className="text-xl font-bold">🔑 Reset Password</h2>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-700 mb-2">Reset password for:</p>
+              <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                <p className="font-semibold text-gray-900">{resetPasswordStaff.first_name} {resetPasswordStaff.last_name}</p>
+                <p className="text-sm text-gray-600">{resetPasswordStaff.employee_id} • {resetPasswordStaff.role}</p>
+                <p className="text-sm text-gray-600">{resetPasswordStaff.email}</p>
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">New Password *</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  placeholder="Min 8 characters"
+                  minLength={8}
+                />
+                <p className="text-sm text-gray-500 mt-2">📧 User will receive an email with the new password</p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 px-6 pb-6">
+              <button
+                onClick={() => {
+                  setResetPasswordStaff(null)
+                  setNewPassword('')
+                }}
+                disabled={isResettingPassword}
+                className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleResetPassword}
+                disabled={!newPassword || newPassword.length < 8 || isResettingPassword}
+                className="px-6 py-2 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-lg hover:from-orange-700 hover:to-red-700 font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {isResettingPassword ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Resetting...
+                  </>
+                ) : (
+                  <>🔑 Reset Password</>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

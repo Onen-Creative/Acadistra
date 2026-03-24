@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -154,7 +155,7 @@ func main() {
 	auditHandler := handlers.NewAuditHandler(db)
 	feesHandler := handlers.NewFeesHandler(db, emailService)
 	libraryHandler := handlers.NewLibraryHandler(db)
-	staffHandler := handlers.NewStaffHandler(db)
+	staffHandler := handlers.NewStaffHandler(db, cfg, emailService)
 	websocketHandler := handlers.NewWebSocketHandler(authService)
 	attendanceHandler := handlers.NewAttendanceHandler(db, emailService)
 	termDatesHandler := handlers.NewTermDatesHandler(db)
@@ -365,6 +366,7 @@ func main() {
 				schoolAdmin.GET("/school-users/:id", userHandler.GetSchoolUser)
 				schoolAdmin.PUT("/school-users/:id", userHandler.UpdateSchoolUser)
 				schoolAdmin.DELETE("/school-users/:id", userHandler.DeleteSchoolUser)
+				schoolAdmin.POST("/school-users/:id/reset-password", userHandler.ResetUserPassword)
 				
 				// Create specific user roles
 				schoolUserHandler := handlers.NewSchoolUserHandler(db)
@@ -784,6 +786,9 @@ func handleCommand(cmd string) {
 		db.Exec("ALTER TABLE staff DROP CONSTRAINT IF EXISTS uni_staff_email")
 		log.Println("Fixed database constraints")
 
+	case "migrate-users-to-staff":
+		migrateUsersToStaff(db)
+
 	default:
 	}
 }
@@ -1011,4 +1016,149 @@ func seedStandardSubjects(db *gorm.DB) {
 		log.Fatal("Failed to seed standard subjects:", err)
 	}
 
+}
+
+
+func migrateUsersToStaff(db *gorm.DB) {
+	log.Println("🔍 Starting migration: Creating staff records for users without staff records...")
+
+	// Find all users who don't have staff records (excluding system_admin and parent)
+	var usersWithoutStaff []models.User
+	err := db.Where("role NOT IN (?, ?) AND id NOT IN (SELECT user_id FROM staff WHERE user_id IS NOT NULL)", 
+		"system_admin", "parent").
+		Preload("School").
+		Find(&usersWithoutStaff).Error
+
+	if err != nil {
+		log.Fatal("Failed to query users:", err)
+	}
+
+	if len(usersWithoutStaff) == 0 {
+		log.Println("✅ No users found without staff records. Migration not needed.")
+		return
+	}
+
+	log.Printf("📋 Found %d users without staff records:\n", len(usersWithoutStaff))
+
+	successCount := 0
+	errorCount := 0
+
+	for _, user := range usersWithoutStaff {
+		log.Printf("\n👤 Processing user: %s (%s) - Role: %s", user.FullName, user.Email, user.Role)
+
+		// Parse full name into first, middle, last
+		firstName, middleName, lastName := parseFullName(user.FullName)
+
+		// Map user role to staff role
+		staffRole := mapUserRoleToStaffRole(user.Role)
+
+		// Generate employee ID
+		var maxEmployeeID string
+		db.Model(&models.Staff{}).
+			Where("school_id = ? AND employee_id LIKE 'STF%'", user.SchoolID).
+			Order("employee_id DESC").
+			Limit(1).
+			Pluck("employee_id", &maxEmployeeID)
+
+		nextNum := 1
+		if maxEmployeeID != "" {
+			var num int
+			if _, err := fmt.Sscanf(maxEmployeeID, "STF%d", &num); err == nil {
+				nextNum = num + 1
+			}
+		}
+		employeeID := fmt.Sprintf("STF%04d", nextNum)
+
+		// Create staff record
+		staff := models.Staff{
+			SchoolID:   *user.SchoolID,
+			UserID:     &user.ID,
+			EmployeeID: employeeID,
+			FirstName:  firstName,
+			MiddleName: middleName,
+			LastName:   lastName,
+			Email:      user.Email,
+			Role:       staffRole,
+			Status:     "active",
+		}
+
+		if err := db.Create(&staff).Error; err != nil {
+			log.Printf("   ❌ Failed to create staff record: %v", err)
+			errorCount++
+			continue
+		}
+
+		// Create TeacherProfile if role is Teacher
+		if staffRole == "Teacher" {
+			teacherProfile := models.TeacherProfile{
+				StaffID:  staff.ID,
+				SchoolID: staff.SchoolID,
+			}
+			if err := db.Create(&teacherProfile).Error; err != nil {
+				log.Printf("   ⚠️  Staff created but failed to create teacher profile: %v", err)
+			} else {
+				log.Printf("   ✅ Created staff record (ID: %s) and teacher profile", employeeID)
+			}
+		} else {
+			log.Printf("   ✅ Created staff record (ID: %s)", employeeID)
+		}
+
+		successCount++
+	}
+
+	log.Printf("\n" + "============================================================")
+	log.Printf("📊 Migration Summary:")
+	log.Printf("   ✅ Successfully migrated: %d users", successCount)
+	if errorCount > 0 {
+		log.Printf("   ❌ Failed: %d users", errorCount)
+	}
+	log.Printf("============================================================")
+	log.Println("✨ Migration completed!")
+}
+
+func parseFullName(fullName string) (firstName, middleName, lastName string) {
+	parts := strings.Fields(fullName)
+	
+	if len(parts) == 0 {
+		return "Unknown", "", "User"
+	} else if len(parts) == 1 {
+		return parts[0], "", ""
+	} else if len(parts) == 2 {
+		return parts[0], "", parts[1]
+	} else {
+		// First name, middle names, last name
+		firstName = parts[0]
+		lastName = parts[len(parts)-1]
+		middleName = strings.Join(parts[1:len(parts)-1], " ")
+		return firstName, middleName, lastName
+	}
+}
+
+func mapUserRoleToStaffRole(userRole string) string {
+	roleMap := map[string]string{
+		"teacher":      "Teacher",
+		"bursar":       "Bursar",
+		"librarian":    "Librarian",
+		"nurse":        "Nurse",
+		"store_keeper": "Store Keeper",
+		"school_admin": "Admin",
+		"security":     "Security",
+		"cleaner":      "Cleaner",
+		"cook":         "Cook",
+		"driver":       "Driver",
+		"gardener":     "Gardener",
+		"maintenance":  "Maintenance",
+		"receptionist": "Receptionist",
+	}
+
+	if staffRole, ok := roleMap[userRole]; ok {
+		return staffRole
+	}
+
+	// Default: capitalize first letter
+	if len(userRole) > 0 {
+		return strings.ToUpper(string(userRole[0])) + userRole[1:]
+	}
+
+	return "Staff"
 }

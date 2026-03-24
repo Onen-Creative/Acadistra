@@ -6,7 +6,7 @@ import { DashboardLayout } from '@/components/DashboardLayout'
 import api from '@/services/api'
 import toast from 'react-hot-toast'
 
-const ROLES = ['Teacher', 'Admin', 'Bursar', 'Librarian', 'Nurse', 'Security', 'Cook', 'Cleaner', 'Driver', 'Accountant', 'IT Support']
+const ROLES = ['Teacher', 'Bursar', 'Librarian', 'Nurse', 'Store Keeper', 'Security', 'Cook', 'Cleaner', 'Driver', 'Accountant', 'IT Support', 'Receptionist']
 const EMPLOYMENT_TYPES = ['Permanent', 'Contract', 'Part-time', 'Volunteer']
 
 export default function StaffRegisterPage() {
@@ -74,8 +74,19 @@ export default function StaffRegisterPage() {
     <DashboardLayout>
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="bg-gradient-to-r from-indigo-600 to-purple-700 rounded-xl shadow-lg p-8 text-white">
-          <h1 className="text-3xl font-bold mb-2">Register New Staff</h1>
-          <p className="text-indigo-100">Complete the registration process step by step</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">Register New Staff</h1>
+              <p className="text-indigo-100">Complete the registration process step by step</p>
+            </div>
+            <button
+              onClick={() => router.push('/staff')}
+              className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors flex items-center gap-2"
+            >
+              <span>←</span>
+              <span>Back to Staff</span>
+            </button>
+          </div>
         </div>
 
         <div className="bg-white rounded-xl shadow-lg p-6">

@@ -36,7 +36,7 @@ type PasswordResetConfirm struct {
 	NewPassword string `json:"new_password" binding:"required,min=8"`
 }
 
-// RequestPasswordReset sends a password reset email
+// RequestPasswordReset sends password reset link to user's email (self-service)
 func (h *PasswordResetHandler) RequestPasswordReset(c *gin.Context) {
 	var req PasswordResetRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -47,19 +47,19 @@ func (h *PasswordResetHandler) RequestPasswordReset(c *gin.Context) {
 	var user models.User
 	if err := h.db.Where("email = ?", req.Email).First(&user).Error; err != nil {
 		// Don't reveal if email exists for security
-		c.JSON(http.StatusOK, gin.H{"message": "If email exists, password reset link has been sent"})
+		c.JSON(http.StatusOK, gin.H{"message": "If your email exists, you will receive a password reset link shortly"})
 		return
 	}
 
 	// Generate reset token
 	token := generateResetToken()
-	resetLink := fmt.Sprintf("https://acadistra.com/reset-password?token=%s", token)
+	resetLink := fmt.Sprintf("http://localhost:3000/reset-password/confirm?token=%s", token)
 
-	// Store token in database with expiry (24 hours)
+	// Store token in database with expiry (1 hour for self-service)
 	resetRecord := &models.PasswordReset{
 		UserID:    user.ID,
 		Token:     token,
-		ExpiresAt: time.Now().Add(24 * time.Hour),
+		ExpiresAt: time.Now().Add(1 * time.Hour),
 	}
 
 	if err := h.db.Create(resetRecord).Error; err != nil {
@@ -67,12 +67,18 @@ func (h *PasswordResetHandler) RequestPasswordReset(c *gin.Context) {
 		return
 	}
 
-	// Send email
+	// Send email with reset link
 	if h.emailService != nil {
-		go h.emailService.SendPasswordResetEmail(user.Email, user.FullName, resetLink)
+		go func(email, name, link string) {
+			if err := h.emailService.SendPasswordResetEmail(email, name, link); err != nil {
+				fmt.Printf("Failed to send password reset email to: %s, Error: %v\n", email, err)
+			}
+		}(user.Email, user.FullName, resetLink)
+	} else {
+		fmt.Println("Email service is not configured")
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Password reset link sent to email"})
+	c.JSON(http.StatusOK, gin.H{"message": "If your email exists, you will receive a password reset link shortly"})
 }
 
 // ConfirmPasswordReset resets the password with valid token
