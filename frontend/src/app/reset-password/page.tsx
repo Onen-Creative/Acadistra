@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -24,7 +24,7 @@ const confirmSchema = z.object({
 type ResetForm = z.infer<typeof resetSchema>
 type ConfirmForm = z.infer<typeof confirmSchema>
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const [step, setStep] = useState<'request' | 'success'>('request')
   const [isConfirmMode, setIsConfirmMode] = useState(false)
   const searchParams = useSearchParams()
@@ -190,5 +190,17 @@ export default function ResetPasswordPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    }>
+      <ResetPasswordContent />
+    </Suspense>
   )
 }
