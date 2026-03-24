@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useMantineColorScheme } from '@mantine/core'
+import api from '@/services/api'
 import { 
   LayoutDashboard, School, UserPlus, Users, Settings, FileText, BarChart3,
   GraduationCap, BookOpen, ClipboardList, DollarSign, Package,
@@ -38,13 +39,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const handleLogout = async () => {
     try {
-      const token = localStorage.getItem('access_token')
-      if (token) {
-        await fetch('http://localhost:8080/api/v1/auth/logout', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-      }
+      await api.post('/auth/logout', {})
     } catch (error) {
       console.error('Logout error:', error)
     } finally {
@@ -66,19 +61,15 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     setShowSearchResults(true)
 
     try {
-      const token = localStorage.getItem('access_token')
       const results: any[] = []
       const searchLower = query.toLowerCase().trim()
 
       // Search students
       if (['school_admin', 'teacher', 'bursar', 'nurse'].includes(user?.role)) {
         try {
-          const studentsRes = await fetch(`http://localhost:8080/api/v1/students`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          })
-          if (studentsRes.ok) {
-            const data = await studentsRes.json()
-            const students = (data.students || []).filter((s: any) => {
+          const studentsRes = await api.get('/students')
+          if (studentsRes.data) {
+            const students = (studentsRes.data.students || []).filter((s: any) => {
               const fullName = `${s.first_name} ${s.middle_name || ''} ${s.last_name}`.toLowerCase()
               const admissionNo = (s.admission_no || '').toLowerCase()
               const className = (s.class?.name || '').toLowerCase()
@@ -94,7 +85,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 title: `${s.first_name} ${s.middle_name || ''} ${s.last_name}`,
                 subtitle: `${s.admission_no} • ${s.class?.name || 'No class'}`,
                 link: `/students/${s.id}`,
-                icon: '👨🎓'
+                icon: '👨‍🎓'
               })
             })
           }
@@ -104,17 +95,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       // Search staff
       if (['school_admin'].includes(user?.role)) {
         try {
-          const staffRes = await fetch(`http://localhost:8080/api/v1/staff`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          })
-          if (staffRes.ok) {
-            const data = await staffRes.json()
-            const staff = (data || []).filter((s: any) => {
+          const staffRes = await api.get('/staff')
+          if (staffRes.data) {
+            const staff = (Array.isArray(staffRes.data) ? staffRes.data : []).filter((s: any) => {
               const fullName = `${s.first_name} ${s.middle_name || ''} ${s.last_name}`.toLowerCase()
-              const staffId = (s.staff_id || '').toLowerCase()
+              const employeeId = (s.employee_id || '').toLowerCase()
               const role = (s.role || '').toLowerCase()
               return fullName.includes(searchLower) || 
-                     staffId.includes(searchLower) || 
+                     employeeId.includes(searchLower) || 
                      role.includes(searchLower)
             }).slice(0, 5)
             
@@ -123,9 +111,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 type: 'staff',
                 id: s.id,
                 title: `${s.first_name} ${s.middle_name || ''} ${s.last_name}`,
-                subtitle: `${s.staff_id} • ${s.role || 'Staff'}`,
+                subtitle: `${s.employee_id} • ${s.role || 'Staff'}`,
                 link: `/staff`,
-                icon: '👨🏫'
+                icon: '👨‍🏫'
               })
             })
           }
@@ -135,12 +123,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       // Search classes
       if (['school_admin', 'teacher'].includes(user?.role)) {
         try {
-          const classesRes = await fetch(`http://localhost:8080/api/v1/classes`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          })
-          if (classesRes.ok) {
-            const data = await classesRes.json()
-            const classes = (data || []).filter((c: any) => {
+          const classesRes = await api.get('/classes')
+          if (classesRes.data) {
+            const classes = (Array.isArray(classesRes.data) ? classesRes.data : []).filter((c: any) => {
               const name = (c.name || '').toLowerCase()
               const level = (c.level || '').toLowerCase()
               return name.includes(searchLower) || level.includes(searchLower)
