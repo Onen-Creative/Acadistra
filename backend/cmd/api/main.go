@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -1052,22 +1053,37 @@ func migrateUsersToStaff(db *gorm.DB) {
 		// Map user role to staff role
 		staffRole := mapUserRoleToStaffRole(user.Role)
 
-		// Generate employee ID
-		var maxEmployeeID string
-		db.Model(&models.Staff{}).
-			Where("school_id = ? AND employee_id LIKE 'STF%'", user.SchoolID).
-			Order("employee_id DESC").
-			Limit(1).
-			Pluck("employee_id", &maxEmployeeID)
-
-		nextNum := 1
-		if maxEmployeeID != "" {
-			var num int
-			if _, err := fmt.Sscanf(maxEmployeeID, "STF%d", &num); err == nil {
-				nextNum = num + 1
+		// Generate school initials from school name
+		var schoolInitials string
+		if user.School != nil {
+			for _, word := range strings.Fields(user.School.Name) {
+				if len(word) > 0 {
+					schoolInitials += strings.ToUpper(string(word[0]))
+				}
 			}
 		}
-		employeeID := fmt.Sprintf("STF%04d", nextNum)
+		if schoolInitials == "" {
+			schoolInitials = "SCH"
+		}
+
+		// Generate employee ID with format: SCHOOLINITIALS/STF/YEAR/SEQUENCE
+		currentYear := time.Now().Year()
+		pattern := fmt.Sprintf("%s/STF/%d/%%", schoolInitials, currentYear)
+		
+		var lastStaff models.Staff
+		var sequence int = 0
+		if err := db.Where("school_id = ? AND employee_id LIKE ?", user.SchoolID, pattern).
+			Order("employee_id DESC").First(&lastStaff).Error; err == nil {
+			parts := strings.Split(lastStaff.EmployeeID, "/")
+			if len(parts) == 4 {
+				var num int
+				if _, scanErr := fmt.Sscanf(parts[3], "%d", &num); scanErr == nil {
+					sequence = num
+				}
+			}
+		}
+		sequence++
+		employeeID := fmt.Sprintf("%s/STF/%d/%03d", schoolInitials, currentYear, sequence)
 
 		// Create staff record
 		staff := models.Staff{
@@ -1078,8 +1094,11 @@ func migrateUsersToStaff(db *gorm.DB) {
 			MiddleName: middleName,
 			LastName:   lastName,
 			Email:      user.Email,
+			Phone:      "0700000000", // Default phone
 			Role:       staffRole,
 			Status:     "active",
+			Nationality: "Ugandan",
+			EmploymentType: "Permanent",
 		}
 
 		if err := db.Create(&staff).Error; err != nil {
