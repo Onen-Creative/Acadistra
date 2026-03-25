@@ -599,14 +599,16 @@ func (s *BulkImportXLSXService) validateStudentRow(row []string, schoolID uuid.U
 		}
 	}
 
-	// Validate gender
-	if gender != "" && gender != "Male" && gender != "Female" {
-		return nil, errors.New("gender must be 'Male' or 'Female'")
+	// Validate gender (accept male/female, m/f, Male/Female, M/F)
+	if gender != "" && gender != "male" && gender != "female" && gender != "m" && gender != "f" {
+		return nil, errors.New("gender must be 'male', 'female', 'm', or 'f'")
 	}
 
-	// Capitalize gender
-	if gender != "" {
-		gender = strings.Title(strings.ToLower(gender))
+	// Normalize gender to Male/Female
+	if gender == "m" || gender == "male" {
+		gender = "Male"
+	} else if gender == "f" || gender == "female" {
+		gender = "Female"
 	}
 
 	data := map[string]interface{}{
