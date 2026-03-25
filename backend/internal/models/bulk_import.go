@@ -19,7 +19,7 @@ type BulkImport struct {
 	ValidRows    int       `gorm:"not null" json:"valid_rows"`
 	InvalidRows  int       `gorm:"not null" json:"invalid_rows"`
 	Errors       string    `gorm:"type:text" json:"errors"`
-	Data         string    `gorm:"type:longtext" json:"data"` // JSON data
+	Data         string    `gorm:"type:text" json:"data"` // JSON data
 	Metadata     string    `gorm:"type:text" json:"metadata"` // Additional info (class_id, term, year, etc.)
 	School       *School   `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
 	Uploader     *User     `gorm:"foreignKey:UploadedBy" json:"uploader,omitempty"`
