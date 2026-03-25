@@ -212,7 +212,6 @@ func (h *StaffHandler) CreateStaff(c *gin.Context) {
 	if req.Email != "" {
 		// Map staff role to user role and default password
 		userRole := ""
-		defaultPassword := ""
 		
 		switch req.Role {
 		case "Teacher":
