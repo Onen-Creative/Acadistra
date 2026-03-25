@@ -64,10 +64,12 @@ export default function StaffRegisterPage() {
       } else {
         delete payload.experience // Remove empty experience field
       }
+      console.log('Submitting staff data:', payload) // Debug log
       await api.post('/api/v1/staff', payload)
       toast.success('Staff registered successfully!')
       router.push('/staff')
     } catch (error: any) {
+      console.error('Staff registration error:', error.response?.data) // Debug log
       toast.error(error.response?.data?.error || 'Failed to register staff')
     } finally {
       setSubmitting(false)
