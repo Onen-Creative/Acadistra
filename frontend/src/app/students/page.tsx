@@ -840,20 +840,36 @@ export default function StudentsPage() {
                     </div>
                   </div>
 
-                  {importDetails.errors && JSON.parse(importDetails.errors).length > 0 && (
+                  {importDetails.errors && (() => {
+                    try {
+                      const errors = JSON.parse(importDetails.errors)
+                      return errors && errors.length > 0
+                    } catch { return false }
+                  })() && (
                     <div className="bg-red-50 border border-red-200 rounded-lg p-4 max-h-48 overflow-y-auto">
                       <Text size="sm" fw={500} c="red" mb="xs">Errors Found</Text>
                       <div className="space-y-1">
-                        {JSON.parse(importDetails.errors).map((error: string, idx: number) => (
-                          <Text key={idx} size="xs" c="red">{error}</Text>
-                        ))}
+                        {(() => {
+                          try {
+                            return JSON.parse(importDetails.errors).map((error: string, idx: number) => (
+                              <Text key={idx} size="xs" c="red">{error}</Text>
+                            ))
+                          } catch { return null }
+                        })()}
                       </div>
                     </div>
                   )}
 
-                  {importDetails.data && JSON.parse(importDetails.data).length > 0 && (
+                  {importDetails.data && (() => {
+                    try {
+                      const data = JSON.parse(importDetails.data)
+                      return data && data.length > 0
+                    } catch { return false }
+                  })() && (
                     <div className="bg-white border border-gray-200 rounded-lg p-4">
-                      <Text size="sm" fw={500} mb="xs">Preview of Valid Students ({JSON.parse(importDetails.data).length} records)</Text>
+                      <Text size="sm" fw={500} mb="xs">Preview of Valid Students ({(() => {
+                        try { return JSON.parse(importDetails.data).length } catch { return 0 }
+                      })()} records)</Text>
                       <div className="max-h-64 overflow-y-auto">
                         <table className="min-w-full text-xs">
                           <thead className="bg-gray-50 sticky top-0">
@@ -866,22 +882,31 @@ export default function StudentsPage() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-200">
-                            {JSON.parse(importDetails.data).slice(0, 10).map((student: any, idx: number) => (
-                              <tr key={idx} className="hover:bg-gray-50">
-                                <td className="px-2 py-1">{student.first_name}</td>
-                                <td className="px-2 py-1">{student.last_name}</td>
-                                <td className="px-2 py-1">{student.gender}</td>
-                                <td className="px-2 py-1">{student.date_of_birth || 'N/A'}</td>
-                                <td className="px-2 py-1">{student.guardian_name || 'N/A'}</td>
-                              </tr>
-                            ))}
+                            {(() => {
+                              try {
+                                return JSON.parse(importDetails.data).slice(0, 10).map((student: any, idx: number) => (
+                                  <tr key={idx} className="hover:bg-gray-50">
+                                    <td className="px-2 py-1">{student.first_name}</td>
+                                    <td className="px-2 py-1">{student.last_name}</td>
+                                    <td className="px-2 py-1">{student.gender}</td>
+                                    <td className="px-2 py-1">{student.date_of_birth || 'N/A'}</td>
+                                    <td className="px-2 py-1">{student.guardian_name || 'N/A'}</td>
+                                  </tr>
+                                ))
+                              } catch { return null }
+                            })()}
                           </tbody>
                         </table>
-                        {JSON.parse(importDetails.data).length > 10 && (
-                          <Text size="xs" c="dimmed" mt="xs" ta="center">
-                            Showing 10 of {JSON.parse(importDetails.data).length} students
-                          </Text>
-                        )}
+                        {(() => {
+                          try {
+                            const data = JSON.parse(importDetails.data)
+                            return data.length > 10 && (
+                              <Text size="xs" c="dimmed" mt="xs" ta="center">
+                                Showing 10 of {data.length} students
+                              </Text>
+                            )
+                          } catch { return null }
+                        })()}
                       </div>
                     </div>
                   )}
@@ -891,7 +916,7 @@ export default function StudentsPage() {
                       <Button 
                         onClick={() => approveMutation.mutate(importId)} 
                         loading={approveMutation.isPending}
-                        disabled={importDetails.valid_rows === 0}
+                        disabled={!importDetails || importDetails.valid_rows === 0}
                       >
                         Approve & Import {importDetails.valid_rows} Students
                       </Button>
