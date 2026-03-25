@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Fragment, useEffect } from 'react'
+import { useState, Fragment } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { notifications } from '@mantine/notifications'
@@ -12,7 +12,7 @@ import Link from 'next/link'
 import * as XLSX from 'xlsx'
 
 export default function ResultsPage() {
-  const [selectedYear, setSelectedYear] = useState<number>(2026)
+  const [selectedYear, setSelectedYear] = useState('2026')
   const [selectedTerm, setSelectedTerm] = useState('Term 1')
   const [selectedClass, setSelectedClass] = useState('')
   const [selectedStudent, setSelectedStudent] = useState('all')
@@ -40,7 +40,7 @@ export default function ResultsPage() {
   const { data: classesData } = useQuery({
     queryKey: ['classes', selectedYear, selectedTerm],
     queryFn: async () => {
-      const res = await classesApi.list({ year: selectedYear, term: selectedTerm })
+      const res = await classesApi.list({ year: Number(selectedYear), term: selectedTerm })
       return Array.isArray(res) ? { classes: res } : res
     }
   })
@@ -49,7 +49,7 @@ export default function ResultsPage() {
     queryKey: ['students', selectedClass, selectedYear, selectedTerm],
     queryFn: async () => {
       if (!selectedClass) return { students: [] }
-      const res = await studentsApi.list({ class_id: selectedClass, year: selectedYear, term: selectedTerm })
+      const res = await studentsApi.list({ class_id: selectedClass, year: Number(selectedYear), term: selectedTerm })
       return Array.isArray(res) ? { students: res } : res
     },
     enabled: !!selectedClass
@@ -88,7 +88,7 @@ export default function ResultsPage() {
         const students = studentsData?.students || []
         const allResults = await Promise.all(
           students.map(async (student: any) => {
-            const params: any = { year: selectedYear.toString(), term: selectedTerm }
+            const params: any = { year: selectedYear, term: selectedTerm }
             if (selectedExamType) params.exam_type = selectedExamType
             const res = await resultsApi.getByStudent(student.id, params)
             return (res.results || []).map((r: any) => ({
@@ -104,7 +104,7 @@ export default function ResultsPage() {
         }
         return results
       } else {
-        const params: any = { year: selectedYear.toString(), term: selectedTerm }
+        const params: any = { year: selectedYear, term: selectedTerm }
         if (selectedExamType) params.exam_type = selectedExamType
         const res = await resultsApi.getByStudent(selectedStudent, params)
         let results = res.results || []
@@ -124,7 +124,7 @@ export default function ResultsPage() {
       const students = studentsData.students
       const allResults = await Promise.all(
         students.map(async (student: any) => {
-          const res = await resultsApi.getByStudent(student.id, { year: selectedYear.toString(), term: selectedTerm })
+          const res = await resultsApi.getByStudent(student.id, { year: selectedYear, term: selectedTerm })
           return res.results || []
         })
       )
@@ -218,17 +218,11 @@ export default function ResultsPage() {
         'Subject': result.subject_name,
         ...(isAdvanced && paper ? { 'Paper': `Paper ${paper}` } : {}),
         'Exam Type': result.exam_type || 'N/A',
+        'CA': marks.ca || 0,
+        'Exam': marks.exam || 0,
+        'Total': marks.total || 0,
+        'Grade': result.final_grade
       }
-      
-      if (isAdvanced) {
-        row['Mark'] = marks.mark || marks.total || 0
-      } else {
-        row['CA'] = marks.ca || 0
-        row['Exam'] = marks.exam || 0
-        row['Total'] = marks.total || 0
-      }
-      
-      row['Grade'] = result.final_grade
       return row
     })
 
@@ -249,22 +243,17 @@ export default function ResultsPage() {
           title="Results Management" 
           subtitle="Manage student examination results and grades"
           action={
-            <div className="flex flex-wrap gap-2 sm:gap-3">
-              <Link href="/results/aoi">
-                <button className="px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base rounded-xl font-semibold bg-gradient-to-r from-purple-500 to-purple-700 text-white hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-                  📝 <span className="hidden sm:inline">View AOI</span>
-                </button>
-              </Link>
+            <div className="flex gap-3">
               <button
                 onClick={exportToExcel}
                 disabled={!resultsData || resultsData.length === 0}
-                className="px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base rounded-xl font-semibold bg-gradient-to-r from-green-500 to-green-700 text-white hover:shadow-xl transition-all duration-300 hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-green-500 to-green-700 text-white hover:shadow-xl transition-all duration-300 hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                📥 <span className="hidden sm:inline">Export</span>
+                📥 Export Excel
               </button>
               <Link href="/marks/enter">
-                <button className="px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base rounded-xl font-semibold bg-gradient-to-r from-blue-500 to-blue-700 text-white hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-                  ➕ <span className="hidden sm:inline">Enter Marks</span>
+                <button className="px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-blue-500 to-blue-700 text-white hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                  ➕ Enter Marks
                 </button>
               </Link>
             </div>
@@ -279,10 +268,10 @@ export default function ResultsPage() {
         </div>
 
         <FormCard>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
             <FormSelect
               value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              onChange={(e) => setSelectedYear(e.target.value)}
               label="Year"
               icon="📅"
               options={[
@@ -363,34 +352,67 @@ export default function ResultsPage() {
           </div>
 
           {selectedClass && resultsData && resultsData.length > 0 && (
-            <div className="overflow-x-auto -mx-4 sm:mx-0">
+            <div className="overflow-x-auto">
               {['S5', 'S6'].includes(currentLevel) ? (
-                // Advanced Level Table - Clean & Smart
-                <table className="min-w-full border-collapse bg-white shadow-sm rounded-lg overflow-hidden">
+                // Advanced Level Table
+                <table className="w-full border-collapse">
                   <thead>
-                    <tr className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+                    <tr className="bg-gray-50">
                       {selectedStudent === 'all' && (
-                        <th className="text-left py-3 sm:py-4 px-3 sm:px-6 text-xs sm:text-sm font-bold border-r border-indigo-500 whitespace-nowrap" rowSpan={2}>Student</th>
+                        <th className="text-left py-3 px-4 font-semibold text-gray-700 border-r-2 border-gray-300" rowSpan={2}>Student</th>
                       )}
-                      <th className="text-left py-3 sm:py-4 px-3 sm:px-6 text-xs sm:text-sm font-bold border-r border-indigo-500 whitespace-nowrap" rowSpan={2}>Subject</th>
-                      <th className="text-center py-3 sm:py-4 px-2 sm:px-4 text-xs sm:text-sm font-bold border-r border-indigo-500 whitespace-nowrap" rowSpan={2}>Exam</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700 border-r-2 border-gray-300" rowSpan={2}>Subject</th>
+                      <th className="text-center py-3 px-4 font-semibold text-gray-700 border-r-2 border-gray-300" rowSpan={2}>Exam Type</th>
                       {(() => {
-                        const allPapers = new Set<number>()
-                        resultsData.forEach((result: any) => {
+                        const grouped = resultsData.reduce((acc: any, result: any) => {
+                          const key = `${result.student_id || 'single'}-${result.subject_id}-${result.exam_type}`
+                          if (!acc[key]) {
+                            acc[key] = { papers: {} }
+                          }
                           const paperNum = result.raw_marks?.paper || 1
-                          allPapers.add(paperNum)
+                          acc[key].papers[paperNum] = true
+                          return acc
+                        }, {})
+                        const allPapers = new Set<number>()
+                        Object.values(grouped).forEach((g: any) => {
+                          Object.keys(g.papers).forEach(p => allPapers.add(parseInt(p)))
                         })
                         const sortedPapers = Array.from(allPapers).sort((a, b) => a - b)
                         return sortedPapers.map(paperNum => (
-                          <th key={paperNum} className="text-center py-3 sm:py-4 px-3 sm:px-6 text-xs sm:text-sm font-bold border-r border-indigo-500 whitespace-nowrap" rowSpan={2}>
-                            P{paperNum}
+                          <th key={paperNum} className="text-center py-3 px-4 font-semibold text-gray-700 border-r-2 border-gray-300" colSpan={3}>
+                            Paper {paperNum}
                           </th>
                         ))
                       })()}
-                      <th className="text-center py-3 sm:py-4 px-3 sm:px-6 text-xs sm:text-sm font-bold whitespace-nowrap" rowSpan={2}>Grade</th>
+                      <th className="text-center py-3 px-4 font-semibold text-gray-700" rowSpan={2}>Grade</th>
+                    </tr>
+                    <tr className="bg-gray-50 border-b-2 border-gray-300">
+                      {(() => {
+                        const grouped = resultsData.reduce((acc: any, result: any) => {
+                          const key = `${result.student_id || 'single'}-${result.subject_id}-${result.exam_type}`
+                          if (!acc[key]) {
+                            acc[key] = { papers: {} }
+                          }
+                          const paperNum = result.raw_marks?.paper || 1
+                          acc[key].papers[paperNum] = true
+                          return acc
+                        }, {})
+                        const allPapers = new Set<number>()
+                        Object.values(grouped).forEach((g: any) => {
+                          Object.keys(g.papers).forEach(p => allPapers.add(parseInt(p)))
+                        })
+                        const sortedPapers = Array.from(allPapers).sort((a, b) => a - b)
+                        return sortedPapers.map(paperNum => (
+                          <Fragment key={paperNum}>
+                            <th className="text-center py-2 px-2 font-medium text-gray-600 text-sm border-r border-gray-200">CA</th>
+                            <th className="text-center py-2 px-2 font-medium text-gray-600 text-sm border-r border-gray-200">Exam</th>
+                            <th className="text-center py-2 px-2 font-medium text-gray-600 text-sm border-r-2 border-gray-300">Total</th>
+                          </Fragment>
+                        ))
+                      })()}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody>
                     {(() => {
                       const grouped = resultsData.reduce((acc: any, result: any) => {
                         const key = `${result.student_id || 'single'}-${result.subject_id}-${result.exam_type}`
@@ -404,7 +426,10 @@ export default function ResultsPage() {
                           }
                         }
                         const paperNum = result.raw_marks?.paper || 1
-                        acc[key].papers[paperNum] = result.raw_marks?.mark || result.raw_marks?.total || 0
+                        acc[key].papers[paperNum] = {
+                          ca: result.raw_marks?.ca || 0,
+                          exam: result.raw_marks?.exam || 0
+                        }
                         if (result.final_grade) {
                           acc[key].final_grade = result.final_grade
                         }
@@ -412,39 +437,34 @@ export default function ResultsPage() {
                       }, {})
                       
                       const allPapers = new Set<number>()
-                      resultsData.forEach((result: any) => {
-                        const paperNum = result.raw_marks?.paper || 1
-                        allPapers.add(paperNum)
+                      Object.values(grouped).forEach((g: any) => {
+                        Object.keys(g.papers).forEach(p => allPapers.add(parseInt(p)))
                       })
                       const sortedPapers = Array.from(allPapers).sort((a, b) => a - b)
                       
                       return Object.values(grouped).map((group: any, idx: number) => (
-                        <tr key={idx} className="hover:bg-indigo-50 transition-colors">
+                        <tr key={idx} className="border-b border-gray-200 hover:bg-gray-50">
                           {selectedStudent === 'all' && (
-                            <td className="py-3 sm:py-4 px-3 sm:px-6 text-xs sm:text-sm font-semibold text-gray-900 border-r border-gray-200 whitespace-nowrap">{group.student_name}</td>
+                            <td className="py-3 px-4 font-medium text-gray-800 border-r-2 border-gray-300">{group.student_name}</td>
                           )}
-                          <td className="py-3 sm:py-4 px-3 sm:px-6 text-xs sm:text-sm text-gray-800 font-medium border-r border-gray-200 whitespace-nowrap">{group.subject_name}</td>
-                          <td className="py-3 sm:py-4 px-2 sm:px-4 text-center border-r border-gray-200">
-                            <span className="inline-block px-2 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700 whitespace-nowrap">
+                          <td className="py-3 px-4 text-gray-700 border-r-2 border-gray-300">{group.subject_name}</td>
+                          <td className="py-3 px-4 text-center border-r-2 border-gray-300">
+                            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
                               {group.exam_type || 'N/A'}
                             </span>
                           </td>
                           {sortedPapers.map(paperNum => (
-                            <td key={paperNum} className="py-3 sm:py-4 px-3 sm:px-6 text-center border-r border-gray-200">
-                              <span className="inline-block px-2 sm:px-4 py-1 sm:py-2 rounded-lg font-bold text-sm sm:text-lg bg-gradient-to-br from-gray-50 to-gray-100 text-gray-900 shadow-sm whitespace-nowrap">
-                                {group.papers[paperNum]?.toFixed(1) || '-'}
-                              </span>
-                            </td>
+                            <Fragment key={paperNum}>
+                              <td className="py-3 px-2 text-center text-gray-700 border-r border-gray-200">{group.papers[paperNum]?.ca || 0}</td>
+                              <td className="py-3 px-2 text-center text-gray-700 border-r border-gray-200">{group.papers[paperNum]?.exam || 0}</td>
+                              <td className="py-3 px-2 text-center font-semibold text-gray-900 border-r-2 border-gray-300">
+                                {group.papers[paperNum] ? (group.papers[paperNum].ca + group.papers[paperNum].exam).toFixed(1) : '0.0'}
+                              </td>
+                            </Fragment>
                           ))}
-                          <td className="py-3 sm:py-4 px-3 sm:px-6 text-center">
-                            <span className={`inline-block px-2 sm:px-4 py-1 sm:py-2 rounded-lg text-sm sm:text-lg font-extrabold shadow-md whitespace-nowrap ${
-                              ['A', 'B', 'C', 'D', 'E'].includes(group.final_grade) 
-                                ? 'bg-gradient-to-br from-green-400 to-green-600 text-white' 
-                                : group.final_grade === 'O' 
-                                ? 'bg-gradient-to-br from-orange-400 to-orange-600 text-white'
-                                : 'bg-gradient-to-br from-red-400 to-red-600 text-white'
-                            }`}>
-                              {group.final_grade || 'N/A'}
+                          <td className="py-3 px-4 text-center">
+                            <span className="px-3 py-1 rounded-full text-sm font-bold bg-green-100 text-green-800">
+                              {group.final_grade}
                             </span>
                           </td>
                         </tr>
@@ -454,18 +474,18 @@ export default function ResultsPage() {
                 </table>
               ) : (
                 // Other Levels Table
-                <table className="min-w-full">
+                <table className="w-full">
                   <thead>
                     <tr className="border-b-2 border-gray-200">
                       {selectedStudent === 'all' && (
-                        <th className="text-left py-3 sm:py-4 px-2 sm:px-4 text-xs sm:text-sm font-semibold text-gray-700 whitespace-nowrap">Student</th>
+                        <th className="text-left py-4 px-4 font-semibold text-gray-700">Student</th>
                       )}
-                      <th className="text-left py-3 sm:py-4 px-2 sm:px-4 text-xs sm:text-sm font-semibold text-gray-700 whitespace-nowrap">Subject</th>
-                      <th className="text-center py-3 sm:py-4 px-2 sm:px-4 text-xs sm:text-sm font-semibold text-gray-700 whitespace-nowrap">Exam</th>
-                      <th className="text-center py-3 sm:py-4 px-2 sm:px-4 text-xs sm:text-sm font-semibold text-gray-700">CA</th>
-                      <th className="text-center py-3 sm:py-4 px-2 sm:px-4 text-xs sm:text-sm font-semibold text-gray-700">Exam</th>
-                      <th className="text-center py-3 sm:py-4 px-2 sm:px-4 text-xs sm:text-sm font-semibold text-gray-700">Total</th>
-                      <th className="text-center py-3 sm:py-4 px-2 sm:px-4 text-xs sm:text-sm font-semibold text-gray-700">Grade</th>
+                      <th className="text-left py-4 px-4 font-semibold text-gray-700">Subject</th>
+                      <th className="text-center py-4 px-4 font-semibold text-gray-700">Exam Type</th>
+                      <th className="text-center py-4 px-4 font-semibold text-gray-700">CA</th>
+                      <th className="text-center py-4 px-4 font-semibold text-gray-700">Exam</th>
+                      <th className="text-center py-4 px-4 font-semibold text-gray-700">Total</th>
+                      <th className="text-center py-4 px-4 font-semibold text-gray-700">Grade</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -479,19 +499,19 @@ export default function ResultsPage() {
                       return (
                         <tr key={`${result.id}-${idx}`} className="border-b border-gray-100 hover:bg-gray-50">
                           {selectedStudent === 'all' && (
-                            <td className="py-3 sm:py-4 px-2 sm:px-4 text-xs sm:text-sm font-medium whitespace-nowrap">{result.student_name}</td>
+                            <td className="py-4 px-4 font-medium">{result.student_name}</td>
                           )}
-                          <td className="py-3 sm:py-4 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap">{result.subject_name}</td>
-                          <td className="py-3 sm:py-4 px-2 sm:px-4 text-center">
-                            <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 whitespace-nowrap">
+                          <td className="py-4 px-4">{result.subject_name}</td>
+                          <td className="py-4 px-4 text-center">
+                            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
                               {examType}
                             </span>
                           </td>
-                          <td className="py-3 sm:py-4 px-2 sm:px-4 text-center text-xs sm:text-sm font-medium">{ca}</td>
-                          <td className="py-3 sm:py-4 px-2 sm:px-4 text-center text-xs sm:text-sm font-medium">{exam}</td>
-                          <td className="py-3 sm:py-4 px-2 sm:px-4 text-xs sm:text-sm font-bold text-center">{total.toFixed(1)}</td>
-                          <td className="py-3 sm:py-4 px-2 sm:px-4 text-center">
-                            <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
+                          <td className="py-4 px-4 text-center font-medium">{ca}</td>
+                          <td className="py-4 px-4 text-center font-medium">{exam}</td>
+                          <td className="py-4 px-4 font-bold text-center">{total.toFixed(1)}</td>
+                          <td className="py-4 px-4 text-center">
+                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
                               total >= 50 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                             }`}>
                               {result.final_grade}
