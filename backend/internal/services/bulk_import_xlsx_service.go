@@ -73,7 +73,7 @@ func (s *BulkImportXLSXService) GenerateStudentTemplate(classID uuid.UUID) (*exc
 		Font: &excelize.Font{Italic: true, Color: "#7F6000"},
 		Alignment: &excelize.Alignment{Horizontal: "left", Vertical: "center", WrapText: true},
 	})
-	f.SetCellValue(sheet, "A3", fmt.Sprintf("INSTRUCTIONS: All students will be imported into %s. Required: First Name, Last Name. Gender must be 'male' or 'female'. Date format: YYYY-MM-DD. Delete sample rows before uploading.", class.Name))
+	f.SetCellValue(sheet, "A3", fmt.Sprintf("INSTRUCTIONS: All students will be imported into %s. Required: First Name, Last Name. Gender: 'male'/'female' or 'm'/'f'. Date formats: YYYY-MM-DD, DD/MM/YYYY, MM/DD/YYYY. Delete sample rows before uploading.", class.Name))
 	f.MergeCell(sheet, "A3", lastCol+"3")
 	f.SetCellStyle(sheet, "A3", lastCol+"3", instructionStyle)
 	f.SetRowHeight(sheet, 3, 40)
@@ -589,13 +589,31 @@ func (s *BulkImportXLSXService) validateStudentRow(row []string, schoolID uuid.U
 		return nil, errors.New("missing required fields: first name and last name")
 	}
 
-	// Parse date
+	// Parse date - support multiple formats
 	var dob time.Time
 	var err error
 	if dobStr != "" {
-		dob, err = time.Parse("2006-01-02", dobStr)
+		// Try multiple date formats
+		dateFormats := []string{
+			"2006-01-02",    // YYYY-MM-DD
+			"02/01/2006",    // DD/MM/YYYY
+			"01/02/2006",    // MM/DD/YYYY
+			"2006/01/02",    // YYYY/MM/DD
+			"02-01-2006",    // DD-MM-YYYY
+			"01-02-2006",    // MM-DD-YYYY
+			"2 Jan 2006",    // D Mon YYYY
+			"02 January 2006", // DD Month YYYY
+		}
+		
+		for _, format := range dateFormats {
+			dob, err = time.Parse(format, dobStr)
+			if err == nil {
+				break
+			}
+		}
+		
 		if err != nil {
-			return nil, fmt.Errorf("invalid date format: %v", err)
+			return nil, fmt.Errorf("invalid date format: %v (supported: YYYY-MM-DD, DD/MM/YYYY, MM/DD/YYYY, etc.)", err)
 		}
 	}
 
