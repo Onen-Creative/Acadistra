@@ -58,13 +58,18 @@ export default function StaffRegisterPage() {
     setSubmitting(true)
     try {
       const payload: any = { ...formData }
-      if (payload.salary) payload.salary = parseFloat(payload.salary)
+      // Convert and clean numeric fields
+      if (payload.salary) {
+        payload.salary = parseFloat(payload.salary)
+      } else {
+        delete payload.salary // Remove empty salary
+      }
       if (payload.experience) {
         payload.experience = parseInt(payload.experience)
       } else {
-        delete payload.experience // Remove empty experience field
+        delete payload.experience // Remove empty experience
       }
-      console.log('Submitting staff data:', payload) // Debug log
+      console.log('Submitting staff data:', JSON.stringify(payload, null, 2)) // Debug log
       await api.post('/api/v1/staff', payload)
       toast.success('Staff registered successfully!')
       router.push('/staff')
