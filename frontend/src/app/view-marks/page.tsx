@@ -366,7 +366,7 @@ export default function ResultsPage() {
                       {(() => {
                         const allPapers = new Set<number>()
                         resultsData.forEach((result: any) => {
-                          const paperNum = result.raw_marks?.paper || 1
+                          const paperNum = result.paper || 1
                           allPapers.add(paperNum)
                         })
                         const sortedPapers = Array.from(allPapers).sort((a, b) => a - b)
@@ -392,7 +392,7 @@ export default function ResultsPage() {
                             final_grade: result.final_grade
                           }
                         }
-                        const paperNum = result.raw_marks?.paper || 1
+                        const paperNum = result.paper || 1
                         // For Advanced level, marks are stored as 'mark', not ca+exam
                         const total = result.raw_marks?.mark || result.raw_marks?.total || ((result.raw_marks?.ca || 0) + (result.raw_marks?.exam || 0))
                         acc[key].papers[paperNum] = total
@@ -404,7 +404,7 @@ export default function ResultsPage() {
                       
                       const allPapers = new Set<number>()
                       resultsData.forEach((result: any) => {
-                        const paperNum = result.raw_marks?.paper || 1
+                        const paperNum = result.paper || 1
                         allPapers.add(paperNum)
                       })
                       const sortedPapers = Array.from(allPapers).sort((a, b) => a - b)
