@@ -172,10 +172,10 @@ export default function AdvancedLevelReportCard({
                   const paper2 = subjectResults.find((r: any) => r.paper === 2)
                   const paper3 = subjectResults.find((r: any) => r.paper === 3)
                   
-                  // Calculate marks - check both total and ca+exam
-                  const p1 = paper1?.raw_marks ? (paper1.raw_marks.total || ((paper1.raw_marks.ca || 0) + (paper1.raw_marks.exam || 0))) : 0
-                  const p2 = paper2?.raw_marks ? (paper2.raw_marks.total || ((paper2.raw_marks.ca || 0) + (paper2.raw_marks.exam || 0))) : 0
-                  const p3 = paper3?.raw_marks ? (paper3.raw_marks.total || ((paper3.raw_marks.ca || 0) + (paper3.raw_marks.exam || 0))) : 0
+                  // Calculate marks - check mark, total, or ca+exam
+                  const p1 = paper1?.raw_marks ? (paper1.raw_marks.mark || paper1.raw_marks.total || ((paper1.raw_marks.ca || 0) + (paper1.raw_marks.exam || 0))) : 0
+                  const p2 = paper2?.raw_marks ? (paper2.raw_marks.mark || paper2.raw_marks.total || ((paper2.raw_marks.ca || 0) + (paper2.raw_marks.exam || 0))) : 0
+                  const p3 = paper3?.raw_marks ? (paper3.raw_marks.mark || paper3.raw_marks.total || ((paper3.raw_marks.ca || 0) + (paper3.raw_marks.exam || 0))) : 0
                   
                   // Get grade from any result that has it
                   let grade = ''
