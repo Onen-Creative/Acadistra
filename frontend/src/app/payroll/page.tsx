@@ -26,11 +26,11 @@ const payrollApi = {
     return response
   },
   updateSalaryStructure: async (id: number, data: any) => {
-    const { data: response } = await api.put(`/payroll/salary-structures/${id}`, data)
+    const { data: response } = await api.put(`/api/v1/payroll/salary-structures/${id}`, data)
     return response
   },
   deleteSalaryStructure: async (id: number) => {
-    const { data } = await api.delete(`/payroll/salary-structures/${id}`)
+    const { data } = await api.delete(`/api/v1/payroll/salary-structures/${id}`)
     return data
   },
   processPayroll: async (data: any) => {
@@ -42,11 +42,11 @@ const payrollApi = {
     return data
   },
   markPaymentPaid: async (id: number, data: any) => {
-    const { data: response } = await api.post(`/payroll/payments/${id}/mark-paid`, data)
+    const { data: response } = await api.post(`/api/v1/payroll/payments/${id}/mark-paid`, data)
     return response
   },
   getPayrollSummary: async (year: number) => {
-    const { data } = await api.get(`/payroll/summary/${year}`)
+    const { data } = await api.get(`/api/v1/payroll/summary/${year}`)
     return data
   },
 }
