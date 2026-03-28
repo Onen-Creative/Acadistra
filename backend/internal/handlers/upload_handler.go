@@ -47,6 +47,9 @@ func (h *UploadHandler) UploadLogo(c *gin.Context) {
 
 // UploadStudentPhoto handles student photo upload with optimization
 func (h *UploadHandler) UploadStudentPhoto(c *gin.Context) {
+	// Set longer timeout for image processing
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 10<<20) // 10MB max
+	
 	file, err := c.FormFile("photo")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No file uploaded"})
@@ -67,7 +70,44 @@ func (h *UploadHandler) UploadStudentPhoto(c *gin.Context) {
 		return
 	}
 
-	// Open uploaded file
+	// Generate unique filename first
+	filename := uuid.New().String()
+	photoPath := filepath.Join("public", "photos", filename+".jpg")
+	thumbPath := filepath.Join("public", "photos", "thumbs", filename+".jpg")
+
+	// Ensure directories exist
+	os.MkdirAll(filepath.Dir(photoPath), 0755)
+	os.MkdirAll(filepath.Dir(thumbPath), 0755)
+
+	// For small files (< 1MB), skip optimization to speed up
+	if file.Size < 1024*1024 {
+		// Just save the original file
+		if err := c.SaveUploadedFile(file, photoPath); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save photo"})
+			return
+		}
+		
+		// Create a simple thumbnail
+		src, err := file.Open()
+		if err == nil {
+			thumbnail, err := utils.CreateThumbnail(src, 150)
+			if err == nil {
+				os.WriteFile(thumbPath, thumbnail, 0644)
+			}
+			src.Close()
+		}
+		
+		c.JSON(http.StatusOK, gin.H{
+			"photo_url":      fmt.Sprintf("/photos/%s.jpg", filename),
+			"thumbnail_url":  fmt.Sprintf("/photos/thumbs/%s.jpg", filename),
+			"original_size":  file.Size,
+			"optimized_size": file.Size,
+			"saved_percent":  "0.0%",
+		})
+		return
+	}
+
+	// For larger files, do optimization
 	src, err := file.Open()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read file"})
@@ -89,15 +129,6 @@ func (h *UploadHandler) UploadStudentPhoto(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create thumbnail"})
 		return
 	}
-
-	// Generate unique filename
-	filename := uuid.New().String()
-	photoPath := filepath.Join("public", "photos", filename+".jpg")
-	thumbPath := filepath.Join("public", "photos", "thumbs", filename+".jpg")
-
-	// Ensure directories exist
-	os.MkdirAll(filepath.Dir(photoPath), 0755)
-	os.MkdirAll(filepath.Dir(thumbPath), 0755)
 
 	// Save optimized photo
 	if err := os.WriteFile(photoPath, optimized, 0644); err != nil {

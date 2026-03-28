@@ -787,7 +787,18 @@ func main() {
 
 	addr := fmt.Sprintf(":%s", cfg.Server.Port)
 	log.Printf("Server starting on %s", addr)
-	if err := r.Run(addr); err != nil {
+	
+	// Create custom HTTP server with longer timeouts for file uploads
+	srv := &http.Server{
+		Addr:           addr,
+		Handler:        r,
+		ReadTimeout:    5 * time.Minute,  // 5 minutes for large file uploads
+		WriteTimeout:   5 * time.Minute,  // 5 minutes for processing
+		IdleTimeout:    120 * time.Second, // 2 minutes idle
+		MaxHeaderBytes: 1 << 20,          // 1 MB headers
+	}
+	
+	if err := srv.ListenAndServe(); err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
 }
