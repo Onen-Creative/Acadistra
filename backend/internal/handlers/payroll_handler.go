@@ -36,10 +36,15 @@ func (h *PayrollHandler) CreateSalaryStructure(c *gin.Context) {
 		HousingAllowance   float64 `json:"housing_allowance"`
 		TransportAllowance float64 `json:"transport_allowance"`
 		MedicalAllowance   float64 `json:"medical_allowance"`
+		LunchAllowance     float64 `json:"lunch_allowance"`
+		OvertimeAllowance  float64 `json:"overtime_allowance"`
+		PerformanceBonus   float64 `json:"performance_bonus"`
 		OtherAllowances    float64 `json:"other_allowances"`
 		NSSFDeduction      float64 `json:"nssf_deduction"`
 		PAYEDeduction      float64 `json:"paye_deduction"`
 		LoanDeduction      float64 `json:"loan_deduction"`
+		InsuranceDeduction float64 `json:"insurance_deduction"`
+		UnionDeduction     float64 `json:"union_deduction"`
 		OtherDeductions    float64 `json:"other_deductions"`
 	}
 
@@ -61,12 +66,18 @@ func (h *PayrollHandler) CreateSalaryStructure(c *gin.Context) {
 		HousingAllowance:   reqData.HousingAllowance,
 		TransportAllowance: reqData.TransportAllowance,
 		MedicalAllowance:   reqData.MedicalAllowance,
+		LunchAllowance:     reqData.LunchAllowance,
+		OvertimeAllowance:  reqData.OvertimeAllowance,
+		PerformanceBonus:   reqData.PerformanceBonus,
 		OtherAllowances:    reqData.OtherAllowances,
 		NSSFDeduction:      reqData.NSSFDeduction,
 		PAYEDeduction:      reqData.PAYEDeduction,
 		LoanDeduction:      reqData.LoanDeduction,
+		InsuranceDeduction: reqData.InsuranceDeduction,
+		UnionDeduction:     reqData.UnionDeduction,
 		OtherDeductions:    reqData.OtherDeductions,
 		EffectiveFrom:      time.Now(),
+		Status:             "active",
 	}
 
 	// If user_id is provided but employee_name is empty, fetch from user

@@ -106,10 +106,12 @@ func (s *PayrollService) ProcessPayroll(schoolID string, month, year int, proces
 
 func (s *PayrollService) calculatePayment(salary *models.SalaryStructure, payrollRunID uint) *models.PayrollPayment {
 	totalAllowances := salary.HousingAllowance + salary.TransportAllowance + 
-		salary.MedicalAllowance + salary.OtherAllowances
+		salary.MedicalAllowance + salary.LunchAllowance + salary.OvertimeAllowance + 
+		salary.PerformanceBonus + salary.OtherAllowances
 	grossSalary := salary.BaseSalary + totalAllowances
 	totalDeductions := salary.NSSFDeduction + salary.PAYEDeduction + 
-		salary.LoanDeduction + salary.OtherDeductions
+		salary.LoanDeduction + salary.InsuranceDeduction + salary.UnionDeduction + 
+		salary.OtherDeductions
 	netSalary := grossSalary - totalDeductions
 
 	return &models.PayrollPayment{

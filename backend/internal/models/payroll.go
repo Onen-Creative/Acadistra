@@ -5,27 +5,34 @@ import (
 )
 
 type SalaryStructure struct {
-	ID              uint      `json:"id" gorm:"primaryKey"`
-	SchoolID        string    `json:"school_id" gorm:"type:varchar(36);not null;index:idx_salary_school"`
-	UserID          *string   `json:"user_id" gorm:"type:varchar(36);index:idx_user_salary"`
-	StaffID         *string   `json:"staff_id" gorm:"type:varchar(36);index:idx_staff_salary"`
-	EmployeeName    string    `json:"employee_name" gorm:"not null"`
-	EmployeeRole    string    `json:"employee_role" gorm:"not null"`
-	EmployeeID      string    `json:"employee_id"`
-	BaseSalary      float64   `json:"base_salary" gorm:"not null"`
-	HousingAllowance float64  `json:"housing_allowance" gorm:"default:0"`
-	TransportAllowance float64 `json:"transport_allowance" gorm:"default:0"`
-	MedicalAllowance float64  `json:"medical_allowance" gorm:"default:0"`
-	OtherAllowances float64   `json:"other_allowances" gorm:"default:0"`
-	NSSFDeduction   float64   `json:"nssf_deduction" gorm:"default:0"`
-	PAYEDeduction   float64   `json:"paye_deduction" gorm:"default:0"`
-	LoanDeduction   float64   `json:"loan_deduction" gorm:"default:0"`
-	OtherDeductions float64   `json:"other_deductions" gorm:"default:0"`
-	EffectiveFrom   time.Time `json:"effective_from" gorm:"not null"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ID                 uint      `json:"id" gorm:"primaryKey"`
+	SchoolID           string    `json:"school_id" gorm:"type:varchar(36);not null;index:idx_salary_school"`
+	UserID             *string   `json:"user_id" gorm:"type:varchar(36);index:idx_user_salary"`
+	StaffID            *string   `json:"staff_id" gorm:"type:varchar(36);index:idx_staff_salary"`
+	EmployeeName       string    `json:"employee_name" gorm:"not null"`
+	EmployeeRole       string    `json:"employee_role" gorm:"not null"`
+	EmployeeID         string    `json:"employee_id"`
+	BaseSalary         float64   `json:"base_salary" gorm:"not null"`
+	HousingAllowance   float64   `json:"housing_allowance" gorm:"default:0"`
+	TransportAllowance float64   `json:"transport_allowance" gorm:"default:0"`
+	MedicalAllowance   float64   `json:"medical_allowance" gorm:"default:0"`
+	LunchAllowance     float64   `json:"lunch_allowance" gorm:"default:0"`
+	OvertimeAllowance  float64   `json:"overtime_allowance" gorm:"default:0"`
+	PerformanceBonus   float64   `json:"performance_bonus" gorm:"default:0"`
+	OtherAllowances    float64   `json:"other_allowances" gorm:"default:0"`
+	NSSFDeduction      float64   `json:"nssf_deduction" gorm:"default:0"`
+	PAYEDeduction      float64   `json:"paye_deduction" gorm:"default:0"`
+	LoanDeduction      float64   `json:"loan_deduction" gorm:"default:0"`
+	InsuranceDeduction float64   `json:"insurance_deduction" gorm:"default:0"`
+	UnionDeduction     float64   `json:"union_deduction" gorm:"default:0"`
+	OtherDeductions    float64   `json:"other_deductions" gorm:"default:0"`
+	EffectiveFrom      time.Time `json:"effective_from" gorm:"not null"`
+	EffectiveTo        *time.Time `json:"effective_to"`
+	Status             string    `json:"status" gorm:"default:'active'"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 	
-	User            *User     `json:"user,omitempty" gorm:"foreignKey:UserID;references:ID"`
+	User               *User     `json:"user,omitempty" gorm:"foreignKey:UserID;references:ID"`
 }
 
 type PayrollRun struct {
