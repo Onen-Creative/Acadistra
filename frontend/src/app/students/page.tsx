@@ -12,6 +12,7 @@ import { studentsApi, classesApi } from '@/services/api'
 import { DashboardLayout } from '@/components/DashboardLayout'
 import api from '@/services/api'
 import Link from 'next/link'
+import { uploadStudentPhoto } from '@/utils/upload'
 
 interface Student {
   id: string
@@ -170,32 +171,23 @@ export default function StudentsPage() {
           }
           
           // Upload photo
-          const formData = new FormData()
-          formData.append('photo', file)
+          const result = await uploadStudentPhoto(file)
           
-          const token = localStorage.getItem('access_token')
-          const uploadRes = await fetch(`http://localhost:8080/api/v1/upload/student-photo`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
-            body: formData
-          })
-          
-          if (!uploadRes.ok) {
+          if (!result.photo_url) {
             results.failed++
             setUploadProgress(prev => ({ ...prev, [fileName]: -1 }))
             continue
           }
           
-          const uploadData = await uploadRes.json()
-          
           // Update student with photo URL
+          const token = localStorage.getItem('access_token')
           const updateRes = await fetch(`http://localhost:8080/api/v1/students/${student.id}`, {
             method: 'PUT',
             headers: { 
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ photo_url: uploadData.photo_url })
+            body: JSON.stringify({ photo_url: result.photo_url })
           })
           
           if (updateRes.ok) {

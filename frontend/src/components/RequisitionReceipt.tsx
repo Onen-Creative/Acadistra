@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { api } from '@/services/api'
+import ImageWithFallback from '@/components/ui/ImageWithFallback'
 
 interface RequisitionReceiptProps {
   requisition: {
@@ -77,10 +78,11 @@ export default function RequisitionReceipt({ requisition, onClose }: Requisition
           <div className="text-center border-b-2 border-black pb-4 mb-6">
             {school?.logo_url && (
               <div className="flex justify-center mb-2">
-                <img 
-                  src={school.logo_url.startsWith('http') ? school.logo_url : `http://localhost:8080${school.logo_url}`} 
+                <ImageWithFallback 
+                  src={school.logo_url} 
                   alt="School Logo" 
-                  className="h-12 w-12 object-contain" 
+                  className="h-12 w-12 object-contain"
+                  fallback="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2'%3E%3Cpath d='M22 10v6M2 10l10-5 10 5-10 5z'/%3E%3Cpath d='M6 12v5c3 3 9 3 12 0v-5'/%3E%3C/svg%3E"
                 />
               </div>
             )}

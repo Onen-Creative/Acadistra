@@ -12,6 +12,7 @@ import { DashboardLayout } from '@/components/DashboardLayout'
 import { PageHeader } from '@/components/ui/BeautifulComponents'
 import { FormInput, FormSelect, FormTextarea, FormSection, FormCard, FormActions, StepIndicator, FormGrid, FullWidthField } from '@/components/ui/FormComponents'
 import { FileInput } from '@mantine/core'
+import { uploadStudentPhoto } from '@/utils/upload'
 const studentSchema = z.object({
   first_name: z.string().min(1, 'Required'),
   middle_name: z.string().optional(),
@@ -105,17 +106,15 @@ export default function StudentRegistrationPage() {
     
     if (photoFile) {
       try {
-        const formData = new FormData()
-        formData.append('photo', photoFile)
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1'}/upload/student-photo`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
-          body: formData
-        })
-        const result = await res.json()
+        const result = await uploadStudentPhoto(photoFile)
         if (result.photo_url) photoUrl = result.photo_url
       } catch (error) {
         console.error('Photo upload failed:', error)
+        notifications.show({ 
+          title: 'Warning', 
+          message: 'Photo upload failed, but student will be registered without photo', 
+          color: 'yellow' 
+        })
       }
     }
 

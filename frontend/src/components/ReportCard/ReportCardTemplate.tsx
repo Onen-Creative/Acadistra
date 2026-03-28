@@ -1,5 +1,8 @@
 'use client'
 
+import ImageWithFallback from '@/components/ui/ImageWithFallback'
+
+
 import React from 'react'
 
 interface ReportCardProps {
@@ -110,7 +113,7 @@ export const ReportCardTemplate: React.FC<ReportCardProps> = ({
         margin: '0 auto',
         padding: '10mm',
         fontFamily: 'Arial, sans-serif',
-        fontSize: '11px',
+        fontSize: '15px',
         backgroundColor: 'white',
         boxSizing: 'border-box'
       }}>
@@ -128,22 +131,27 @@ export const ReportCardTemplate: React.FC<ReportCardProps> = ({
             {/* School Logo */}
             <div style={{ width: '60px', height: '60px', flexShrink: 0, border: '2px solid #d1d5db', borderRadius: '4px', overflow: 'hidden', backgroundColor: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {school?.logo_url ? (
-                <img src={school.logo_url.startsWith('http') ? school.logo_url : `http://localhost:8080${school.logo_url}`} alt="School Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                <ImageWithFallback 
+                  src={school.logo_url} 
+                  alt="School Logo" 
+                  className="w-full h-full object-contain"
+                  fallback="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2'%3E%3Cpath d='M22 10v6M2 10l10-5 10 5-10 5z'/%3E%3Cpath d='M6 12v5c3 3 9 3 12 0v-5'/%3E%3C/svg%3E"
+                />
               ) : (
-                <span style={{ fontSize: '8px', color: '#9ca3af', textAlign: 'center' }}>School Logo</span>
+                <span style={{ fontSize: '16px', color: '#9ca3af', textAlign: 'center' }}>School Logo</span>
               )}
             </div>
             
             {/* School Details */}
             <div style={{ textAlign: 'center', flex: 1 }}>
-              <h1 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e3a8a', marginBottom: '2px' }}>
+              <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1e3a8a', marginBottom: '2px' }}>
                 {school?.name || 'Tanna Memorial High School'}
               </h1>
               <p style={{ fontSize: '9px', color: '#4b5563', margin: '1px 0', fontStyle: 'italic' }}>
                 "{school?.motto || 'Excellence in Education'}"
               </p>
-              <p style={{ fontSize: '10px', color: '#4b5563', margin: '1px 0' }}>{school?.address || 'Tororo, Uganda'}</p>
-              <p style={{ fontSize: '10px', color: '#4b5563', margin: '1px 0' }}>
+              <p style={{ fontSize: '16px', color: '#4b5563', margin: '1px 0' }}>{school?.address || 'Tororo, Uganda'}</p>
+              <p style={{ fontSize: '16px', color: '#4b5563', margin: '1px 0' }}>
                 Tel: {school?.phone || '+256700000000'} | Email: {school?.contact_email || 'info@acadistra.com'}
               </p>
               <div style={{ 
@@ -153,7 +161,7 @@ export const ReportCardTemplate: React.FC<ReportCardProps> = ({
                 display: 'inline-block',
                 borderRadius: '4px'
               }}>
-                <h2 style={{ fontSize: '14px', fontWeight: '600', color: '#1e40af', margin: 0 }}>
+                <h2 style={{ fontSize: '16px', fontWeight: '600', color: '#1e40af', margin: 0 }}>
                   STUDENT REPORT CARD
                 </h2>
               </div>
@@ -162,10 +170,15 @@ export const ReportCardTemplate: React.FC<ReportCardProps> = ({
             {/* Student Photo */}
             <div style={{ width: '60px', height: '60px', flexShrink: 0, border: '2px solid #d1d5db', borderRadius: '4px', overflow: 'hidden', backgroundColor: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {student?.photo_url ? (
-                <img src={student.photo_url.startsWith('http') ? student.photo_url : `http://localhost:8080${student.photo_url}`} alt="Student" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <ImageWithFallback 
+                  src={student.photo_url}
+                  alt="Student Photo"
+                  className="w-full h-full object-cover"
+                  fallback="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 24 24' fill='%23667eea'%3E%3Cpath d='M12 12C14.7614 12 17 9.76142 17 7C17 4.23858 14.7614 2 12 2C9.23858 2 7 4.23858 7 7C7 9.76142 9.23858 12 12 12Z' fill='white'/%3E%3Cpath d='M12 14C7.58172 14 4 17.5817 4 22H20C20 17.5817 16.4183 14 12 14Z' fill='white'/%3E%3C/svg%3E"
+                />
               ) : (
                 <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span style={{ fontSize: '20px', fontWeight: 'bold', color: 'white' }}>
+                  <span style={{ fontSize: '24px', fontWeight: 'bold', color: 'white' }}>
                     {student?.first_name?.[0]}{student?.last_name?.[0]}
                   </span>
                 </div>
@@ -186,24 +199,24 @@ export const ReportCardTemplate: React.FC<ReportCardProps> = ({
           border: '1px solid #e5e7eb'
         }}>
           <div>
-            <p style={{ margin: '2px 0', fontSize: '10px' }}>
+            <p style={{ margin: '2px 0', fontSize: '16px' }}>
               <span style={{ fontWeight: '600' }}>Student Name:</span> {student?.first_name} {student?.last_name}
             </p>
-            <p style={{ margin: '2px 0', fontSize: '10px' }}>
+            <p style={{ margin: '2px 0', fontSize: '16px' }}>
               <span style={{ fontWeight: '600' }}>Admission No:</span> {student?.admission_number}
             </p>
-            <p style={{ margin: '2px 0', fontSize: '10px' }}>
+            <p style={{ margin: '2px 0', fontSize: '16px' }}>
               <span style={{ fontWeight: '600' }}>Class:</span> {className}
             </p>
           </div>
           <div>
-            <p style={{ margin: '2px 0', fontSize: '10px' }}>
+            <p style={{ margin: '2px 0', fontSize: '16px' }}>
               <span style={{ fontWeight: '600' }}>Term:</span> {term}
             </p>
-            <p style={{ margin: '2px 0', fontSize: '10px' }}>
+            <p style={{ margin: '2px 0', fontSize: '16px' }}>
               <span style={{ fontWeight: '600' }}>Year:</span> {year}
             </p>
-            <p style={{ margin: '2px 0', fontSize: '10px' }}>
+            <p style={{ margin: '2px 0', fontSize: '16px' }}>
               <span style={{ fontWeight: '600' }}>Exam Type:</span> {examType}
             </p>
           </div>
@@ -212,7 +225,7 @@ export const ReportCardTemplate: React.FC<ReportCardProps> = ({
         {/* Academic Performance */}
         <div style={{ marginBottom: '6px', flex: 1 }}>
           <h3 style={{ 
-            fontSize: '12px', 
+            fontSize: '16px', 
             fontWeight: 'bold', 
             color: '#1e3a8a', 
             marginBottom: '6px',
@@ -242,22 +255,22 @@ export const ReportCardTemplate: React.FC<ReportCardProps> = ({
           border: '1px solid #93c5fd'
         }}>
           <div style={{ textAlign: 'center' }}>
-            <p style={{ fontSize: '8px', color: '#4b5563', margin: '0 0 2px 0' }}>Total Subjects</p>
-            <p style={{ fontSize: '14px', fontWeight: 'bold', color: '#1e3a8a', margin: 0 }}>{stats.subjects}</p>
+            <p style={{ fontSize: '16px', color: '#4b5563', margin: '0 0 2px 0' }}>Total Subjects</p>
+            <p style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e3a8a', margin: 0 }}>{stats.subjects}</p>
           </div>
           <div style={{ textAlign: 'center' }}>
-            <p style={{ fontSize: '8px', color: '#4b5563', margin: '0 0 2px 0' }}>Total Marks</p>
-            <p style={{ fontSize: '14px', fontWeight: 'bold', color: '#1e3a8a', margin: 0 }}>{stats.totalMarks.toFixed(1)}</p>
+            <p style={{ fontSize: '16px', color: '#4b5563', margin: '0 0 2px 0' }}>Total Marks</p>
+            <p style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e3a8a', margin: 0 }}>{stats.totalMarks.toFixed(1)}</p>
           </div>
           <div style={{ textAlign: 'center' }}>
-            <p style={{ fontSize: '8px', color: '#4b5563', margin: '0 0 2px 0' }}>Average</p>
-            <p style={{ fontSize: '14px', fontWeight: 'bold', color: '#1e3a8a', margin: 0 }}>{stats.average}%</p>
+            <p style={{ fontSize: '16px', color: '#4b5563', margin: '0 0 2px 0' }}>Average</p>
+            <p style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e3a8a', margin: 0 }}>{stats.average}%</p>
           </div>
         </div>
 
         {/* Grading Key */}
         <div style={{ marginBottom: '6px' }}>
-          <h3 style={{ fontSize: '10px', fontWeight: 'bold', color: '#1e3a8a', marginBottom: '4px', textAlign: 'center' }}>GRADING SCALE</h3>
+          <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e3a8a', marginBottom: '4px', textAlign: 'center' }}>GRADING SCALE</h3>
           <div style={{ display: 'flex', justifyContent: 'center' }}>
             <table style={{ borderCollapse: 'collapse', border: '1px solid #d1d5db' }}>
               <tbody>
@@ -310,7 +323,7 @@ export const ReportCardTemplate: React.FC<ReportCardProps> = ({
 
         {/* Teacher Comments */}
         <div style={{ marginBottom: '6px' }}>
-          <h3 style={{ fontSize: '10px', fontWeight: 'bold', color: '#1e3a8a', marginBottom: '4px' }}>TEACHER'S COMMENTS</h3>
+          <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e3a8a', marginBottom: '4px' }}>TEACHER'S COMMENTS</h3>
           <div style={{ fontSize: '9px', backgroundColor: '#f9fafb', padding: '6px', borderRadius: '4px', border: '1px solid #e5e7eb' }}>
             <p style={{ margin: '0 0 4px 0' }}><span style={{ fontWeight: '600' }}>Class Teacher:</span> {getTeacherComment(stats.avgNum)}</p>
             <p style={{ margin: 0 }}><span style={{ fontWeight: '600' }}>Head Teacher:</span> {getHeadTeacherComment(stats.avgNum)}</p>
@@ -327,15 +340,15 @@ export const ReportCardTemplate: React.FC<ReportCardProps> = ({
         }}>
           <div style={{ backgroundColor: '#fef3c7', padding: '6px', borderRadius: '4px', border: '1px solid #fbbf24', textAlign: 'center' }}>
             <p style={{ margin: 0, fontWeight: '600' }}>Outstanding Balance:</p>
-            <p style={{ margin: '2px 0 0 0', fontSize: '11px', fontWeight: 'bold' }}>UGX {outstandingBalance.toLocaleString()}</p>
+            <p style={{ margin: '2px 0 0 0', fontSize: '15px', fontWeight: 'bold' }}>UGX {outstandingBalance.toLocaleString()}</p>
           </div>
           <div style={{ backgroundColor: '#dbeafe', padding: '6px', borderRadius: '4px', border: '1px solid #60a5fa', textAlign: 'center' }}>
             <p style={{ margin: 0, fontWeight: '600' }}>Next Term Begins:</p>
-            <p style={{ margin: '2px 0 0 0', fontSize: '10px', fontWeight: 'bold' }}>{formatDate(nextTermBegins)}</p>
+            <p style={{ margin: '2px 0 0 0', fontSize: '16px', fontWeight: 'bold' }}>{formatDate(nextTermBegins)}</p>
           </div>
           <div style={{ backgroundColor: '#dbeafe', padding: '6px', borderRadius: '4px', border: '1px solid #60a5fa', textAlign: 'center' }}>
             <p style={{ margin: 0, fontWeight: '600' }}>Next Term Ends:</p>
-            <p style={{ margin: '2px 0 0 0', fontSize: '10px', fontWeight: 'bold' }}>{formatDate(nextTermEnds)}</p>
+            <p style={{ margin: '2px 0 0 0', fontSize: '16px', fontWeight: 'bold' }}>{formatDate(nextTermEnds)}</p>
           </div>
         </div>
 
@@ -355,7 +368,7 @@ export const ReportCardTemplate: React.FC<ReportCardProps> = ({
 
 const tableStyle = {
   width: '100%',
-  fontSize: '11px',
+  fontSize: '15px',
   borderCollapse: 'collapse' as const,
   marginBottom: '2px'
 }
@@ -365,13 +378,13 @@ const thStyle = {
   padding: '5px',
   backgroundColor: '#dbeafe',
   fontWeight: '600' as const,
-  fontSize: '10px'
+  fontSize: '16px'
 }
 
 const tdStyle = {
   border: '1px solid #d1d5db',
   padding: '5px',
-  fontSize: '11px'
+  fontSize: '15px'
 }
 
 const getSubjectRemark = (total: number) => {
@@ -407,7 +420,7 @@ const NurseryTable: React.FC<{ results: any[] }> = ({ results }) => (
             <td style={{ ...tdStyle, textAlign: 'center' }}>{hasMarks ? (marks.exam || 0) : ''}</td>
             <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 'bold' }}>{hasMarks ? total.toFixed(1) : ''}</td>
             <td style={{ ...tdStyle, textAlign: 'center', fontWeight: '600' }}>{result.final_grade || ''}</td>
-            <td style={{ ...tdStyle, textAlign: 'center', fontSize: '7px' }}>{hasMarks ? getSubjectRemark(total) : ''}</td>
+            <td style={{ ...tdStyle, textAlign: 'center', fontSize: '9px' }}>{hasMarks ? getSubjectRemark(total) : ''}</td>
           </tr>
         )
       })}
@@ -439,7 +452,7 @@ const PrimaryLowerTable: React.FC<{ results: any[] }> = ({ results }) => (
             <td style={{ ...tdStyle, textAlign: 'center' }}>{hasMarks ? (marks.exam || 0) : ''}</td>
             <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 'bold' }}>{hasMarks ? total.toFixed(1) : ''}</td>
             <td style={{ ...tdStyle, textAlign: 'center', fontWeight: '600', color: '#1e3a8a' }}>{result.final_grade || ''}</td>
-            <td style={{ ...tdStyle, textAlign: 'center', fontSize: '7px' }}>{hasMarks ? getSubjectRemark(total) : ''}</td>
+            <td style={{ ...tdStyle, textAlign: 'center', fontSize: '9px' }}>{hasMarks ? getSubjectRemark(total) : ''}</td>
           </tr>
         )
       })}
@@ -474,7 +487,7 @@ const PrimaryUpperTable: React.FC<{ results: any[] }> = ({ results }) => (
             <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 'bold' }}>{hasMarks ? total.toFixed(1) : ''}</td>
             <td style={{ ...tdStyle, textAlign: 'center', fontWeight: '600', color: '#1e3a8a' }}>{result.final_grade || ''}</td>
             <td style={{ ...tdStyle, textAlign: 'center' }}>{result.final_grade ? (gradePoints[result.final_grade] || '') : ''}</td>
-            <td style={{ ...tdStyle, textAlign: 'center', fontSize: '7px' }}>{hasMarks ? getSubjectRemark(total) : ''}</td>
+            <td style={{ ...tdStyle, textAlign: 'center', fontSize: '9px' }}>{hasMarks ? getSubjectRemark(total) : ''}</td>
           </tr>
         )
       })}
@@ -486,12 +499,12 @@ const OrdinaryTable: React.FC<{ results: any[] }> = ({ results }) => (
   <table style={tableStyle}>
     <thead>
       <tr>
-        <th style={{ ...thStyle, textAlign: 'left', fontSize: '11px' }}>Subject</th>
-        <th style={{ ...thStyle, textAlign: 'center', width: '60px', fontSize: '10px' }}>CA (20)</th>
-        <th style={{ ...thStyle, textAlign: 'center', width: '60px', fontSize: '10px' }}>Exam (80)</th>
-        <th style={{ ...thStyle, textAlign: 'center', width: '60px', fontSize: '10px' }}>Total (100)</th>
-        <th style={{ ...thStyle, textAlign: 'center', width: '50px', fontSize: '10px' }}>Grade</th>
-        <th style={{ ...thStyle, textAlign: 'center', width: '70px', fontSize: '10px' }}>Remark</th>
+        <th style={{ ...thStyle, textAlign: 'left', fontSize: '15px' }}>Subject</th>
+        <th style={{ ...thStyle, textAlign: 'center', width: '60px', fontSize: '16px' }}>CA (20)</th>
+        <th style={{ ...thStyle, textAlign: 'center', width: '60px', fontSize: '16px' }}>Exam (80)</th>
+        <th style={{ ...thStyle, textAlign: 'center', width: '60px', fontSize: '16px' }}>Total (100)</th>
+        <th style={{ ...thStyle, textAlign: 'center', width: '50px', fontSize: '16px' }}>Grade</th>
+        <th style={{ ...thStyle, textAlign: 'center', width: '70px', fontSize: '16px' }}>Remark</th>
       </tr>
     </thead>
     <tbody>
@@ -501,12 +514,12 @@ const OrdinaryTable: React.FC<{ results: any[] }> = ({ results }) => (
         const total = marks.total || 0
         return (
           <tr key={idx}>
-            <td style={{ ...tdStyle, fontSize: '11px' }}>{result.subject_name}</td>
-            <td style={{ ...tdStyle, textAlign: 'center', fontSize: '11px' }}>{hasMarks ? (marks.ca || 0) : ''}</td>
-            <td style={{ ...tdStyle, textAlign: 'center', fontSize: '11px' }}>{hasMarks ? (marks.exam || 0) : ''}</td>
-            <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 'bold', fontSize: '11px' }}>{hasMarks ? total.toFixed(1) : ''}</td>
-            <td style={{ ...tdStyle, textAlign: 'center', fontWeight: '600', fontSize: '13px', color: '#1e3a8a' }}>{result.final_grade || ''}</td>
-            <td style={{ ...tdStyle, textAlign: 'center', fontSize: '10px' }}>{hasMarks ? getSubjectRemark(total) : ''}</td>
+            <td style={{ ...tdStyle, fontSize: '15px' }}>{result.subject_name}</td>
+            <td style={{ ...tdStyle, textAlign: 'center', fontSize: '15px' }}>{hasMarks ? (marks.ca || 0) : ''}</td>
+            <td style={{ ...tdStyle, textAlign: 'center', fontSize: '15px' }}>{hasMarks ? (marks.exam || 0) : ''}</td>
+            <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 'bold', fontSize: '15px' }}>{hasMarks ? total.toFixed(1) : ''}</td>
+            <td style={{ ...tdStyle, textAlign: 'center', fontWeight: '600', fontSize: '15px', color: '#1e3a8a' }}>{result.final_grade || ''}</td>
+            <td style={{ ...tdStyle, textAlign: 'center', fontSize: '16px' }}>{hasMarks ? getSubjectRemark(total) : ''}</td>
           </tr>
         )
       })}
@@ -538,7 +551,7 @@ const AdvancedTable: React.FC<{ results: any[] }> = ({ results }) => (
             <td style={{ ...tdStyle, textAlign: 'center' }}>{hasMarks ? (marks.exam || 0) : ''}</td>
             <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 'bold' }}>{hasMarks ? total.toFixed(1) : ''}</td>
             <td style={{ ...tdStyle, textAlign: 'center', fontWeight: '600', fontSize: '9px', color: '#1e3a8a' }}>{result.final_grade || ''}</td>
-            <td style={{ ...tdStyle, textAlign: 'center', fontSize: '7px' }}>{hasMarks ? getSubjectRemark(total) : ''}</td>
+            <td style={{ ...tdStyle, textAlign: 'center', fontSize: '9px' }}>{hasMarks ? getSubjectRemark(total) : ''}</td>
           </tr>
         )
       })}

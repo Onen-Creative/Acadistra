@@ -29,9 +29,12 @@ export default function FeesPage() {
   const [feeItems, setFeeItems] = useState<{category: string, amount: number}[]>([{category: '', amount: 0}])
   const [feeTypeFilter, setFeeTypeFilter] = useState('')
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('')
+  const [standardFeeTypes, setStandardFeeTypes] = useState<any[]>([])
+  const [loadingFeeTypes, setLoadingFeeTypes] = useState(false)
 
   useEffect(() => {
     loadLevels()
+    loadStandardFeeTypes()
   }, [])
 
   useEffect(() => {
@@ -51,6 +54,36 @@ export default function FeesPage() {
       setLevels(response.data.levels || [])
     } catch (error) {
       toast.error('Failed to load levels')
+    }
+  }
+
+  const loadStandardFeeTypes = async () => {
+    setLoadingFeeTypes(true)
+    try {
+      const response = await api.get('/api/v1/fee-types')
+      setStandardFeeTypes(response.data.fee_types || [])
+    } catch (error) {
+      console.error('Failed to load standard fee types:', error)
+      // Fallback to hardcoded fee types if API fails
+      setStandardFeeTypes([
+        { name: 'Tuition', code: 'TUITION' },
+        { name: 'Uniform', code: 'UNIFORM' },
+        { name: 'Medical', code: 'MEDICAL' },
+        { name: 'Boarding', code: 'BOARDING' },
+        { name: 'Transport', code: 'TRANSPORT' },
+        { name: 'Meals', code: 'MEALS' },
+        { name: 'Books', code: 'BOOKS' },
+        { name: 'Sports', code: 'SPORTS' },
+        { name: 'Development', code: 'DEVELOPMENT' },
+        { name: 'Field Work', code: 'FIELD_WORK' },
+        { name: 'Extra Lessons', code: 'EXTRA_LESSONS' },
+        { name: 'Holiday Lessons', code: 'HOLIDAY_LESSONS' },
+        { name: 'Handling Fee', code: 'HANDLING_FEE' },
+        { name: 'Mocks', code: 'MOCKS' },
+        { name: 'Other', code: 'OTHER' }
+      ])
+    } finally {
+      setLoadingFeeTypes(false)
     }
   }
 
@@ -509,18 +542,15 @@ export default function FeesPage() {
                           }}
                           className="flex-1 border rounded-lg px-3 py-2"
                           required
+                          disabled={loadingFeeTypes}
                         >
-                          <option value="">Select fee type</option>
-                          <option value="Tuition">Tuition</option>
-                          <option value="Uniform">Uniform</option>
-                          <option value="Medical">Medical</option>
-                          <option value="Boarding">Boarding</option>
-                          <option value="Transport">Transport</option>
-                          <option value="Meals">Meals</option>
-                          <option value="Books">Books</option>
-                          <option value="Sports">Sports</option>
-                          <option value="Development">Development</option>
-                          <option value="Other">Other</option>
+                          <option value="">{loadingFeeTypes ? 'Loading fee types...' : 'Select fee type'}</option>
+                          {standardFeeTypes.map(feeType => (
+                            <option key={feeType.code} value={feeType.name}>
+                              {feeType.name}
+                              {feeType.description && ` - ${feeType.description}`}
+                            </option>
+                          ))}
                         </select>
                         <input
                           type="number"
@@ -582,18 +612,14 @@ export default function FeesPage() {
                   <div className="space-y-3">
                     {feeItems.map((item, index) => (
                       <div key={index} className="flex gap-2 items-center">
-                        <select value={item.category} onChange={(e) => { const newItems = [...feeItems]; newItems[index].category = e.target.value; setFeeItems(newItems); }} className="flex-1 border rounded-lg px-3 py-2" required>
-                          <option value="">Select fee type</option>
-                          <option value="Tuition">Tuition</option>
-                          <option value="Uniform">Uniform</option>
-                          <option value="Medical">Medical</option>
-                          <option value="Boarding">Boarding</option>
-                          <option value="Transport">Transport</option>
-                          <option value="Meals">Meals</option>
-                          <option value="Books">Books</option>
-                          <option value="Sports">Sports</option>
-                          <option value="Development">Development</option>
-                          <option value="Other">Other</option>
+                        <select value={item.category} onChange={(e) => { const newItems = [...feeItems]; newItems[index].category = e.target.value; setFeeItems(newItems); }} className="flex-1 border rounded-lg px-3 py-2" required disabled={loadingFeeTypes}>
+                          <option value="">{loadingFeeTypes ? 'Loading fee types...' : 'Select fee type'}</option>
+                          {standardFeeTypes.map(feeType => (
+                            <option key={feeType.code} value={feeType.name}>
+                              {feeType.name}
+                              {feeType.description && ` - ${feeType.description}`}
+                            </option>
+                          ))}
                         </select>
                         <input type="number" placeholder="Amount" value={item.amount || ''} onChange={(e) => { const newItems = [...feeItems]; newItems[index].amount = parseFloat(e.target.value) || 0; setFeeItems(newItems); }} className="w-40 border rounded-lg px-3 py-2" required min="0" />
                         {feeItems.length > 1 && (

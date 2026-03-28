@@ -111,6 +111,11 @@ func main() {
 		c.JSON(200, gin.H{"message": "Standard subjects seeded successfully"})
 	})
 
+	r.GET("/setup/seed-fee-types", func(c *gin.Context) {
+		seedStandardFeeTypes(db)
+		c.JSON(200, gin.H{"message": "Standard fee types seeded successfully"})
+	})
+
 	// Services
 	authService := services.NewAuthService(db, cfg)
 	emailService := services.NewEmailService(
@@ -223,6 +228,14 @@ func main() {
 				sysAdmin.PUT("/standard-subjects/:id", subjectHandler.UpdateStandardSubject)
 				sysAdmin.DELETE("/standard-subjects/:id", subjectHandler.DeleteStandardSubject)
 
+				// Standard fee types management
+				standardFeeTypeHandler := handlers.NewStandardFeeTypeHandler(db)
+				sysAdmin.GET("/standard-fee-types", standardFeeTypeHandler.GetAllFeeTypes)
+				sysAdmin.GET("/standard-fee-types/by-level", standardFeeTypeHandler.GetFeeTypesByLevel)
+				sysAdmin.GET("/standard-fee-types/by-category", standardFeeTypeHandler.GetFeeTypesByCategory)
+				sysAdmin.GET("/standard-fee-types/compulsory", standardFeeTypeHandler.GetCompulsoryFeeTypes)
+				sysAdmin.GET("/standard-fee-types/categories", standardFeeTypeHandler.GetFeeTypeCategories)
+
 				// Audit logs
 				sysAdmin.GET("/audit/recent", auditHandler.GetRecentActivity)
 				sysAdmin.GET("/audit-logs", func(c *gin.Context) {
@@ -269,6 +282,11 @@ func main() {
 				sysAdmin.POST("/seed-subjects", func(c *gin.Context) {
 					seedStandardSubjects(db)
 					c.JSON(200, gin.H{"message": "Standard subjects seeded successfully"})
+				})
+
+				sysAdmin.POST("/seed-fee-types", func(c *gin.Context) {
+					seedStandardFeeTypes(db)
+					c.JSON(200, gin.H{"message": "Standard fee types seeded successfully"})
 				})
 
 				// System settings
@@ -738,6 +756,14 @@ func main() {
 			protected.GET("/subjects", subjectHandler.ListStandardSubjects)
 			protected.GET("/subjects/school", subjectHandler.GetSchoolSubjects)
 			protected.GET("/subjects/levels", subjectHandler.GetLevels)
+			
+			// Standard fee types - All authenticated users can access
+			standardFeeTypeHandler := handlers.NewStandardFeeTypeHandler(db)
+			protected.GET("/fee-types", standardFeeTypeHandler.GetAllFeeTypes)
+			protected.GET("/fee-types/by-level", standardFeeTypeHandler.GetFeeTypesByLevel)
+			protected.GET("/fee-types/by-category", standardFeeTypeHandler.GetFeeTypesByCategory)
+			protected.GET("/fee-types/compulsory", standardFeeTypeHandler.GetCompulsoryFeeTypes)
+			protected.GET("/fee-types/categories", standardFeeTypeHandler.GetFeeTypeCategories)
 			protected.POST("/results", resultHandler.CreateOrUpdate)
 			protected.GET("/integration-activities", integrationActivityHandler.GetByClass)
 			protected.POST("/integration-activities", integrationActivityHandler.CreateOrUpdate)
@@ -746,8 +772,13 @@ func main() {
 				c.ShouldBindJSON(&body)
 				c.JSON(200, gin.H{"received": body, "headers": c.Request.Header})
 			})
-			protected.POST("/upload/logo", uploadHandler.UploadLogo)
-			protected.POST("/upload/student-photo", uploadHandler.UploadStudentPhoto)
+			// Upload endpoints with query token support for file uploads
+			upload := protected.Group("/upload")
+			upload.Use(middleware.AllowQueryToken())
+			{
+				upload.POST("/logo", uploadHandler.UploadLogo)
+				upload.POST("/student-photo", uploadHandler.UploadStudentPhoto)
+			}
 		}
 	}
 
@@ -781,6 +812,9 @@ func handleCommand(cmd string) {
 
 	case "seed-standard-subjects":
 		seedStandardSubjects(db)
+
+	case "seed-standard-fee-types":
+		seedStandardFeeTypes(db)
 
 	case "fix-constraints":
 		// Drop old constraints that cause migration issues
@@ -1017,6 +1051,17 @@ func seedStandardSubjects(db *gorm.DB) {
 		log.Fatal("Failed to seed standard subjects:", err)
 	}
 
+}
+
+func seedStandardFeeTypes(db *gorm.DB) {
+	log.Println("Seeding standard fee types...")
+
+	feeTypeService := services.NewStandardFeeTypeService(db)
+	if err := feeTypeService.SeedStandardFeeTypes(); err != nil {
+		log.Fatal("Failed to seed standard fee types:", err)
+	}
+
+	log.Println("Standard fee types seeded successfully")
 }
 
 

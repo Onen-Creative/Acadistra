@@ -9,6 +9,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import api from '@/services/api'
+import { getImageUrl } from '@/utils/imageUrl'
 
 const schoolSchema = z.object({
   name: z.string().min(3, 'Name must be at least 3 characters'),
@@ -35,9 +36,8 @@ export default function SchoolsPage() {
 
   const getLogoUrl = (logoUrl: string | null | undefined) => {
     if (!logoUrl) return ''
-    if (logoUrl.startsWith('http') || logoUrl.startsWith('blob:')) return logoUrl
-    // Use relative path - Caddy will proxy to backend
-    return logoUrl
+    if (logoUrl.startsWith('blob:')) return logoUrl // For preview images
+    return getImageUrl(logoUrl)
   }
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<SchoolFormData>({

@@ -105,11 +105,15 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://acadistra.com}
+        - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-https://acadistra.com}
+        - NEXT_PUBLIC_SOCKET_URL=${NEXT_PUBLIC_API_URL:-https://acadistra.com}
     container_name: acadistra_frontend
     restart: unless-stopped
     environment:
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://acadistra.com}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-https://acadistra.com}
+      - NEXT_PUBLIC_SOCKET_URL=${NEXT_PUBLIC_API_URL:-https://acadistra.com}
       - NODE_ENV=production
     ports:
       - "127.0.0.1:3000:3000"

@@ -306,6 +306,17 @@ type StandardSubject struct {
 	Description  string `gorm:"type:text" json:"description"`
 }
 
+// StandardFeeType stores standardized fee types for different school levels
+type StandardFeeType struct {
+	BaseModel
+	Name           string `gorm:"type:varchar(255);not null" json:"name"`
+	Code           string `gorm:"type:varchar(50);not null;uniqueIndex" json:"code"`
+	Category       string `gorm:"type:varchar(100);not null;index" json:"category"`
+	Description    string `gorm:"type:text" json:"description"`
+	IsCompulsory   bool   `gorm:"default:false" json:"is_compulsory"`
+	AppliesToLevels JSONB  `gorm:"type:json" json:"applies_to_levels"` // ["ECCE", "Primary", "O-Level", "A-Level"]
+}
+
 // RefreshToken stores refresh tokens for revocation
 type RefreshToken struct {
 	ID        uuid.UUID `gorm:"type:char(36);primaryKey" json:"id"`

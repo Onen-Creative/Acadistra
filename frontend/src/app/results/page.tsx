@@ -357,59 +357,26 @@ export default function ResultsPage() {
                 // Advanced Level Table
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="bg-gray-50">
+                    <tr className="bg-gray-50 border-b-2 border-gray-300">
                       {selectedStudent === 'all' && (
-                        <th className="text-left py-3 px-4 font-semibold text-gray-700 border-r-2 border-gray-300" rowSpan={2}>Student</th>
+                        <th className="text-left py-3 px-4 font-semibold text-gray-700">Student</th>
                       )}
-                      <th className="text-left py-3 px-4 font-semibold text-gray-700 border-r-2 border-gray-300" rowSpan={2}>Subject</th>
-                      <th className="text-center py-3 px-4 font-semibold text-gray-700 border-r-2 border-gray-300" rowSpan={2}>Exam Type</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Subject</th>
+                      <th className="text-center py-3 px-4 font-semibold text-gray-700">Exam</th>
                       {(() => {
-                        const grouped = resultsData.reduce((acc: any, result: any) => {
-                          const key = `${result.student_id || 'single'}-${result.subject_id}-${result.exam_type}`
-                          if (!acc[key]) {
-                            acc[key] = { papers: {} }
-                          }
-                          const paperNum = result.raw_marks?.paper || 1
-                          acc[key].papers[paperNum] = true
-                          return acc
-                        }, {})
                         const allPapers = new Set<number>()
-                        Object.values(grouped).forEach((g: any) => {
-                          Object.keys(g.papers).forEach(p => allPapers.add(parseInt(p)))
+                        resultsData.forEach((result: any) => {
+                          const paperNum = result.raw_marks?.paper || 1
+                          allPapers.add(paperNum)
                         })
                         const sortedPapers = Array.from(allPapers).sort((a, b) => a - b)
                         return sortedPapers.map(paperNum => (
-                          <th key={paperNum} className="text-center py-3 px-4 font-semibold text-gray-700 border-r-2 border-gray-300" colSpan={3}>
-                            Paper {paperNum}
+                          <th key={paperNum} className="text-center py-3 px-4 font-semibold text-gray-700">
+                            P{paperNum}
                           </th>
                         ))
                       })()}
-                      <th className="text-center py-3 px-4 font-semibold text-gray-700" rowSpan={2}>Grade</th>
-                    </tr>
-                    <tr className="bg-gray-50 border-b-2 border-gray-300">
-                      {(() => {
-                        const grouped = resultsData.reduce((acc: any, result: any) => {
-                          const key = `${result.student_id || 'single'}-${result.subject_id}-${result.exam_type}`
-                          if (!acc[key]) {
-                            acc[key] = { papers: {} }
-                          }
-                          const paperNum = result.raw_marks?.paper || 1
-                          acc[key].papers[paperNum] = true
-                          return acc
-                        }, {})
-                        const allPapers = new Set<number>()
-                        Object.values(grouped).forEach((g: any) => {
-                          Object.keys(g.papers).forEach(p => allPapers.add(parseInt(p)))
-                        })
-                        const sortedPapers = Array.from(allPapers).sort((a, b) => a - b)
-                        return sortedPapers.map(paperNum => (
-                          <Fragment key={paperNum}>
-                            <th className="text-center py-2 px-2 font-medium text-gray-600 text-sm border-r border-gray-200">CA</th>
-                            <th className="text-center py-2 px-2 font-medium text-gray-600 text-sm border-r border-gray-200">Exam</th>
-                            <th className="text-center py-2 px-2 font-medium text-gray-600 text-sm border-r-2 border-gray-300">Total</th>
-                          </Fragment>
-                        ))
-                      })()}
+                      <th className="text-center py-3 px-4 font-semibold text-gray-700">Grade</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -426,10 +393,11 @@ export default function ResultsPage() {
                           }
                         }
                         const paperNum = result.raw_marks?.paper || 1
-                        acc[key].papers[paperNum] = {
-                          ca: result.raw_marks?.ca || 0,
-                          exam: result.raw_marks?.exam || 0
-                        }
+                        // Check multiple formats: mark, total, or ca+exam
+                        const total = result.raw_marks?.mark || 
+                                     result.raw_marks?.total || 
+                                     ((result.raw_marks?.ca || 0) + (result.raw_marks?.exam || 0))
+                        acc[key].papers[paperNum] = total
                         if (result.final_grade) {
                           acc[key].final_grade = result.final_grade
                         }
@@ -437,30 +405,27 @@ export default function ResultsPage() {
                       }, {})
                       
                       const allPapers = new Set<number>()
-                      Object.values(grouped).forEach((g: any) => {
-                        Object.keys(g.papers).forEach(p => allPapers.add(parseInt(p)))
+                      resultsData.forEach((result: any) => {
+                        const paperNum = result.raw_marks?.paper || 1
+                        allPapers.add(paperNum)
                       })
                       const sortedPapers = Array.from(allPapers).sort((a, b) => a - b)
                       
                       return Object.values(grouped).map((group: any, idx: number) => (
                         <tr key={idx} className="border-b border-gray-200 hover:bg-gray-50">
                           {selectedStudent === 'all' && (
-                            <td className="py-3 px-4 font-medium text-gray-800 border-r-2 border-gray-300">{group.student_name}</td>
+                            <td className="py-3 px-4 font-medium text-gray-800">{group.student_name}</td>
                           )}
-                          <td className="py-3 px-4 text-gray-700 border-r-2 border-gray-300">{group.subject_name}</td>
-                          <td className="py-3 px-4 text-center border-r-2 border-gray-300">
+                          <td className="py-3 px-4 text-gray-700">{group.subject_name}</td>
+                          <td className="py-3 px-4 text-center">
                             <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
                               {group.exam_type || 'N/A'}
                             </span>
                           </td>
                           {sortedPapers.map(paperNum => (
-                            <Fragment key={paperNum}>
-                              <td className="py-3 px-2 text-center text-gray-700 border-r border-gray-200">{group.papers[paperNum]?.ca || 0}</td>
-                              <td className="py-3 px-2 text-center text-gray-700 border-r border-gray-200">{group.papers[paperNum]?.exam || 0}</td>
-                              <td className="py-3 px-2 text-center font-semibold text-gray-900 border-r-2 border-gray-300">
-                                {group.papers[paperNum] ? (group.papers[paperNum].ca + group.papers[paperNum].exam).toFixed(1) : '0.0'}
-                              </td>
-                            </Fragment>
+                            <td key={paperNum} className="py-3 px-4 text-center font-medium text-gray-900">
+                              {group.papers[paperNum] !== undefined ? group.papers[paperNum].toFixed(1) : '-'}
+                            </td>
                           ))}
                           <td className="py-3 px-4 text-center">
                             <span className="px-3 py-1 rounded-full text-sm font-bold bg-green-100 text-green-800">

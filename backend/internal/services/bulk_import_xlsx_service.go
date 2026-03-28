@@ -554,7 +554,7 @@ func (s *BulkImportXLSXService) ParseMarksXLSX(file *excelize.File, schoolID uui
 	return bulkImport, nil
 }
 
-func (s *BulkImportXLSXService) validateStudentRow(row []string, schoolID uuid.UUID, classID uuid.UUID) (map[string]interface{}, error) {
+func (s *BulkImportXLSXService) validateStudentRow(row []string, _ uuid.UUID, classID uuid.UUID) (map[string]interface{}, error) {
 	firstName := strings.TrimSpace(row[0])
 	middleName := strings.TrimSpace(row[1])
 	lastName := strings.TrimSpace(row[2])
@@ -618,14 +618,20 @@ func (s *BulkImportXLSXService) validateStudentRow(row []string, schoolID uuid.U
 	}
 
 	// Validate gender (accept male/female, m/f, Male/Female, M/F)
-	if gender != "" && gender != "male" && gender != "female" && gender != "m" && gender != "f" {
+	switch gender {
+	case "male", "female", "m", "f":
+		// Valid gender values
+	case "":
+		// Empty is allowed
+	default:
 		return nil, errors.New("gender must be 'male', 'female', 'm', or 'f'")
 	}
 
 	// Normalize gender to Male/Female
-	if gender == "m" || gender == "male" {
+	switch gender {
+	case "m", "male":
 		gender = "Male"
-	} else if gender == "f" || gender == "female" {
+	case "f", "female":
 		gender = "Female"
 	}
 

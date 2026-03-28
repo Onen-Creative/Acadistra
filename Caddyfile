@@ -1,10 +1,18 @@
 # Main domain - Frontend with API routing
 acadistra.com, www.acadistra.com {
-	# Route /logos/* and /photos/* to backend
+	# Route /logos/* and /photos/* to backend with proper headers
 	handle /logos/* {
+		header {
+			Cache-Control "public, max-age=31536000, immutable"
+			Access-Control-Allow-Origin "*"
+		}
 		reverse_proxy backend:8080
 	}
 	handle /photos/* {
+		header {
+			Cache-Control "public, max-age=31536000, immutable"
+			Access-Control-Allow-Origin "*"
+		}
 		reverse_proxy backend:8080
 	}
 	

@@ -89,6 +89,7 @@ func Migrate(db *gorm.DB) error {
 		&models.Guardian{},
 		&models.Enrollment{},
 		&models.StandardSubject{},
+		&models.StandardFeeType{},
 		&models.Assessment{},
 		&models.Mark{},
 		&models.SubjectResult{},

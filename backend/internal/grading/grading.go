@@ -238,11 +238,13 @@ func (g *UACEGrader) ComputeGradeFromPapers(paperMarks []float64) GradeResult {
 
 func (g *UACEGrader) compute2Papers(codes []int) (string, string) {
 	sum := codes[0] + codes[1]
-	both := codes[0] <= 2 && codes[1] <= 2
+	
+	// All papers excellent (both ≤2) → A
+	if codes[0] <= 2 && codes[1] <= 2 {
+		return "A", fmt.Sprintf("Both papers ≤2: (%d,%d)", codes[0], codes[1])
+	}
 	
 	switch {
-	case both:
-		return "A", fmt.Sprintf("Both papers ≤2: (%d,%d)", codes[0], codes[1])
 	case (codes[0] == 3 || codes[1] == 3) && codes[0] <= 3 && codes[1] <= 3:
 		return "B", fmt.Sprintf("One paper =3, other ≤3: (%d,%d)", codes[0], codes[1])
 	case (codes[0] == 4 || codes[1] == 4) && codes[0] <= 4 && codes[1] <= 4:
@@ -265,8 +267,9 @@ func (g *UACEGrader) compute3Papers(codes []int) (string, string) {
 	}
 	
 	switch {
-	case codes[2] == 3 && codes[0] <= 2 && codes[1] <= 2:
-		return "A", fmt.Sprintf("One =3, others ≤2: %v", codes)
+	// Grade A: All papers ≤2, OR highest is 3 with others ≤2
+	case codes[2] <= 3 && codes[0] <= 2 && codes[1] <= 2:
+		return "A", fmt.Sprintf("Highest ≤3, others ≤2: %v", codes)
 	case codes[2] == 4 && codes[0] <= 4 && codes[1] <= 4:
 		return "B", fmt.Sprintf("One =4, others ≤4: %v", codes)
 	case codes[2] == 5 && codes[0] <= 5 && codes[1] <= 5:
@@ -284,8 +287,9 @@ func (g *UACEGrader) compute3Papers(codes []int) (string, string) {
 
 func (g *UACEGrader) compute4Papers(codes []int) (string, string) {
 	switch {
-	case codes[3] == 3 && codes[0] <= 2 && codes[1] <= 2 && codes[2] <= 2:
-		return "A", fmt.Sprintf("One =3, others ≤2: %v", codes)
+	// Grade A: All papers ≤2, OR highest is 3 with others ≤2
+	case codes[3] <= 3 && codes[0] <= 2 && codes[1] <= 2 && codes[2] <= 2:
+		return "A", fmt.Sprintf("Highest ≤3, others ≤2: %v", codes)
 	case codes[3] == 4 && codes[0] <= 4 && codes[1] <= 4 && codes[2] <= 4:
 		return "B", fmt.Sprintf("One =4, others ≤4: %v", codes)
 	case codes[3] == 5 && codes[0] <= 5 && codes[1] <= 5 && codes[2] <= 5:
