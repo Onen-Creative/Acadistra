@@ -1,5 +1,10 @@
 # Main domain - Frontend with API routing
 acadistra.com, www.acadistra.com {
+	# Route Socket.IO to backend (must be before /api/*)
+	handle /socket.io/* {
+		reverse_proxy backend:8080
+	}
+	
 	# Route /logos/* and /photos/* to backend with proper headers
 	handle /logos/* {
 		header {
