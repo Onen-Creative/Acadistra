@@ -28,7 +28,12 @@ func (s *PayrollService) CreateSalaryStructure(salary *models.SalaryStructure) e
 }
 
 func (s *PayrollService) UpdateSalaryStructure(id uint, salary *models.SalaryStructure) error {
-	return s.db.Model(&models.SalaryStructure{}).Where("id = ?", id).Updates(salary).Error
+	return s.db.Model(&models.SalaryStructure{}).Where("id = ?", id).Select(
+		"base_salary", "housing_allowance", "transport_allowance", "medical_allowance",
+		"lunch_allowance", "overtime_allowance", "performance_bonus", "other_allowances",
+		"nssf_deduction", "paye_deduction", "loan_deduction", "insurance_deduction",
+		"union_deduction", "other_deductions", "effective_from", "effective_to", "status",
+	).Updates(salary).Error
 }
 
 func (s *PayrollService) DeleteSalaryStructure(id uint) error {

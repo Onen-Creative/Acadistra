@@ -623,9 +623,20 @@ function AddStructureModal({ staff, preselected, onClose, onSubmit }: any) {
     base_salary: preselected?.base_salary || '', 
     housing_allowance: '', 
     transport_allowance: '', 
+    medical_allowance: '',
+    lunch_allowance: '',
+    overtime_allowance: '',
+    performance_bonus: '',
+    other_allowances: '',
     nssf_deduction: '', 
-    paye_deduction: '', 
-    effective_from: new Date().toISOString().split('T')[0] 
+    paye_deduction: '',
+    loan_deduction: '',
+    insurance_deduction: '',
+    union_deduction: '',
+    other_deductions: '',
+    effective_from: new Date().toISOString().split('T')[0],
+    effective_to: '',
+    status: 'active'
   })
 
   const handleStaffSelect = (staffId: string) => {
@@ -641,9 +652,35 @@ function AddStructureModal({ staff, preselected, onClose, onSubmit }: any) {
     }
   }
 
+  const calculateTotals = () => {
+    const baseSalary = parseFloat(formData.base_salary) || 0
+    const totalAllowances = (
+      (parseFloat(formData.housing_allowance) || 0) +
+      (parseFloat(formData.transport_allowance) || 0) +
+      (parseFloat(formData.medical_allowance) || 0) +
+      (parseFloat(formData.lunch_allowance) || 0) +
+      (parseFloat(formData.overtime_allowance) || 0) +
+      (parseFloat(formData.performance_bonus) || 0) +
+      (parseFloat(formData.other_allowances) || 0)
+    )
+    const totalDeductions = (
+      (parseFloat(formData.nssf_deduction) || 0) +
+      (parseFloat(formData.paye_deduction) || 0) +
+      (parseFloat(formData.loan_deduction) || 0) +
+      (parseFloat(formData.insurance_deduction) || 0) +
+      (parseFloat(formData.union_deduction) || 0) +
+      (parseFloat(formData.other_deductions) || 0)
+    )
+    const grossSalary = baseSalary + totalAllowances
+    const netSalary = grossSalary - totalDeductions
+    return { baseSalary, totalAllowances, totalDeductions, grossSalary, netSalary }
+  }
+
+  const totals = calculateTotals()
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-2xl">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
         <h3 className="text-xl font-bold mb-4">Add Salary Structure</h3>
         <form onSubmit={(e) => { 
           e.preventDefault(); 
@@ -654,12 +691,23 @@ function AddStructureModal({ staff, preselected, onClose, onSubmit }: any) {
             base_salary: parseFloat(formData.base_salary) || 0,
             housing_allowance: parseFloat(formData.housing_allowance) || 0,
             transport_allowance: parseFloat(formData.transport_allowance) || 0,
+            medical_allowance: parseFloat(formData.medical_allowance) || 0,
+            lunch_allowance: parseFloat(formData.lunch_allowance) || 0,
+            overtime_allowance: parseFloat(formData.overtime_allowance) || 0,
+            performance_bonus: parseFloat(formData.performance_bonus) || 0,
+            other_allowances: parseFloat(formData.other_allowances) || 0,
             nssf_deduction: parseFloat(formData.nssf_deduction) || 0,
             paye_deduction: parseFloat(formData.paye_deduction) || 0,
-            effective_from: formData.effective_from
+            loan_deduction: parseFloat(formData.loan_deduction) || 0,
+            insurance_deduction: parseFloat(formData.insurance_deduction) || 0,
+            union_deduction: parseFloat(formData.union_deduction) || 0,
+            other_deductions: parseFloat(formData.other_deductions) || 0,
+            effective_from: formData.effective_from,
+            effective_to: formData.effective_to || null,
+            status: formData.status
           };
           onSubmit(payload); 
-        }} className="space-y-4">
+        }} className="space-y-6">
           <div>
             <label className="block text-sm font-medium mb-2">Select Staff Member *</label>
             <select value={formData.staff_id} onChange={(e) => handleStaffSelect(e.target.value)} required className="w-full border rounded-lg px-3 py-2" disabled={!!preselected}>
@@ -669,6 +717,7 @@ function AddStructureModal({ staff, preselected, onClose, onSubmit }: any) {
               ))}
             </select>
           </div>
+          
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">Employee Name</label>
@@ -679,7 +728,9 @@ function AddStructureModal({ staff, preselected, onClose, onSubmit }: any) {
               <input type="text" value={formData.employee_role} readOnly className="w-full border rounded-lg px-3 py-2 bg-gray-100" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <h4 className="font-semibold text-blue-900 mb-3">Basic Salary</h4>
             <div>
               <label className="block text-sm font-medium mb-2">Base Salary (UGX) *</label>
               <input 
@@ -689,35 +740,126 @@ function AddStructureModal({ staff, preselected, onClose, onSubmit }: any) {
                 required 
                 className="w-full border rounded-lg px-3 py-2"
               />
-              {formData.base_salary && formData.staff_id && (
-                <p className="text-xs text-gray-500 mt-1">Pre-filled from staff record</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Housing Allowance (UGX)</label>
-              <input type="number" value={formData.housing_allowance} onChange={(e) => setFormData({ ...formData, housing_allowance: e.target.value })} className="w-full border rounded-lg px-3 py-2" placeholder="0" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Transport Allowance (UGX)</label>
-              <input type="number" value={formData.transport_allowance} onChange={(e) => setFormData({ ...formData, transport_allowance: e.target.value })} className="w-full border rounded-lg px-3 py-2" placeholder="0" />
+
+          <div className="bg-green-50 p-4 rounded-lg">
+            <h4 className="font-semibold text-green-900 mb-3">Allowances</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Housing Allowance (UGX)</label>
+                <input type="number" value={formData.housing_allowance} onChange={(e) => setFormData({ ...formData, housing_allowance: e.target.value })} className="w-full border rounded-lg px-3 py-2" placeholder="0" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Transport Allowance (UGX)</label>
+                <input type="number" value={formData.transport_allowance} onChange={(e) => setFormData({ ...formData, transport_allowance: e.target.value })} className="w-full border rounded-lg px-3 py-2" placeholder="0" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Medical Allowance (UGX)</label>
+                <input type="number" value={formData.medical_allowance} onChange={(e) => setFormData({ ...formData, medical_allowance: e.target.value })} className="w-full border rounded-lg px-3 py-2" placeholder="0" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Lunch Allowance (UGX)</label>
+                <input type="number" value={formData.lunch_allowance} onChange={(e) => setFormData({ ...formData, lunch_allowance: e.target.value })} className="w-full border rounded-lg px-3 py-2" placeholder="0" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Overtime Allowance (UGX)</label>
+                <input type="number" value={formData.overtime_allowance} onChange={(e) => setFormData({ ...formData, overtime_allowance: e.target.value })} className="w-full border rounded-lg px-3 py-2" placeholder="0" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Performance Bonus (UGX)</label>
+                <input type="number" value={formData.performance_bonus} onChange={(e) => setFormData({ ...formData, performance_bonus: e.target.value })} className="w-full border rounded-lg px-3 py-2" placeholder="0" />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm font-medium mb-2">Other Allowances (UGX)</label>
+                <input type="number" value={formData.other_allowances} onChange={(e) => setFormData({ ...formData, other_allowances: e.target.value })} className="w-full border rounded-lg px-3 py-2" placeholder="0" />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">NSSF Deduction (UGX)</label>
-              <input type="number" value={formData.nssf_deduction} onChange={(e) => setFormData({ ...formData, nssf_deduction: e.target.value })} className="w-full border rounded-lg px-3 py-2" placeholder="0" />
+          </div>
+
+          <div className="bg-red-50 p-4 rounded-lg">
+            <h4 className="font-semibold text-red-900 mb-3">Deductions</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">NSSF Deduction (UGX)</label>
+                <input type="number" value={formData.nssf_deduction} onChange={(e) => setFormData({ ...formData, nssf_deduction: e.target.value })} className="w-full border rounded-lg px-3 py-2" placeholder="0" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">PAYE Deduction (UGX)</label>
+                <input type="number" value={formData.paye_deduction} onChange={(e) => setFormData({ ...formData, paye_deduction: e.target.value })} className="w-full border rounded-lg px-3 py-2" placeholder="0" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Loan Deduction (UGX)</label>
+                <input type="number" value={formData.loan_deduction} onChange={(e) => setFormData({ ...formData, loan_deduction: e.target.value })} className="w-full border rounded-lg px-3 py-2" placeholder="0" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Insurance Deduction (UGX)</label>
+                <input type="number" value={formData.insurance_deduction} onChange={(e) => setFormData({ ...formData, insurance_deduction: e.target.value })} className="w-full border rounded-lg px-3 py-2" placeholder="0" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Union Deduction (UGX)</label>
+                <input type="number" value={formData.union_deduction} onChange={(e) => setFormData({ ...formData, union_deduction: e.target.value })} className="w-full border rounded-lg px-3 py-2" placeholder="0" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Other Deductions (UGX)</label>
+                <input type="number" value={formData.other_deductions} onChange={(e) => setFormData({ ...formData, other_deductions: e.target.value })} className="w-full border rounded-lg px-3 py-2" placeholder="0" />
+              </div>
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">PAYE Deduction (UGX)</label>
-            <input type="number" value={formData.paye_deduction} onChange={(e) => setFormData({ ...formData, paye_deduction: e.target.value })} className="w-full border rounded-lg px-3 py-2" placeholder="0" />
+
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <h4 className="font-semibold text-gray-900 mb-3">Effective Period & Status</h4>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Effective From *</label>
+                <input type="date" value={formData.effective_from} onChange={(e) => setFormData({ ...formData, effective_from: e.target.value })} required className="w-full border rounded-lg px-3 py-2" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Effective To</label>
+                <input type="date" value={formData.effective_to} onChange={(e) => setFormData({ ...formData, effective_to: e.target.value })} className="w-full border rounded-lg px-3 py-2" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Status</label>
+                <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} className="w-full border rounded-lg px-3 py-2">
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">Effective From *</label>
-            <input type="date" value={formData.effective_from} onChange={(e) => setFormData({ ...formData, effective_from: e.target.value })} required className="w-full border rounded-lg px-3 py-2" />
+
+          <div className="bg-indigo-50 p-4 rounded-lg">
+            <h4 className="font-semibold text-indigo-900 mb-3">Salary Summary</h4>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span>Base Salary:</span>
+                  <span className="font-medium">UGX {totals.baseSalary.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-green-600">
+                  <span>Total Allowances:</span>
+                  <span className="font-medium">UGX {totals.totalAllowances.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between font-semibold border-t pt-2">
+                  <span>Gross Salary:</span>
+                  <span>UGX {totals.grossSalary.toLocaleString()}</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between text-red-600">
+                  <span>Total Deductions:</span>
+                  <span className="font-medium">UGX {totals.totalDeductions.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between font-bold text-lg border-t pt-2 text-indigo-600">
+                  <span>Net Salary:</span>
+                  <span>UGX {totals.netSalary.toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
           </div>
+
           <div className="flex gap-3">
-            <button type="submit" className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-2 rounded-lg hover:shadow-xl transition-all font-semibold">Create</button>
+            <button type="submit" className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-2 rounded-lg hover:shadow-xl transition-all font-semibold">Create Salary Structure</button>
             <button type="button" onClick={onClose} className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 font-semibold">Cancel</button>
           </div>
         </form>

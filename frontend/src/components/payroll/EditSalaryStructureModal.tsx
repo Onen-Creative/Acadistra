@@ -96,10 +96,20 @@ export function EditSalaryStructureModal({
   }
 
   const handleInputChange = (field: string, value: string | number) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: typeof value === 'string' ? (field.includes('_') ? parseFloat(value) || 0 : value) : value
-    }))
+    setFormData(prev => {
+      if (typeof value === 'string' && field.includes('_')) {
+        // Handle numeric fields
+        const numericValue = value === '' ? 0 : parseFloat(value)
+        return {
+          ...prev,
+          [field]: isNaN(numericValue) ? 0 : numericValue
+        }
+      }
+      return {
+        ...prev,
+        [field]: value
+      }
+    })
     
     // Clear error when user starts typing
     if (errors[field]) {
