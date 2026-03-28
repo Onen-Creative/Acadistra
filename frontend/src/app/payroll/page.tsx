@@ -4,10 +4,13 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { DashboardLayout } from '@/components/DashboardLayout'
 import { PageHeader } from '@/components/ui/BeautifulComponents'
+import { SalaryStructureDetailsModal } from '@/components/payroll/SalaryStructureDetailsModal'
+import { EditSalaryStructureModal } from '@/components/payroll/EditSalaryStructureModal'
 import Toast from '@/components/Toast'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import { api } from '@/services/api'
 import * as XLSX from 'xlsx'
+import { Eye, Edit, Trash2 } from 'lucide-react'
 
 const payrollApi = {
   listStaff: async () => {
@@ -53,6 +56,8 @@ export default function PayrollPage() {
   const [activeTab, setActiveTab] = useState<'structures' | 'runs' | 'summary' | 'staff'>('staff')
   const [staffFilter, setStaffFilter] = useState<'all' | 'teaching' | 'non-teaching'>('all')
   const [showAddStructure, setShowAddStructure] = useState(false)
+  const [showEditStructure, setShowEditStructure] = useState(false)
+  const [showStructureDetails, setShowStructureDetails] = useState(false)
   const [showProcessPayroll, setShowProcessPayroll] = useState(false)
   const [showMarkPaid, setShowMarkPaid] = useState(false)
   const [selectedStructure, setSelectedStructure] = useState<any>(null)
@@ -108,6 +113,17 @@ export default function PayrollPage() {
       showToast('Success!', 'Salary structure created', 'success')
     },
     onError: () => showToast('Error', 'Failed to create salary structure', 'error'),
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: any) => payrollApi.updateSalaryStructure(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['salary-structures'] })
+      setShowEditStructure(false)
+      setSelectedStructure(null)
+      showToast('Success!', 'Salary structure updated', 'success')
+    },
+    onError: () => showToast('Error', 'Failed to update salary structure', 'error'),
   })
 
   const deleteMutation = useMutation({
@@ -295,22 +311,48 @@ export default function PayrollPage() {
                       <td className="px-6 py-4 text-right text-sm text-gray-700">UGX {((s.nssf_deduction || 0) + (s.paye_deduction || 0) + (s.loan_deduction || 0) + (s.other_deductions || 0)).toLocaleString()}</td>
                       <td className="px-6 py-4 text-right text-sm font-semibold text-green-600">UGX {((s.base_salary || 0) + (s.housing_allowance || 0) + (s.transport_allowance || 0) + (s.medical_allowance || 0) + (s.other_allowances || 0) - (s.nssf_deduction || 0) - (s.paye_deduction || 0) - (s.loan_deduction || 0) - (s.other_deductions || 0)).toLocaleString()}</td>
                       <td className="px-6 py-4 text-center">
-                        <button
-                          onClick={() => {
-                            setConfirmDialog({
-                              isOpen: true,
-                              title: 'Delete Salary Structure',
-                              message: `Delete salary structure for ${s.employee_name}?`,
-                              onConfirm: () => {
-                                deleteMutation.mutate(s.id)
-                                setConfirmDialog({ ...confirmDialog, isOpen: false })
-                              },
-                            })
-                          }}
-                          className="inline-flex items-center px-3 py-1 text-sm font-medium text-white bg-red-600 rounded hover:bg-red-700 transition-colors"
-                        >
-                          Delete
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => {
+                              setSelectedStructure(s)
+                              setShowStructureDetails(true)
+                            }}
+                            className="inline-flex items-center px-3 py-1 text-sm font-medium text-blue-700 bg-blue-100 rounded hover:bg-blue-200 transition-colors"
+                            title="View Details"
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            View
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedStructure(s)
+                              setShowEditStructure(true)
+                            }}
+                            className="inline-flex items-center px-3 py-1 text-sm font-medium text-indigo-700 bg-indigo-100 rounded hover:bg-indigo-200 transition-colors"
+                            title="Edit Structure"
+                          >
+                            <Edit className="w-4 h-4 mr-1" />
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => {
+                              setConfirmDialog({
+                                isOpen: true,
+                                title: 'Delete Salary Structure',
+                                message: `Delete salary structure for ${s.employee_name}?`,
+                                onConfirm: () => {
+                                  deleteMutation.mutate(s.id)
+                                  setConfirmDialog({ ...confirmDialog, isOpen: false })
+                                },
+                              })
+                            }}
+                            className="inline-flex items-center px-3 py-1 text-sm font-medium text-red-700 bg-red-100 rounded hover:bg-red-200 transition-colors"
+                            title="Delete Structure"
+                          >
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -523,6 +565,38 @@ export default function PayrollPage() {
         )}
 
         {showAddStructure && <AddStructureModal staff={staff} preselected={selectedStructure} onClose={() => { setShowAddStructure(false); setSelectedStructure(null); }} onSubmit={createMutation.mutate} />}
+        {showEditStructure && selectedStructure && (
+          <EditSalaryStructureModal 
+            structure={selectedStructure} 
+            onClose={() => { setShowEditStructure(false); setSelectedStructure(null); }} 
+            onSubmit={(id, data) => updateMutation.mutate({ id, data })}
+            isLoading={updateMutation.isPending}
+          />
+        )}
+        {showStructureDetails && selectedStructure && (
+          <SalaryStructureDetailsModal 
+            structure={selectedStructure} 
+            onClose={() => { setShowStructureDetails(false); setSelectedStructure(null); }}
+            onEdit={(structure) => {
+              setShowStructureDetails(false)
+              setSelectedStructure(structure)
+              setShowEditStructure(true)
+            }}
+            onDelete={(id) => {
+              setConfirmDialog({
+                isOpen: true,
+                title: 'Delete Salary Structure',
+                message: `Delete salary structure for ${selectedStructure.employee_name}?`,
+                onConfirm: () => {
+                  deleteMutation.mutate(id)
+                  setConfirmDialog({ ...confirmDialog, isOpen: false })
+                  setShowStructureDetails(false)
+                  setSelectedStructure(null)
+                },
+              })
+            }}
+          />
+        )}
         {showProcessPayroll && <ProcessPayrollModal onClose={() => setShowProcessPayroll(false)} onSubmit={processMutation.mutate} />}
         {showMarkPaid && <MarkPaidModal payment={selectedPayment} onClose={() => { setShowMarkPaid(false); setSelectedPayment(null); }} onSubmit={(data: any) => markPaidMutation.mutate({ id: selectedPayment.id, data })} />}
 
