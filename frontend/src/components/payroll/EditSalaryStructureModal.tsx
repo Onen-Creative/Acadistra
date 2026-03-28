@@ -141,8 +141,23 @@ export function EditSalaryStructureModal({
     }
 
     const submitData = {
-      ...formData,
-      effective_to: formData.effective_to || undefined
+      base_salary: formData.base_salary,
+      housing_allowance: formData.housing_allowance,
+      transport_allowance: formData.transport_allowance,
+      medical_allowance: formData.medical_allowance,
+      lunch_allowance: formData.lunch_allowance,
+      overtime_allowance: formData.overtime_allowance,
+      performance_bonus: formData.performance_bonus,
+      other_allowances: formData.other_allowances,
+      nssf_deduction: formData.nssf_deduction,
+      paye_deduction: formData.paye_deduction,
+      loan_deduction: formData.loan_deduction,
+      insurance_deduction: formData.insurance_deduction,
+      union_deduction: formData.union_deduction,
+      other_deductions: formData.other_deductions,
+      effective_from: formData.effective_from + 'T00:00:00Z', // Convert to ISO string
+      effective_to: formData.effective_to ? formData.effective_to + 'T00:00:00Z' : null,
+      status: formData.status
     }
 
     onSubmit(structure.id, submitData)

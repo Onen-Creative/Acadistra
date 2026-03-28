@@ -91,9 +91,9 @@ export default function PayrollPage() {
         'Department': s.department || 'N/A',
         'Type': s.role === 'Teacher' ? 'Teaching' : 'Non-Teaching',
         'Base Salary': salary?.base_salary || 0,
-        'Allowances': ((salary?.housing_allowance || 0) + (salary?.transport_allowance || 0) + (salary?.medical_allowance || 0) + (salary?.other_allowances || 0)),
-        'Deductions': ((salary?.nssf_deduction || 0) + (salary?.paye_deduction || 0) + (salary?.loan_deduction || 0) + (salary?.other_deductions || 0)),
-        'Net Salary': salary ? ((salary.base_salary || 0) + (salary.housing_allowance || 0) + (salary.transport_allowance || 0) + (salary.medical_allowance || 0) + (salary.other_allowances || 0) - (salary.nssf_deduction || 0) - (salary.paye_deduction || 0) - (salary.loan_deduction || 0) - (salary.other_deductions || 0)) : 0,
+        'Allowances': ((salary?.housing_allowance || 0) + (salary?.transport_allowance || 0) + (salary?.medical_allowance || 0) + (salary?.lunch_allowance || 0) + (salary?.overtime_allowance || 0) + (salary?.performance_bonus || 0) + (salary?.other_allowances || 0)),
+        'Deductions': ((salary?.nssf_deduction || 0) + (salary?.paye_deduction || 0) + (salary?.loan_deduction || 0) + (salary?.insurance_deduction || 0) + (salary?.union_deduction || 0) + (salary?.other_deductions || 0)),
+        'Net Salary': salary ? ((salary.base_salary || 0) + (salary.housing_allowance || 0) + (salary.transport_allowance || 0) + (salary.medical_allowance || 0) + (salary.lunch_allowance || 0) + (salary.overtime_allowance || 0) + (salary.performance_bonus || 0) + (salary.other_allowances || 0) - (salary.nssf_deduction || 0) - (salary.paye_deduction || 0) - (salary.loan_deduction || 0) - (salary.insurance_deduction || 0) - (salary.union_deduction || 0) - (salary.other_deductions || 0)) : 0,
         'Status': s.status,
       }
     })
@@ -307,9 +307,9 @@ export default function PayrollPage() {
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">{s.employee_name}</td>
                       <td className="px-6 py-4 text-sm text-gray-700">{s.employee_role}</td>
                       <td className="px-6 py-4 text-right text-sm font-medium text-gray-900">UGX {(s.base_salary || 0).toLocaleString()}</td>
-                      <td className="px-6 py-4 text-right text-sm text-gray-700">UGX {((s.housing_allowance || 0) + (s.transport_allowance || 0) + (s.medical_allowance || 0) + (s.other_allowances || 0)).toLocaleString()}</td>
-                      <td className="px-6 py-4 text-right text-sm text-gray-700">UGX {((s.nssf_deduction || 0) + (s.paye_deduction || 0) + (s.loan_deduction || 0) + (s.other_deductions || 0)).toLocaleString()}</td>
-                      <td className="px-6 py-4 text-right text-sm font-semibold text-green-600">UGX {((s.base_salary || 0) + (s.housing_allowance || 0) + (s.transport_allowance || 0) + (s.medical_allowance || 0) + (s.other_allowances || 0) - (s.nssf_deduction || 0) - (s.paye_deduction || 0) - (s.loan_deduction || 0) - (s.other_deductions || 0)).toLocaleString()}</td>
+                      <td className="px-6 py-4 text-right text-sm text-gray-700">UGX {((s.housing_allowance || 0) + (s.transport_allowance || 0) + (s.medical_allowance || 0) + (s.lunch_allowance || 0) + (s.overtime_allowance || 0) + (s.performance_bonus || 0) + (s.other_allowances || 0)).toLocaleString()}</td>
+                      <td className="px-6 py-4 text-right text-sm text-gray-700">UGX {((s.nssf_deduction || 0) + (s.paye_deduction || 0) + (s.loan_deduction || 0) + (s.insurance_deduction || 0) + (s.union_deduction || 0) + (s.other_deductions || 0)).toLocaleString()}</td>
+                      <td className="px-6 py-4 text-right text-sm font-semibold text-green-600">UGX {((s.base_salary || 0) + (s.housing_allowance || 0) + (s.transport_allowance || 0) + (s.medical_allowance || 0) + (s.lunch_allowance || 0) + (s.overtime_allowance || 0) + (s.performance_bonus || 0) + (s.other_allowances || 0) - (s.nssf_deduction || 0) - (s.paye_deduction || 0) - (s.loan_deduction || 0) - (s.insurance_deduction || 0) - (s.union_deduction || 0) - (s.other_deductions || 0)).toLocaleString()}</td>
                       <td className="px-6 py-4 text-center">
                         <div className="flex items-center justify-center gap-2">
                           <button
