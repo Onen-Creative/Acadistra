@@ -10,9 +10,13 @@ RUN npm install --legacy-peer-deps
 # Copy source
 COPY . .
 
-# Build with environment variable
+# Build with environment variables
 ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_APP_URL
+ARG NEXT_PUBLIC_SOCKET_URL
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+ENV NEXT_PUBLIC_SOCKET_URL=${NEXT_PUBLIC_SOCKET_URL}
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
