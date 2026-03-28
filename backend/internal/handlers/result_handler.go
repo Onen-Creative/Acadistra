@@ -651,6 +651,132 @@ func (h *ResultHandler) Delete(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Result deleted"})
 }
 
+// RecalculateGrades recalculates all grades using current grading logic
+func (h *ResultHandler) RecalculateGrades(c *gin.Context) {
+	userRole := c.GetString("user_role")
+	if userRole != "system_admin" && userRole != "school_admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only admins can recalculate grades"})
+		return
+	}
+
+	schoolID := c.GetString("tenant_school_id")
+	term := c.Query("term")
+	year := c.Query("year")
+	level := c.Query("level") // Optional: specific level like "S5", "S6"
+
+	// Get all results to recalculate
+	query := h.db.Model(&models.SubjectResult{})
+	if schoolID != "" && userRole != "system_admin" {
+		query = query.Where("school_id = ?", schoolID)
+	}
+	if term != "" {
+		query = query.Where("term = ?", term)
+	}
+	if year != "" {
+		query = query.Where("year = ?", year)
+	}
+
+	var results []models.SubjectResult
+	if err := query.Find(&results).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	updated := 0
+	errors := 0
+
+	for _, result := range results {
+		// Get student's class level
+		var enrollment models.Enrollment
+		if err := h.db.Where("student_id = ?", result.StudentID).Order("created_at DESC").First(&enrollment).Error; err != nil {
+			continue
+		}
+
+		var class models.Class
+		if err := h.db.First(&class, enrollment.ClassID).Error; err != nil {
+			continue
+		}
+
+		// Skip if level filter is specified and doesn't match
+		if level != "" && class.Level != level {
+			continue
+		}
+
+		// Only recalculate UACE grades (S5, S6) for now
+		if class.Level != "S5" && class.Level != "S6" {
+			continue
+		}
+
+		if result.RawMarks == nil {
+			continue
+		}
+
+		// Get mark from raw_marks
+		mark := 0.0
+		if m, ok := result.RawMarks["mark"].(float64); ok {
+			mark = m
+		} else if t, ok := result.RawMarks["total"].(float64); ok {
+			mark = t
+		} else if e, ok := result.RawMarks["exam"].(float64); ok {
+			// Fallback for old format
+			if c, ok := result.RawMarks["ca"].(float64); ok {
+				mark = c + e
+			} else {
+				mark = e
+			}
+		}
+
+		if mark <= 0 {
+			continue
+		}
+
+		// Recalculate grade using UACE grader
+		grader := &grading.UACEGrader{}
+		code := grader.MapMarkToCode(mark)
+
+		var newGrade string
+		switch code {
+		case 1:
+			newGrade = "D1"
+		case 2:
+			newGrade = "D2"
+		case 3:
+			newGrade = "C3"
+		case 4:
+			newGrade = "C4"
+		case 5:
+			newGrade = "C5"
+		case 6:
+			newGrade = "C6"
+		case 7:
+			newGrade = "P7"
+		case 8:
+			newGrade = "P8"
+		default:
+			newGrade = "F9"
+		}
+
+		// Update if grade changed
+		if result.FinalGrade != newGrade {
+			result.FinalGrade = newGrade
+			result.ComputationReason = fmt.Sprintf("Recalculated: %.2f/100 → %s", mark, newGrade)
+			
+			if err := h.db.Save(&result).Error; err != nil {
+				errors++
+			} else {
+				updated++
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Grade recalculation completed",
+		"updated": updated,
+		"errors":  errors,
+		"total":   len(results),
+	})
+}
+
 // GetPerformanceSummary returns comprehensive performance summary with all subjects per class
 func (h *ResultHandler) GetPerformanceSummary(c *gin.Context) {
 	schoolID := c.GetString("tenant_school_id")

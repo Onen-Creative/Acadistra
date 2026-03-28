@@ -307,6 +307,9 @@ func main() {
 				sysAdmin.GET("/reports/system/students", systemReportsHandler.GenerateStudentsReport)
 				sysAdmin.GET("/reports/system/activity", systemReportsHandler.GenerateActivityReport)
 				sysAdmin.GET("/reports/system/performance", systemReportsHandler.GeneratePerformanceReport)
+				
+				// Grade recalculation
+				sysAdmin.POST("/recalculate-grades", resultHandler.RecalculateGrades)
 			}
 
 			// Shared routes for school_admin, teacher, librarian, nurse, bursar, and parent
