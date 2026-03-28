@@ -243,7 +243,6 @@ export function EditSalaryStructureModal({
                         errors.base_salary ? 'border-red-300' : 'border-gray-300'
                       }`}
                       min="0"
-                      step="1000"
                       required
                     />
                     {errors.base_salary && (
@@ -323,7 +322,6 @@ export function EditSalaryStructureModal({
                         onChange={(e) => handleInputChange('housing_allowance', e.target.value)}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                         min="0"
-                        step="1000"
                       />
                     </div>
 
@@ -337,7 +335,6 @@ export function EditSalaryStructureModal({
                         onChange={(e) => handleInputChange('transport_allowance', e.target.value)}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                         min="0"
-                        step="1000"
                       />
                     </div>
 
@@ -351,7 +348,6 @@ export function EditSalaryStructureModal({
                         onChange={(e) => handleInputChange('medical_allowance', e.target.value)}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                         min="0"
-                        step="1000"
                       />
                     </div>
 
@@ -365,7 +361,6 @@ export function EditSalaryStructureModal({
                         onChange={(e) => handleInputChange('lunch_allowance', e.target.value)}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                         min="0"
-                        step="1000"
                       />
                     </div>
 
@@ -379,7 +374,6 @@ export function EditSalaryStructureModal({
                         onChange={(e) => handleInputChange('overtime_allowance', e.target.value)}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                         min="0"
-                        step="1000"
                       />
                     </div>
 
@@ -393,7 +387,6 @@ export function EditSalaryStructureModal({
                         onChange={(e) => handleInputChange('performance_bonus', e.target.value)}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                         min="0"
-                        step="1000"
                       />
                     </div>
                   </div>
@@ -408,7 +401,6 @@ export function EditSalaryStructureModal({
                       onChange={(e) => handleInputChange('other_allowances', e.target.value)}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                       min="0"
-                      step="1000"
                     />
                   </div>
                 </div>
@@ -435,7 +427,6 @@ export function EditSalaryStructureModal({
                         onChange={(e) => handleInputChange('nssf_deduction', e.target.value)}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
                         min="0"
-                        step="1000"
                       />
                       <p className="text-xs text-gray-500 mt-1">Usually 5% of basic salary</p>
                     </div>
@@ -450,7 +441,6 @@ export function EditSalaryStructureModal({
                         onChange={(e) => handleInputChange('paye_deduction', e.target.value)}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
                         min="0"
-                        step="1000"
                       />
                       <p className="text-xs text-gray-500 mt-1">Based on URA tax brackets</p>
                     </div>
@@ -465,7 +455,6 @@ export function EditSalaryStructureModal({
                         onChange={(e) => handleInputChange('loan_deduction', e.target.value)}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
                         min="0"
-                        step="1000"
                       />
                     </div>
 
@@ -479,7 +468,6 @@ export function EditSalaryStructureModal({
                         onChange={(e) => handleInputChange('insurance_deduction', e.target.value)}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
                         min="0"
-                        step="1000"
                       />
                     </div>
 
@@ -493,7 +481,6 @@ export function EditSalaryStructureModal({
                         onChange={(e) => handleInputChange('union_deduction', e.target.value)}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
                         min="0"
-                        step="1000"
                       />
                     </div>
 
@@ -507,7 +494,6 @@ export function EditSalaryStructureModal({
                         onChange={(e) => handleInputChange('other_deductions', e.target.value)}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
                         min="0"
-                        step="1000"
                       />
                     </div>
                   </div>
