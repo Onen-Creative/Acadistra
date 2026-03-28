@@ -156,7 +156,7 @@ export function EditSalaryStructureModal({
       union_deduction: formData.union_deduction,
       other_deductions: formData.other_deductions,
       effective_from: formData.effective_from + 'T00:00:00Z', // Convert to ISO string
-      effective_to: formData.effective_to ? formData.effective_to + 'T00:00:00Z' : null,
+      effective_to: formData.effective_to ? formData.effective_to + 'T00:00:00Z' : undefined,
       status: formData.status
     }
 
