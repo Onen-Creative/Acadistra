@@ -46,7 +46,7 @@ export default function SystemSettingsPage() {
         setLoading(false)
         return
       }
-      const res = await fetch('http://localhost:8080/api/v1/settings', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://acadistra.com'}/api/v1/settings`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
       if (res.ok) {
@@ -75,7 +75,7 @@ export default function SystemSettingsPage() {
       }
       
       
-      const res = await fetch('http://localhost:8080/api/v1/settings', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://acadistra.com'}/api/v1/settings`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -14,8 +14,8 @@ export function getImageUrl(path: string | null | undefined): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   
   // Get environment variables
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-  const APP_URL = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://acadistra.com';
+  const APP_URL = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_API_URL || 'https://acadistra.com';
   
   // In production, images are served through Caddy proxy from main domain
   // In development, serve directly from backend

@@ -51,7 +51,7 @@ export function useImageUpload() {
       formData.append(fieldName, file)
 
       // Get API URL
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://acadistra.com'
       const uploadUrl = `${API_URL}/api/v1/upload/${options.endpoint}`
 
       // Get auth token

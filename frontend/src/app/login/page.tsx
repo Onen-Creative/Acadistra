@@ -29,7 +29,7 @@ export default function LoginPage() {
         ? { phone: data.identifier, password: data.password }
         : { email: data.identifier, password: data.password }
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/auth/login`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://acadistra.com'}/api/v1/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

@@ -123,7 +123,7 @@ export default function StudentDetailPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 w-full lg:w-auto">
               {studentData.photo_url ? (
                 <img 
-                  src={studentData.photo_url.startsWith('http') ? studentData.photo_url : `http://localhost:8080${studentData.photo_url}`}
+                  src={studentData.photo_url.startsWith('http') ? studentData.photo_url : `${process.env.NEXT_PUBLIC_API_URL || 'https://acadistra.com'}${studentData.photo_url}`}
                   alt={`${studentData.first_name} ${studentData.last_name}`}
                   className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-xl object-cover border-4 border-white/30 shadow-xl mx-auto sm:mx-0"
                 />

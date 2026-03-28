@@ -71,8 +71,8 @@ export default function BulkMarksImportPage() {
     try {
       const token = localStorage.getItem('access_token')
       const url = classId 
-        ? `http://localhost:8080/api/v1/marks/import-template?class_id=${classId}`
-        : 'http://localhost:8080/api/v1/marks/import-template'
+        ? `${process.env.NEXT_PUBLIC_API_URL || 'https://acadistra.com'}/api/v1/marks/import-template?class_id=${classId}`
+        : `${process.env.NEXT_PUBLIC_API_URL || 'https://acadistra.com'}/api/v1/marks/import-template`
       
       const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}` }

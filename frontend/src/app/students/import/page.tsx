@@ -50,7 +50,7 @@ export default function StudentImportPage() {
   const downloadTemplate = async () => {
     try {
       const token = localStorage.getItem('access_token');
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1'}/import/templates/students?token=${token}`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://acadistra.com'}/api/v1/import/templates/students?token=${token}`);
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');

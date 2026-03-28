@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { DashboardLayout } from '@/components/DashboardLayout'
 import { TrendingUp, BarChart3, Users, BookOpen } from 'lucide-react'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://acadistra.com'
 
 export default function PerformanceAnalytics() {
   const [loading, setLoading] = useState(false)

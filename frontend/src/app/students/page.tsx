@@ -181,7 +181,7 @@ export default function StudentsPage() {
           
           // Update student with photo URL
           const token = localStorage.getItem('access_token')
-          const updateRes = await fetch(`http://localhost:8080/api/v1/students/${student.id}`, {
+          const updateRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://acadistra.com'}/api/v1/students/${student.id}`, {
             method: 'PUT',
             headers: { 
               'Authorization': `Bearer ${token}`,
@@ -518,7 +518,7 @@ export default function StudentsPage() {
                         <div className="flex items-center gap-2">
                           {student.photo_url ? (
                             <img 
-                              src={student.photo_url.startsWith('http') ? student.photo_url : `http://localhost:8080${student.photo_url}`}
+                              src={student.photo_url.startsWith('http') ? student.photo_url : `${process.env.NEXT_PUBLIC_API_URL || 'https://acadistra.com'}${student.photo_url}`}
                               alt={`${student.first_name} ${student.last_name}`}
                               className="w-8 h-8 rounded-full object-cover flex-shrink-0"
                               onError={(e) => {
