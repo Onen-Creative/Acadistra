@@ -121,8 +121,9 @@ func (h *ResultHandler) GetByStudent(c *gin.Context) {
 		}
 	}
 	
-	// Fix grades for subsidiary subjects
+	// Fix grades for subsidiary subjects and convert UACE codes to letter grades
 	for i := range results {
+		// Handle subsidiary subjects
 		if results[i].SubjectName == "ICT" || results[i].SubjectName == "General Paper" ||
 			strings.Contains(strings.ToLower(results[i].SubjectName), "ict") ||
 			strings.Contains(strings.ToLower(results[i].SubjectName), "general paper") ||
@@ -142,6 +143,33 @@ func (h *ResultHandler) GetByStudent(c *gin.Context) {
 					results[i].FinalGrade = "O"
 				} else if total > 0 {
 					results[i].FinalGrade = "F"
+				}
+			}
+		}
+		
+		// Convert UACE numeric codes to letter grades for Advanced Level
+		if classLevel == "S5" || classLevel == "S6" {
+			// Check if grade is a numeric code (1-9) and convert to letter grade
+			if len(results[i].FinalGrade) == 1 {
+				switch results[i].FinalGrade {
+				case "1":
+					results[i].FinalGrade = "D1"
+				case "2":
+					results[i].FinalGrade = "D2"
+				case "3":
+					results[i].FinalGrade = "C3"
+				case "4":
+					results[i].FinalGrade = "C4"
+				case "5":
+					results[i].FinalGrade = "C5"
+				case "6":
+					results[i].FinalGrade = "C6"
+				case "7":
+					results[i].FinalGrade = "P7"
+				case "8":
+					results[i].FinalGrade = "P8"
+				case "9":
+					results[i].FinalGrade = "F9"
 				}
 			}
 		}
@@ -379,48 +407,73 @@ func (h *ResultHandler) CreateOrUpdate(c *gin.Context) {
 				}
 			}
 			
-			if len(paperMarks) >= 2 {
-				grader := &grading.UACEGrader{}
-				gradeResult = grader.ComputeGradeFromPapers(paperMarks)
-				
-				// Update grade for all papers of this subject
-				for _, p := range allPapers {
-					if p.ID != result.ID {
-						h.db.Model(&models.SubjectResult{}).Where("id = ?", p.ID).Updates(map[string]interface{}{
-							"final_grade":        gradeResult.FinalGrade,
-							"computation_reason": gradeResult.ComputationReason,
-							"rule_version_hash":  gradeResult.RuleVersionHash,
-						})
-					}
-				}
-			} else if len(paperMarks) == 1 {
-				// Check if this is a subsidiary subject
-				isSubsidiary := standardSubject.Name == "ICT" || 
-					standardSubject.Name == "General Paper" ||
-					strings.Contains(strings.ToLower(standardSubject.Name), "ict") ||
-					strings.Contains(strings.ToLower(standardSubject.Name), "general paper") ||
-					strings.Contains(strings.ToLower(standardSubject.Name), "subsidiary")
-				
-				if isSubsidiary {
-					// Subsidiary subjects use O/F grading
-					if mark >= 50 {
-						gradeResult.FinalGrade = "O"
-					} else {
-						gradeResult.FinalGrade = "F"
-					}
-					gradeResult.ComputationReason = fmt.Sprintf("Subsidiary: Paper mark %.2f/100 → Grade %s", mark, gradeResult.FinalGrade)
-					gradeResult.RuleVersionHash = "UACE_SUBSIDIARY_V1"
-				} else {
-					// Principal subjects need multiple papers - but show individual paper grade
+				if len(paperMarks) >= 2 {
 					grader := &grading.UACEGrader{}
-					code := grader.MapMarkToCode(mark)
-					gradeResult.FinalGrade = fmt.Sprintf("%d", code)
-					gradeResult.ComputationReason = fmt.Sprintf("Single paper: %.2f/100 → Code %d (awaiting other papers)", mark, code)
+					gradeResult = grader.ComputeGradeFromPapers(paperMarks)
+					
+					// Update grade for all papers of this subject
+					for _, p := range allPapers {
+						if p.ID != result.ID {
+							h.db.Model(&models.SubjectResult{}).Where("id = ?", p.ID).Updates(map[string]interface{}{
+								"final_grade":        gradeResult.FinalGrade,
+								"computation_reason": gradeResult.ComputationReason,
+								"rule_version_hash":  gradeResult.RuleVersionHash,
+							})
+						}
+					}
+				} else if len(paperMarks) == 1 {
+					// Check if this is a subsidiary subject
+					isSubsidiary := standardSubject.Name == "ICT" || 
+						standardSubject.Name == "General Paper" ||
+						strings.Contains(strings.ToLower(standardSubject.Name), "ict") ||
+						strings.Contains(strings.ToLower(standardSubject.Name), "general paper") ||
+						strings.Contains(strings.ToLower(standardSubject.Name), "subsidiary")
+					
+					if isSubsidiary {
+						// Subsidiary subjects use O/F grading
+						if mark >= 50 {
+							gradeResult.FinalGrade = "O"
+						} else {
+							gradeResult.FinalGrade = "F"
+						}
+						gradeResult.ComputationReason = fmt.Sprintf("Subsidiary: Paper mark %.2f/100 → Grade %s", mark, gradeResult.FinalGrade)
+						gradeResult.RuleVersionHash = "UACE_SUBSIDIARY_V1"
+					} else {
+						// Principal subjects: Show individual paper grade as letter grade
+						grader := &grading.UACEGrader{}
+						code := grader.MapMarkToCode(mark)
+						
+						// Convert code to letter grade for display
+						var letterGrade string
+						switch code {
+						case 1:
+							letterGrade = "D1"
+						case 2:
+							letterGrade = "D2"
+						case 3:
+							letterGrade = "C3"
+						case 4:
+							letterGrade = "C4"
+						case 5:
+							letterGrade = "C5"
+						case 6:
+							letterGrade = "C6"
+						case 7:
+							letterGrade = "P7"
+						case 8:
+							letterGrade = "P8"
+						default:
+							letterGrade = "F9"
+						}
+						
+						gradeResult.FinalGrade = letterGrade
+						gradeResult.ComputationReason = fmt.Sprintf("Single paper: %.2f/100 → Grade %s (awaiting other papers for final grade)", mark, letterGrade)
+						gradeResult.RuleVersionHash = "UACE_SINGLE_PAPER_V1"
+					}
+				} else {
+					gradeResult.FinalGrade = ""
+					gradeResult.ComputationReason = "No marks entered"
 				}
-			} else {
-				gradeResult.FinalGrade = ""
-				gradeResult.ComputationReason = "No marks entered"
-			}
 		} else {
 			gradeResult.FinalGrade = ""
 			gradeResult.ComputationReason = "UACE requires paper-based entry"
