@@ -9,7 +9,12 @@ self.addEventListener('fetch', (event) => {
   const { request } = event
   const url = new URL(request.url)
 
-  // API requests - Network First
+  // Only handle requests from the same origin (acadistra.com)
+  if (url.origin !== self.location.origin) {
+    return
+  }
+
+  // API requests - Network First (only for same-origin API calls)
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(request)
@@ -18,11 +23,24 @@ self.addEventListener('fetch', (event) => {
             const responseClone = response.clone()
             caches.open(API_CACHE).then((cache) => {
               cache.put(request, responseClone)
-            })
+            }).catch(() => {})
           }
           return response
         })
-        .catch(() => caches.match(request))
+        .catch(() => {
+          return caches.match(request).then(cached => {
+            if (cached) return cached
+            // Return a proper error response
+            return new Response(
+              JSON.stringify({ error: 'Network error' }), 
+              { 
+                status: 503, 
+                statusText: 'Service Unavailable',
+                headers: { 'Content-Type': 'application/json' }
+              }
+            )
+          })
+        })
     )
     return
   }
@@ -37,18 +55,26 @@ self.addEventListener('fetch', (event) => {
             const responseClone = response.clone()
             caches.open(STATIC_CACHE).then((cache) => {
               cache.put(request, responseClone)
-            })
+            }).catch(() => {})
           }
           return response
+        }).catch(() => {
+          // Return a proper error response for static assets
+          return new Response('', { status: 404, statusText: 'Not Found' })
         })
       })
     )
     return
   }
 
-  // Default - Network First
+  // Default - Network First with proper error handling
   event.respondWith(
-    fetch(request).catch(() => caches.match(request))
+    fetch(request).catch(() => {
+      return caches.match(request).then(cached => {
+        if (cached) return cached
+        return new Response('', { status: 404, statusText: 'Not Found' })
+      })
+    })
   )
 })
 
