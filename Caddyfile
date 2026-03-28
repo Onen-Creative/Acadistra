@@ -39,8 +39,3 @@ api.acadistra.com {
 storage.acadistra.com {
 	reverse_proxy minio:9001
 }
-
-# Wildcard for school subdomains
-*.acadistra.com {
-	reverse_proxy frontend:3000
-}
