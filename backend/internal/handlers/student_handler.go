@@ -233,11 +233,40 @@ func (h *StudentHandler) List(c *gin.Context) {
 			page = parsedPage
 		}
 	}
-	limit := 10 // Fixed at 10 per page
-	offset := (page - 1) * limit
+	
+	// Allow flexible limit with reasonable defaults and maximum
+	limit := 50 // Default to 50 per page
+	if l := c.Query("limit"); l != "" {
+		if parsedLimit, err := strconv.Atoi(l); err == nil && parsedLimit > 0 {
+			// Cap at 1000 to prevent performance issues
+			if parsedLimit > 1000 {
+				limit = 1000
+			} else {
+				limit = parsedLimit
+			}
+		}
+	}
+	
+	// Special case: if limit is -1, return all students (no pagination)
+	var offset int
+	if c.Query("limit") == "-1" {
+		limit = 0 // GORM treats 0 as no limit
+		offset = 0
+	} else {
+		offset = (page - 1) * limit
+	}
 
 	var students []models.Student
-	if err := query.Offset(offset).Limit(limit).Find(&students).Error; err != nil {
+	var err error
+	if limit == 0 {
+		// No pagination - return all students
+		err = query.Find(&students).Error
+	} else {
+		// With pagination
+		err = query.Offset(offset).Limit(limit).Find(&students).Error
+	}
+	
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch students"})
 		return
 	}
@@ -255,7 +284,10 @@ func (h *StudentHandler) List(c *gin.Context) {
 		}
 	}
 
-	totalPages := int((totalCount + int64(limit) - 1) / int64(limit))
+	totalPages := 1
+	if limit > 0 {
+		totalPages = int((totalCount + int64(limit) - 1) / int64(limit))
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"students": students, 
@@ -263,6 +295,7 @@ func (h *StudentHandler) List(c *gin.Context) {
 		"page": page,
 		"limit": limit,
 		"total_pages": totalPages,
+		"showing_all": limit == 0,
 	})
 }
 

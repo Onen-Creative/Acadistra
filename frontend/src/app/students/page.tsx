@@ -42,6 +42,8 @@ export default function StudentsPage() {
   const [selectedYear, setSelectedYear] = useState('2026')
   const [selectedTerm, setSelectedTerm] = useState('Term 1')
   const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50) // Default to 50 per page
+  const [showAll, setShowAll] = useState(false) // Toggle to show all students
   const [editModalOpened, { open: openEdit, close: closeEdit }] = useDisclosure()
   const [importModalOpened, { open: openImport, close: closeImport }] = useDisclosure()
   const [photoUploadModalOpened, { open: openPhotoUpload, close: closePhotoUpload }] = useDisclosure()
@@ -68,12 +70,16 @@ export default function StudentsPage() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, selectedClass, selectedGender, selectedLevel, selectedYear, selectedTerm])
+  }, [searchTerm, selectedClass, selectedGender, selectedLevel, selectedYear, selectedTerm, pageSize, showAll])
 
-  const { data: allStudentsData, isLoading } = useQuery({
-    queryKey: ['students', searchTerm, selectedClass, selectedGender, selectedLevel, selectedYear, selectedTerm],
+  const { data: studentsData, isLoading } = useQuery({
+    queryKey: ['students', searchTerm, selectedClass, selectedGender, selectedLevel, selectedYear, selectedTerm, currentPage, pageSize, showAll],
     queryFn: async () => {
-      const params: any = {}
+      const params: any = {
+        page: currentPage,
+        limit: showAll ? -1 : pageSize // Use -1 to get all students
+      }
+      
       if (searchTerm) params.search = searchTerm
       if (selectedClass) params.class_id = selectedClass
       if (selectedGender) params.gender = selectedGender
@@ -86,12 +92,14 @@ export default function StudentsPage() {
       
       const response = await studentsApi.list(params)
       
-      // Return the raw response - we'll handle pagination in the component
+      // Handle different response formats
       if (response && response.students && Array.isArray(response.students)) {
         return {
           students: response.students,
-          total: response.students.length,
-          raw_response: response
+          total: response.total || response.students.length,
+          page: response.page || currentPage,
+          total_pages: response.total_pages || Math.ceil((response.total || response.students.length) / (showAll ? response.students.length : pageSize)),
+          showing_all: response.showing_all || showAll
         }
       }
       
@@ -99,7 +107,9 @@ export default function StudentsPage() {
         return {
           students: response,
           total: response.length,
-          raw_response: response
+          page: currentPage,
+          total_pages: 1,
+          showing_all: true
         }
       }
       
@@ -107,26 +117,7 @@ export default function StudentsPage() {
     },
   })
 
-  // Client-side pagination
-  const studentsData = React.useMemo(() => {
-    if (!allStudentsData?.students) {
-      return { students: [], total: 0, page: currentPage, total_pages: 0 }
-    }
 
-    const allStudents = allStudentsData.students
-    const startIndex = (currentPage - 1) * 5
-    const endIndex = startIndex + 5
-    const paginatedStudents = allStudents.slice(startIndex, endIndex)
-    
-
-    
-    return {
-      students: paginatedStudents,
-      total: allStudents.length,
-      page: currentPage,
-      total_pages: Math.ceil(allStudents.length / 5)
-    }
-  }, [allStudentsData, currentPage])
 
   const { data: classesData } = useQuery({
     queryKey: ['classes', selectedYear, selectedTerm],
@@ -187,7 +178,7 @@ export default function StudentsPage() {
     queryKey: ['students-for-photos', photoUploadClass, selectedYear, selectedTerm],
     queryFn: async () => {
       if (!photoUploadClass) return []
-      const params: any = { class_id: photoUploadClass, year: selectedYear, term: selectedTerm, limit: 500 }
+      const params: any = { class_id: photoUploadClass, year: selectedYear, term: selectedTerm, limit: -1 } // Get all students
       const response = await studentsApi.list(params)
       return Array.isArray(response) ? response : response.students
     },
@@ -458,7 +449,7 @@ export default function StudentsPage() {
 
         {/* Filters */}
         <div className="bg-white rounded-xl shadow-lg p-6">
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Year</label>
               <select
@@ -530,6 +521,30 @@ export default function StudentsPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Per Page</label>
+              <select
+                value={showAll ? 'all' : pageSize.toString()}
+                onChange={(e) => {
+                  if (e.target.value === 'all') {
+                    setShowAll(true)
+                    setPageSize(50)
+                  } else {
+                    setShowAll(false)
+                    setPageSize(parseInt(e.target.value))
+                  }
+                }}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              >
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="200">200</option>
+                <option value="500">500</option>
+                <option value="all">Show All</option>
+              </select>
             </div>
           </div>
         </div>
@@ -637,7 +652,7 @@ export default function StudentsPage() {
             </div>
             
             {/* Pagination */}
-            {((studentsData?.total_pages && studentsData.total_pages > 1) || (studentsData?.total && studentsData.total > 5)) && (
+            {!studentsData?.showing_all && studentsData?.total_pages && studentsData.total_pages > 1 && (
               <div className="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
                 <div className="flex items-center justify-between">
                   <div className="flex-1 flex justify-between sm:hidden">
@@ -649,8 +664,8 @@ export default function StudentsPage() {
                       Previous
                     </button>
                     <button
-                      onClick={() => setCurrentPage(Math.min(studentsData.total_pages || Math.ceil((studentsData.total || 0) / 5), currentPage + 1))}
-                      disabled={currentPage === (studentsData.total_pages || Math.ceil((studentsData.total || 0) / 5))}
+                      onClick={() => setCurrentPage(Math.min(studentsData.total_pages, currentPage + 1))}
+                      disabled={currentPage === studentsData.total_pages}
                       className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Next
@@ -659,9 +674,10 @@ export default function StudentsPage() {
                   <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
                     <div>
                       <p className="text-sm text-gray-700">
-                        Showing <span className="font-medium">{((currentPage - 1) * 5) + 1}</span> to{' '}
-                        <span className="font-medium">{Math.min(currentPage * 5, studentsData.total || 0)}</span> of{' '}
+                        Showing <span className="font-medium">{((currentPage - 1) * pageSize) + 1}</span> to{' '}
+                        <span className="font-medium">{Math.min(currentPage * pageSize, studentsData.total || 0)}</span> of{' '}
                         <span className="font-medium">{studentsData.total || 0}</span> results
+                        {showAll && <span className="text-green-600 font-medium"> (All students shown)</span>}
                       </p>
                     </div>
                     <div>
@@ -677,7 +693,7 @@ export default function StudentsPage() {
                         </button>
                         
                         {(() => {
-                          const totalPages = studentsData.total_pages || Math.ceil((studentsData.total || 0) / 5)
+                          const totalPages = studentsData.total_pages
                           const maxVisiblePages = 7
                           let startPage = 1
                           let endPage = totalPages
@@ -757,8 +773,8 @@ export default function StudentsPage() {
                         })()}
                         
                         <button
-                          onClick={() => setCurrentPage(Math.min(studentsData.total_pages || Math.ceil((studentsData.total || 0) / 5), currentPage + 1))}
-                          disabled={currentPage === (studentsData.total_pages || Math.ceil((studentsData.total || 0) / 5))}
+                          onClick={() => setCurrentPage(Math.min(studentsData.total_pages, currentPage + 1))}
+                          disabled={currentPage === studentsData.total_pages}
                           className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
