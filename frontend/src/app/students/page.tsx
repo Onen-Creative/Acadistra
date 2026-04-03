@@ -676,33 +676,85 @@ export default function StudentsPage() {
                           </svg>
                         </button>
                         
-                        {Array.from({ length: Math.min(5, studentsData.total_pages || Math.ceil((studentsData.total || 0) / 5)) }, (_, i) => {
+                        {(() => {
                           const totalPages = studentsData.total_pages || Math.ceil((studentsData.total || 0) / 5)
-                          let pageNum;
-                          if (totalPages <= 5) {
-                            pageNum = i + 1;
-                          } else if (currentPage <= 3) {
-                            pageNum = i + 1;
-                          } else if (currentPage >= totalPages - 2) {
-                            pageNum = totalPages - 4 + i;
-                          } else {
-                            pageNum = currentPage - 2 + i;
+                          const maxVisiblePages = 7
+                          let startPage = 1
+                          let endPage = totalPages
+                          
+                          if (totalPages > maxVisiblePages) {
+                            const halfVisible = Math.floor(maxVisiblePages / 2)
+                            if (currentPage <= halfVisible) {
+                              endPage = maxVisiblePages
+                            } else if (currentPage >= totalPages - halfVisible) {
+                              startPage = totalPages - maxVisiblePages + 1
+                            } else {
+                              startPage = currentPage - halfVisible
+                              endPage = currentPage + halfVisible
+                            }
                           }
                           
-                          return (
-                            <button
-                              key={pageNum}
-                              onClick={() => setCurrentPage(pageNum)}
-                              className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                                currentPage === pageNum
-                                  ? 'z-10 bg-indigo-50 border-indigo-500 text-indigo-600'
-                                  : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                              }`}
-                            >
-                              {pageNum}
-                            </button>
-                          );
-                        })}
+                          const pages = []
+                          
+                          // Add first page and ellipsis if needed
+                          if (startPage > 1) {
+                            pages.push(
+                              <button
+                                key={1}
+                                onClick={() => setCurrentPage(1)}
+                                className="relative inline-flex items-center px-4 py-2 border bg-white border-gray-300 text-gray-500 hover:bg-gray-50 text-sm font-medium"
+                              >
+                                1
+                              </button>
+                            )
+                            if (startPage > 2) {
+                              pages.push(
+                                <span key="start-ellipsis" className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                                  ...
+                                </span>
+                              )
+                            }
+                          }
+                          
+                          // Add visible page numbers
+                          for (let i = startPage; i <= endPage; i++) {
+                            pages.push(
+                              <button
+                                key={i}
+                                onClick={() => setCurrentPage(i)}
+                                className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                                  currentPage === i
+                                    ? 'z-10 bg-indigo-50 border-indigo-500 text-indigo-600'
+                                    : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                                }`}
+                              >
+                                {i}
+                              </button>
+                            )
+                          }
+                          
+                          // Add ellipsis and last page if needed
+                          if (endPage < totalPages) {
+                            if (endPage < totalPages - 1) {
+                              pages.push(
+                                <span key="end-ellipsis" className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                                  ...
+                                </span>
+                              )
+                            }
+                            pages.push(
+                              <button
+                                key={totalPages}
+                                onClick={() => setCurrentPage(totalPages)}
+                                className="relative inline-flex items-center px-4 py-2 border bg-white border-gray-300 text-gray-500 hover:bg-gray-50 text-sm font-medium"
+                              >
+                                {totalPages}
+                              </button>
+                            )
+                          }
+                          
+                          return pages
+                        })()}
                         
                         <button
                           onClick={() => setCurrentPage(Math.min(studentsData.total_pages || Math.ceil((studentsData.total || 0) / 5), currentPage + 1))}
