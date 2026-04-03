@@ -23,6 +23,7 @@ type UserFormData = z.infer<typeof userSchema>
 export default function SystemUsersPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<any>(null)
   const [viewingUser, setViewingUser] = useState<any>(null)
@@ -33,8 +34,15 @@ export default function SystemUsersPage() {
   })
 
   const { data: users, isLoading } = useQuery({
-    queryKey: ['system-users', searchTerm, roleFilter],
-    queryFn: () => api.get('/api/v1/users', { params: { search: searchTerm, role: roleFilter } }).then(res => res.data),
+    queryKey: ['system-users', searchTerm, roleFilter, currentPage],
+    queryFn: () => api.get('/api/v1/users', { 
+      params: { 
+        search: searchTerm, 
+        role: roleFilter,
+        page: currentPage,
+        limit: 10 // Show 10 users per page
+      } 
+    }).then(res => res.data),
   })
 
   const { data: schools } = useQuery({
@@ -87,13 +95,17 @@ export default function SystemUsersPage() {
     setIsModalOpen(true)
   }
 
+  const totalPages = Math.ceil((users?.total || 0) / 10)
+  const startUser = ((currentPage - 1) * 10) + 1
+  const endUser = Math.min(currentPage * 10, users?.total || 0)
+
   return (
     
       <DashboardLayout>
         <div className="space-y-8">
           <PageHeader 
             title="System Users" 
-            subtitle="Manage all users across all schools"
+            subtitle={`Manage all users across all schools (${users?.total || 0} total users)`}
             action={
               <button onClick={openCreateModal} className="bg-white text-blue-600 px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all">
                 + Create User
@@ -102,18 +114,42 @@ export default function SystemUsersPage() {
           />
 
           <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-            <div className="flex gap-4 mb-6">
-              <input
-                type="text"
-                placeholder="🔍 Search users..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="input flex-1 border-2 border-gray-200 focus:border-blue-500 rounded-xl"
-              />
-              <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="input w-48 border-2 border-gray-200 focus:border-blue-500 rounded-xl">
-                <option value="">All Roles</option>
-                <option value="school_admin">School Admin</option>
-              </select>
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex gap-4">
+                <input
+                  type="text"
+                  placeholder="🔍 Search users..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value)
+                    setCurrentPage(1) // Reset to first page when searching
+                  }}
+                  className="input flex-1 border-2 border-gray-200 focus:border-blue-500 rounded-xl"
+                />
+                <select 
+                  value={roleFilter} 
+                  onChange={(e) => {
+                    setRoleFilter(e.target.value)
+                    setCurrentPage(1) // Reset to first page when filtering
+                  }} 
+                  className="input w-48 border-2 border-gray-200 focus:border-blue-500 rounded-xl"
+                >
+                  <option value="">All Roles</option>
+                  <option value="system_admin">System Admin</option>
+                  <option value="school_admin">School Admin</option>
+                  <option value="teacher">Teacher</option>
+                  <option value="bursar">Bursar</option>
+                  <option value="librarian">Librarian</option>
+                  <option value="nurse">Nurse</option>
+                  <option value="storekeeper">Store Keeper</option>
+                  <option value="parent">Parent</option>
+                </select>
+              </div>
+              {users?.total && (
+                <div className="text-sm text-gray-600">
+                  Showing {startUser}-{endUser} of {users.total} users
+                </div>
+              )}
             </div>
 
             {isLoading ? (
@@ -240,6 +276,31 @@ export default function SystemUsersPage() {
                   ))}
                 </div>
               </>
+            )}
+
+            {/* Pagination */}
+            {users?.total && users.total > 10 && (
+              <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-200">
+                <div className="text-sm text-gray-600">
+                  Page {currentPage} of {totalPages}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
             )}
           </div>
 

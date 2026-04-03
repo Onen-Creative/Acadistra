@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"net/http"
 	"strings"
@@ -632,7 +631,7 @@ func (h *ResultHandler) CreateOrUpdate(c *gin.Context) {
 			for _, guardian := range guardians {
 				if guardian.Email != "" {
 					if err := h.emailService.SendGradeAlert(guardian.Email, studentName, subject.Name, grade, fmt.Sprintf("%s %d", term, year)); err != nil {
-						log.Printf("Failed to send grade alert: %v", err)
+						// Failed to send grade alert
 					}
 				}
 			}

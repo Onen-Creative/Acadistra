@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -167,7 +168,7 @@ func (h *StudentHandler) Delete(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Student deleted successfully"})
 }
 
-// List lists all students with filters
+// List lists all students with filters and pagination
 func (h *StudentHandler) List(c *gin.Context) {
 	schoolID := c.GetString("tenant_school_id")
 	userRole := c.GetString("user_role")
@@ -218,8 +219,25 @@ func (h *StudentHandler) List(c *gin.Context) {
 	// Select distinct students
 	query = query.Select("DISTINCT students.*")
 
+	// Get total count before pagination
+	var totalCount int64
+	if err := query.Count(&totalCount).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count students"})
+		return
+	}
+
+	// Pagination
+	page := 1
+	if p := c.Query("page"); p != "" {
+		if parsedPage, err := strconv.Atoi(p); err == nil && parsedPage > 0 {
+			page = parsedPage
+		}
+	}
+	limit := 10 // Fixed at 10 per page
+	offset := (page - 1) * limit
+
 	var students []models.Student
-	if err := query.Find(&students).Error; err != nil {
+	if err := query.Offset(offset).Limit(limit).Find(&students).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch students"})
 		return
 	}
@@ -237,7 +255,15 @@ func (h *StudentHandler) List(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{"students": students, "total": len(students)})
+	totalPages := int((totalCount + int64(limit) - 1) / int64(limit))
+
+	c.JSON(http.StatusOK, gin.H{
+		"students": students, 
+		"total": totalCount,
+		"page": page,
+		"limit": limit,
+		"total_pages": totalPages,
+	})
 }
 
 // PromoteOrDemote promotes or demotes a student to a new class

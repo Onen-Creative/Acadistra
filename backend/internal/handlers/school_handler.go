@@ -502,8 +502,8 @@ func (h *SchoolHandler) GetStats(c *gin.Context) {
 
 	// Total counts
 	h.db.Model(&models.School{}).Count(&stats.TotalSchools)
-	h.db.Model(&models.User{}).Count(&stats.TotalUsers)
-	h.db.Model(&models.Student{}).Count(&stats.TotalStudents)
+	h.db.Model(&models.User{}).Where("deleted_at IS NULL").Count(&stats.TotalUsers)
+	h.db.Model(&models.Student{}).Where("deleted_at IS NULL").Count(&stats.TotalStudents)
 
 	c.JSON(http.StatusOK, stats)
 }

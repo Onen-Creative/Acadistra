@@ -12,6 +12,8 @@ export default function FeesPage() {
   const [classes, setClasses] = useState<any[]>([])
   const [students, setStudents] = useState<any[]>([])
   const [fees, setFees] = useState<any[]>([])
+  const [totalFees, setTotalFees] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
   const [selectedLevel, setSelectedLevel] = useState('')
   const [selectedClass, setSelectedClass] = useState('')
   const [term, setTerm] = useState('Term 1')
@@ -46,7 +48,7 @@ export default function FeesPage() {
       loadStudents()
       loadFees()
     }
-  }, [selectedClass, term, year])
+  }, [selectedClass, term, year, currentPage])
 
   const loadLevels = async () => {
     try {
@@ -63,8 +65,7 @@ export default function FeesPage() {
       const response = await api.get('/api/v1/fee-types')
       setStandardFeeTypes(response.data.fee_types || [])
     } catch (error) {
-      console.error('Failed to load standard fee types:', error)
-      // Fallback to hardcoded fee types if API fails
+      // Failed to load standard fee types - use fallback
       setStandardFeeTypes([
         { name: 'Tuition', code: 'TUITION' },
         { name: 'Uniform', code: 'UNIFORM' },
@@ -109,8 +110,28 @@ export default function FeesPage() {
   const loadFees = async () => {
     setLoading(true)
     try {
-      const response = await api.get('/api/v1/fees', { params: { class_id: selectedClass, term, year } })
-      const feesData = Array.isArray(response.data) ? response.data : response.data?.fees || []
+      const response = await api.get('/api/v1/fees', { 
+        params: { 
+          class_id: selectedClass, 
+          term, 
+          year,
+          page: currentPage,
+          limit: 10
+        } 
+      })
+      
+      let feesData = []
+      let total = 0
+      
+      if (response.data && typeof response.data === 'object') {
+        // Handle paginated response
+        feesData = Array.isArray(response.data.fees) ? response.data.fees : response.data.data || []
+        total = response.data.total || feesData.length
+      } else {
+        // Handle direct array response
+        feesData = Array.isArray(response.data) ? response.data : []
+        total = feesData.length
+      }
       
       // Load payment history for each fee
       const feesWithPayments = await Promise.all(feesData.map(async (fee: any) => {
@@ -126,8 +147,11 @@ export default function FeesPage() {
       }))
       
       setFees(feesWithPayments)
+      setTotalFees(total)
     } catch (error) {
       toast.error('Failed to load fees')
+      setFees([])
+      setTotalFees(0)
     } finally {
       setLoading(false)
     }
@@ -313,10 +337,21 @@ export default function FeesPage() {
     outstanding: filteredFees.reduce((sum, f) => sum + (f.outstanding || 0), 0)
   }
 
+  const totalPages = Math.ceil(totalFees / 10)
+  const startFee = ((currentPage - 1) * 10) + 1
+  const endFee = Math.min(currentPage * 10, totalFees)
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Fees Management</h1>
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold">Fees Management</h1>
+          {totalFees > 0 && (
+            <div className="text-sm text-gray-600">
+              Total: {totalFees} students • Showing {startFee}-{endFee}
+            </div>
+          )}
+        </div>
 
         {/* Filters */}
         <div className="bg-white rounded-lg shadow p-4">
@@ -327,19 +362,19 @@ export default function FeesPage() {
               <option value="Term 3">Term 3</option>
             </select>
             <input type="number" value={year} onChange={(e) => setYear(Number(e.target.value))} className="px-3 py-2 border rounded-lg" />
-            <select value={selectedLevel} onChange={(e) => { setSelectedLevel(e.target.value); setSelectedClass('') }} className="px-3 py-2 border rounded-lg">
+            <select value={selectedLevel} onChange={(e) => { setSelectedLevel(e.target.value); setSelectedClass(''); setCurrentPage(1) }} className="px-3 py-2 border rounded-lg">
               <option value="">Select Level</option>
               {levels.map(l => <option key={l} value={l}>{l}</option>)}
             </select>
-            <select value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)} disabled={!selectedLevel} className="px-3 py-2 border rounded-lg disabled:opacity-50">
+            <select value={selectedClass} onChange={(e) => { setSelectedClass(e.target.value); setCurrentPage(1) }} disabled={!selectedLevel} className="px-3 py-2 border rounded-lg disabled:opacity-50">
               <option value="">Select Class</option>
               {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-            <select value={feeTypeFilter} onChange={(e) => setFeeTypeFilter(e.target.value)} className="px-3 py-2 border rounded-lg">
+            <select value={feeTypeFilter} onChange={(e) => { setFeeTypeFilter(e.target.value); setCurrentPage(1) }} className="px-3 py-2 border rounded-lg">
               <option value="">All Fee Types</option>
               {allFeeTypes.map(type => <option key={type} value={type}>{type}</option>)}
             </select>
-            <select value={paymentStatusFilter} onChange={(e) => setPaymentStatusFilter(e.target.value)} className="px-3 py-2 border rounded-lg">
+            <select value={paymentStatusFilter} onChange={(e) => { setPaymentStatusFilter(e.target.value); setCurrentPage(1) }} className="px-3 py-2 border rounded-lg">
               <option value="">All Status</option>
               <option value="paid">Fully Paid</option>
               <option value="partial">Partially Paid</option>
@@ -501,6 +536,31 @@ export default function FeesPage() {
                 })}
               </tbody>
             </table>
+            
+            {/* Pagination */}
+            {totalFees > 10 && (
+              <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-200 px-4">
+                <div className="text-sm text-gray-600">
+                  Page {currentPage} of {totalPages}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ) : selectedClass ? (
           <div className="bg-white rounded-lg shadow p-12 text-center text-gray-500">No fees records found</div>

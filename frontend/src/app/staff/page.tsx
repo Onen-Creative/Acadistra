@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { DashboardLayout } from '@/components/DashboardLayout'
-import api from '@/services/api'
+import api, { staffApi } from '@/services/api'
 import toast from 'react-hot-toast'
 
 interface Staff {
@@ -57,6 +57,8 @@ export default function StaffPage() {
   const [loading, setLoading] = useState(true)
   const [selectedRole, setSelectedRole] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalStaff, setTotalStaff] = useState(0)
   const [viewingStaff, setViewingStaff] = useState<Staff | null>(null)
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null)
   const [deletingStaff, setDeletingStaff] = useState<Staff | null>(null)
@@ -67,18 +69,57 @@ export default function StaffPage() {
 
   useEffect(() => {
     fetchStaff()
-  }, [selectedRole]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedRole, currentPage]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchStaff = async () => {
     try {
       setLoading(true)
-      const params = new URLSearchParams()
-      if (selectedRole) params.append('role', selectedRole)
-      const response = await api.get(`/staff?${params.toString()}`)
-      setStaff(Array.isArray(response.data) ? response.data : [])
+      const response = await staffApi.list({
+        role: selectedRole || undefined,
+        page: currentPage,
+        limit: 10
+      })
+      
+      if (response && typeof response === 'object') {
+        // Handle different possible response structures
+        if (Array.isArray(response)) {
+          // Direct array response - implement client-side pagination
+          const startIndex = (currentPage - 1) * 10
+          const endIndex = startIndex + 10
+          const paginatedStaff = response.slice(startIndex, endIndex)
+          setStaff(paginatedStaff)
+          setTotalStaff(response.length)
+        } else if (response.staff && Array.isArray(response.staff)) {
+          // Response with staff property
+          setStaff(response.staff)
+          setTotalStaff(response.total || response.staff.length)
+        } else if (response.data && Array.isArray(response.data)) {
+          // Response with data property
+          setStaff(response.data)
+          setTotalStaff(response.total || response.data.length)
+        } else {
+          // Unknown structure
+          console.error('Unknown staff API response structure:', response)
+          setStaff([])
+          setTotalStaff(0)
+        }
+      } else {
+        // Handle direct array response
+        if (Array.isArray(response)) {
+          const startIndex = (currentPage - 1) * 10
+          const endIndex = startIndex + 10
+          const paginatedStaff = response.slice(startIndex, endIndex)
+          setStaff(paginatedStaff)
+          setTotalStaff(response.length)
+        } else {
+          setStaff([])
+          setTotalStaff(0)
+        }
+      }
     } catch (error: any) {
       console.error('Failed to fetch staff:', error)
       setStaff([])
+      setTotalStaff(0)
       if (error.response?.status !== 401) {
         toast.error('Failed to load staff')
       }
@@ -168,11 +209,15 @@ export default function StaffPage() {
   )
 
   const stats = {
-    total: staff.length,
+    total: totalStaff,
     active: staff.filter(s => s.status === 'active').length,
     teachers: staff.filter(s => s.role === 'Teacher').length,
     support: staff.filter(s => s.role !== 'Teacher').length,
   }
+
+  const totalPages = Math.ceil(totalStaff / 10)
+  const startStaff = ((currentPage - 1) * 10) + 1
+  const endStaff = Math.min(currentPage * 10, totalStaff)
 
   return (
     <DashboardLayout>
@@ -181,7 +226,7 @@ export default function StaffPage() {
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             <div>
               <h1 className="text-3xl font-bold mb-2">Staff Management</h1>
-              <p className="text-indigo-100">Manage all school staff members</p>
+              <p className="text-indigo-100">Manage all school staff members ({totalStaff} total staff)</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button onClick={() => router.push('/staff/leave')} className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-medium">📅 Leave</button>
@@ -211,30 +256,42 @@ export default function StaffPage() {
         </div>
 
         <div className="bg-white rounded-xl shadow-lg p-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="md:col-span-2">
-              <input
-                type="text"
-                placeholder="Search staff..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-              />
+          <div className="flex justify-between items-center mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 flex-1">
+              <div className="md:col-span-2">
+                <input
+                  type="text"
+                  placeholder="Search staff..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <select
+                value={selectedRole}
+                onChange={(e) => {
+                  setSelectedRole(e.target.value)
+                  setCurrentPage(1) // Reset to first page when filtering
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="">All Roles</option>
+                {ROLES.map(role => <option key={role} value={role}>{role}</option>)}
+              </select>
+              <button
+                onClick={() => router.push('/staff/register')}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium"
+              >
+                + Add Staff
+              </button>
             </div>
-            <select
-              value={selectedRole}
-              onChange={(e) => setSelectedRole(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">All Roles</option>
-              {ROLES.map(role => <option key={role} value={role}>{role}</option>)}
-            </select>
-            <button
-              onClick={() => router.push('/staff/register')}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium"
-            >
-              + Add Staff
-            </button>
+            {totalStaff > 0 && (
+              <div className="text-sm text-gray-600 ml-4">
+                Showing {startStaff}-{endStaff} of {totalStaff} staff
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end">
             <button
               onClick={exportToXLSX}
               className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium"
@@ -250,6 +307,7 @@ export default function StaffPage() {
           </div>
         ) : (
           <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -304,6 +362,31 @@ export default function StaffPage() {
                 </tbody>
               </table>
             </div>
+            
+            {/* Pagination */}
+            {totalStaff > 10 && (
+              <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-200">
+                <div className="text-sm text-gray-600">
+                  Page {currentPage} of {totalPages}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

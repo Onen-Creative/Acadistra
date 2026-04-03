@@ -48,11 +48,15 @@ func (h *UserHandler) List(c *gin.Context) {
 		}
 	}
 	search := c.Query("search")
+	role := c.Query("role")
 	offset := (page - 1) * limit
 
 	query := h.db.Model(&models.User{}).Preload("School")
 	if search != "" {
 		query = query.Where("full_name LIKE ? OR email LIKE ?", "%"+search+"%", "%"+search+"%")
+	}
+	if role != "" {
+		query = query.Where("role = ?", role)
 	}
 
 	var total int64
