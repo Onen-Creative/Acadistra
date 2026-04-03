@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { DashboardLayout } from '@/components/DashboardLayout'
-import { api, studentsApi } from '@/services/api'
+import { api } from '@/services/api'
 import Link from 'next/link'
 import { Users, GraduationCap, BookOpen, DollarSign, TrendingUp, TrendingDown, Calendar, Award, Clock, AlertCircle, CheckCircle, XCircle } from 'lucide-react'
 
@@ -23,7 +23,7 @@ export default function SchoolAdminDashboard() {
     setLoading(true)
     try {
       const [studentsRes, staffRes, classesRes, feesRes, attendanceRes, financeRes] = await Promise.all([
-        studentsApi.list({ limit: -1 }), // Use studentsApi.list() like the students page does
+        api.get('/api/v1/students', { params: { limit: -1 } }),
         api.get('/api/v1/staff'),
         api.get('/api/v1/classes'),
         api.get('/api/v1/fees', { params: { term, year } }),
@@ -31,9 +31,8 @@ export default function SchoolAdminDashboard() {
         api.get('/api/v1/finance/summary', { params: { term, year } })
       ])
 
-      // studentsApi.list() returns the data directly, not wrapped in .data
-      const students = Array.isArray(studentsRes?.students) ? studentsRes.students : []
-      const totalStudents = studentsRes?.total || students.length // Use total from API response
+      const students = Array.isArray(studentsRes.data?.students) ? studentsRes.data.students : []
+      const totalStudents = studentsRes.data?.total || students.length
       const staff = Array.isArray(staffRes.data) ? staffRes.data : (Array.isArray(staffRes.data?.staff) ? staffRes.data.staff : [])
       const classes = Array.isArray(classesRes.data) ? classesRes.data : (Array.isArray(classesRes.data?.classes) ? classesRes.data.classes : [])
       const fees = Array.isArray(feesRes.data?.fees) ? feesRes.data.fees : []

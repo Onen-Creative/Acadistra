@@ -33,7 +33,7 @@ export default function PerformanceAnalytics() {
 
   const fetchSubjects = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/subjects/school`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/subjects/school`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` }
       })
       const data = await res.json()
@@ -47,7 +47,7 @@ export default function PerformanceAnalytics() {
 
   const fetchClasses = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/classes`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/classes`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` }
       })
       const data = await res.json()
@@ -76,7 +76,7 @@ export default function PerformanceAnalytics() {
       const params = new URLSearchParams()
       if (selectedSubject) params.append('subject_id', selectedSubject)
 
-      const res = await fetch(`${API_BASE_URL}/analytics/subject-trend?${params}`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/analytics/subject-trend?${params}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` }
       })
       const data = await res.json()
@@ -88,7 +88,7 @@ export default function PerformanceAnalytics() {
 
   const fetchClassComparison = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/analytics/class-comparison?term=${selectedTerm}&year=${selectedYear}&exam_type=${selectedExamType}`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/analytics/class-comparison?term=${selectedTerm}&year=${selectedYear}&exam_type=${selectedExamType}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` }
       })
       const data = await res.json()
@@ -100,7 +100,7 @@ export default function PerformanceAnalytics() {
 
   const fetchSubjectComparison = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/analytics/subject-comparison?class_id=${selectedClass}&term=${selectedTerm}&year=${selectedYear}&exam_type=${selectedExamType}`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/analytics/subject-comparison?class_id=${selectedClass}&term=${selectedTerm}&year=${selectedYear}&exam_type=${selectedExamType}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` }
       })
       const data = await res.json()
@@ -112,7 +112,7 @@ export default function PerformanceAnalytics() {
 
   const fetchTermComparison = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/analytics/term-comparison?class_id=${selectedClass}&year=${selectedYear}`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/analytics/term-comparison?class_id=${selectedClass}&year=${selectedYear}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` }
       })
       const data = await res.json()
