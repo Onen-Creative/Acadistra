@@ -34,6 +34,9 @@ func (h *UploadHandler) UploadLogo(c *gin.Context) {
 		ext = file.Filename[len(file.Filename)-4:]
 	}
 
+	// Ensure directory exists
+	os.MkdirAll("public/logos", 0755)
+
 	// Save to public/logos directory
 	filename := uuid.New().String() + ext
 	path := "public/logos/" + filename

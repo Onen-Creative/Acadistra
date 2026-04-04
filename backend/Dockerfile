@@ -21,15 +21,14 @@ FROM alpine:latest
 
 RUN apk --no-cache add ca-certificates postgresql-client curl
 
-WORKDIR /root/
+WORKDIR /app
 
 # Copy the binary from builder
 COPY --from=builder /app/main .
 COPY --from=builder /app/migrations ./migrations
-COPY --from=builder /app/public ./public
 
-# Create directories
-RUN mkdir -p /root/public/logos
+# Create upload directories
+RUN mkdir -p /app/public/logos /app/public/photos /app/public/photos/thumbs
 
 # Expose port
 EXPOSE 8080
