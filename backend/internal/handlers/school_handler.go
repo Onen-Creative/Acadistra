@@ -496,14 +496,14 @@ func (h *SchoolHandler) GetStats(c *gin.Context) {
 	// Students by school (show all schools with their student counts, including zero)
 	h.db.Model(&models.School{}).
 		Select("schools.name as school_name, COUNT(DISTINCT students.id) as student_count").
-		Joins("LEFT JOIN students ON schools.id = students.school_id AND students.deleted_at IS NULL").
+		Joins("LEFT JOIN students ON schools.id = students.school_id AND students.deleted_at IS NULL AND students.status = 'active'").
 		Group("schools.id, schools.name").
 		Scan(&stats.StudentsBySchool)
 
 	// Total counts
 	h.db.Model(&models.School{}).Count(&stats.TotalSchools)
 	h.db.Model(&models.User{}).Where("deleted_at IS NULL").Count(&stats.TotalUsers)
-	h.db.Model(&models.Student{}).Where("deleted_at IS NULL").Count(&stats.TotalStudents)
+	h.db.Model(&models.Student{}).Where("deleted_at IS NULL AND status = 'active'").Count(&stats.TotalStudents)
 
 	c.JSON(http.StatusOK, stats)
 }
