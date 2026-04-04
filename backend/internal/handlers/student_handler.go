@@ -180,7 +180,7 @@ func (h *StudentHandler) List(c *gin.Context) {
 		return
 	}
 	
-	query := h.db.Table("students").Where("students.school_id = ?", schoolID)
+	query := h.db.Table("students").Where("students.school_id = ? AND students.deleted_at IS NULL", schoolID)
 
 	// Check if we need to join enrollments and classes
 	level := c.Query("level")
