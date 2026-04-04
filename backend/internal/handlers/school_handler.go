@@ -503,7 +503,12 @@ func (h *SchoolHandler) GetStats(c *gin.Context) {
 	// Total counts
 	h.db.Model(&models.School{}).Count(&stats.TotalSchools)
 	h.db.Model(&models.User{}).Where("deleted_at IS NULL").Count(&stats.TotalUsers)
-	h.db.Model(&models.Student{}).Where("deleted_at IS NULL AND status = 'active'").Count(&stats.TotalStudents)
+	// Count students with active enrollments (consistent with student list endpoint)
+	h.db.Table("students").
+		Select("COUNT(DISTINCT students.id)").
+		Joins("INNER JOIN enrollments ON students.id = enrollments.student_id AND enrollments.status = 'active'").
+		Where("students.deleted_at IS NULL").
+		Scan(&stats.TotalStudents)
 
 	c.JSON(http.StatusOK, stats)
 }
