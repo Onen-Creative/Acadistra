@@ -49,7 +49,7 @@ func (h *ClassHandler) List(c *gin.Context) {
 		return
 	}
 
-	// Add student count for each class
+	// Add student count for each class (only active enrollments with non-deleted students)
 	type ClassWithCount struct {
 		models.Class
 		StudentCount int64 `json:"student_count"`
@@ -57,7 +57,10 @@ func (h *ClassHandler) List(c *gin.Context) {
 	result := make([]ClassWithCount, len(classes))
 	for i, class := range classes {
 		var count int64
-		h.db.Model(&models.Enrollment{}).Where("class_id = ? AND status = ?", class.ID, "active").Count(&count)
+		h.db.Model(&models.Enrollment{}).
+			Joins("JOIN students ON students.id = enrollments.student_id AND students.deleted_at IS NULL").
+			Where("enrollments.class_id = ? AND enrollments.status = ?", class.ID, "active").
+			Count(&count)
 		result[i] = ClassWithCount{Class: class, StudentCount: count}
 	}
 
@@ -251,9 +254,12 @@ func (h *ClassHandler) Delete(c *gin.Context) {
 		}
 	}
 
-	// Check if class has active enrollments
+	// Check if class has active enrollments with non-deleted students
 	var count int64
-	h.db.Model(&models.Enrollment{}).Where("class_id = ? AND status = ?", id, "active").Count(&count)
+	h.db.Model(&models.Enrollment{}).
+		Joins("JOIN students ON students.id = enrollments.student_id AND students.deleted_at IS NULL").
+		Where("enrollments.class_id = ? AND enrollments.status = ?", id, "active").
+		Count(&count)
 	if count > 0 {
 		c.JSON(http.StatusConflict, gin.H{"error": "Cannot delete class with active enrollments"})
 		return

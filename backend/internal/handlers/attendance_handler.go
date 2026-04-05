@@ -570,7 +570,7 @@ func (h *AttendanceHandler) GetClassAttendanceSummary(c *gin.Context) {
 	// Get all students in class
 	var students []models.Student
 	h.db.Joins("JOIN enrollments ON enrollments.student_id = students.id").
-		Where("enrollments.class_id = ? AND enrollments.status = 'active' AND students.school_id = ?", classID, schoolID).
+		Where("enrollments.class_id = ? AND enrollments.status = 'active' AND students.school_id = ? AND students.deleted_at IS NULL", classID, schoolID).
 		Find(&students)
 
 	type StudentSummary struct {
@@ -890,7 +890,7 @@ func (h *AttendanceHandler) GetAttendanceReport(c *gin.Context) {
 
 	var students []models.Student
 	h.db.Joins("JOIN enrollments ON enrollments.student_id = students.id").
-		Where("enrollments.class_id = ? AND enrollments.status = 'active' AND students.school_id = ?", classID, schoolID).
+		Where("enrollments.class_id = ? AND enrollments.status = 'active' AND students.school_id = ? AND students.deleted_at IS NULL", classID, schoolID).
 		Order("students.first_name, students.last_name").
 		Find(&students)
 
