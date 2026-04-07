@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"net/http"
 	"strings"
@@ -629,9 +630,11 @@ func (h *ResultHandler) CreateOrUpdate(c *gin.Context) {
 			
 			studentName := fmt.Sprintf("%s %s", student.FirstName, student.LastName)
 			for _, guardian := range guardians {
-				if guardian.Email != "" {
+				if guardian.Email != "" && h.emailService != nil {
 					if err := h.emailService.SendGradeAlert(guardian.Email, studentName, subject.Name, grade, fmt.Sprintf("%s %d", term, year)); err != nil {
-						// Failed to send grade alert
+						log.Printf("[EMAIL ERROR] Failed to send grade alert to %s for student %s: %v", guardian.Email, studentName, err)
+					} else {
+						log.Printf("[EMAIL SUCCESS] Grade alert sent to %s for student %s (Subject: %s, Grade: %s)", guardian.Email, studentName, subject.Name, grade)
 					}
 				}
 			}

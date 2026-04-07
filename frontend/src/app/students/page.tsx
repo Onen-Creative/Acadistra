@@ -130,6 +130,14 @@ export default function StudentsPage() {
     },
   })
 
+  const { data: schoolLevels } = useQuery({
+    queryKey: ['school-levels'],
+    queryFn: async () => {
+      const response = await api.get('/api/v1/school/levels')
+      return response.data.levels || []
+    },
+  })
+
   const { data: imports } = useQuery({
     queryKey: ['imports'],
     queryFn: async () => {
@@ -482,7 +490,7 @@ export default function StudentsPage() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               >
                 <option value="">All Levels</option>
-                {['S1', 'S2', 'S3', 'S4', 'S5', 'S6'].map(l => (
+                {(schoolLevels || []).map((l: string) => (
                   <option key={l} value={l}>{l}</option>
                 ))}
               </select>
