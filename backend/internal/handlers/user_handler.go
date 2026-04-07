@@ -1,9 +1,12 @@
 package handlers
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -131,6 +134,25 @@ func (h *UserHandler) Create(c *gin.Context) {
 		return
 	}
 
+	// Get school to extract initials for employee_id
+	var school models.School
+	if err := h.db.First(&school, "id = ?", schoolID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "School not found"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch school: " + err.Error()})
+		}
+		return
+	}
+
+	// Start transaction
+	tx := h.db.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
 	user := &models.User{
 		SchoolID: &schoolID,
 		Email:    req.Email,
@@ -139,8 +161,80 @@ func (h *UserHandler) Create(c *gin.Context) {
 		IsActive: true,
 	}
 
+	// Create user account
 	if err := h.authService.CreateUser(user, req.Password); err != nil {
+		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Create corresponding staff record with employee_id
+	// Generate school initials from school name
+	var schoolInitials string
+	for _, word := range strings.Fields(school.Name) {
+		if len(word) > 0 {
+			schoolInitials += strings.ToUpper(string(word[0]))
+		}
+	}
+	if schoolInitials == "" {
+		schoolInitials = "SCH"
+	}
+
+	// Find last employee number for this school
+	var lastStaff models.Staff
+	var sequence int = 0
+	currentYear := time.Now().Year()
+	pattern := fmt.Sprintf("%s/STF/%d/%%", schoolInitials, currentYear)
+	if err := tx.Where("school_id = ? AND employee_id LIKE ?", schoolID, pattern).
+		Order("employee_id DESC").First(&lastStaff).Error; err == nil {
+		parts := strings.Split(lastStaff.EmployeeID, "/")
+		if len(parts) == 4 {
+			var num int
+			if _, scanErr := fmt.Sscanf(parts[3], "%d", &num); scanErr == nil {
+				sequence = num
+			}
+		}
+	}
+	sequence++
+	employeeID := fmt.Sprintf("%s/STF/%d/%03d", schoolInitials, currentYear, sequence)
+
+	// Parse full name into first and last name
+	nameParts := strings.Fields(req.FullName)
+	firstName := ""
+	middleName := ""
+	lastName := ""
+	if len(nameParts) > 0 {
+		firstName = nameParts[0]
+	}
+	if len(nameParts) > 2 {
+		middleName = nameParts[1]
+		lastName = strings.Join(nameParts[2:], " ")
+	} else if len(nameParts) > 1 {
+		lastName = strings.Join(nameParts[1:], " ")
+	}
+
+	// Create staff record
+	staff := models.Staff{
+		SchoolID:   schoolID,
+		UserID:     &user.ID,
+		EmployeeID: employeeID,
+		FirstName:  firstName,
+		MiddleName: middleName,
+		LastName:   lastName,
+		Email:      req.Email,
+		Role:       "School Admin",
+		Status:     "active",
+	}
+
+	if err := tx.Create(&staff).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create staff record: " + err.Error()})
+		return
+	}
+
+	// Commit transaction
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to complete user creation: " + err.Error()})
 		return
 	}
 
@@ -149,9 +243,11 @@ func (h *UserHandler) Create(c *gin.Context) {
 		schoolName := "Acadistra"
 		if user.School != nil {
 			schoolName = user.School.Name
+		} else {
+			schoolName = school.Name
 		}
-		go func(email, name, role, school, password string) {
-			if err := h.emailService.SendWelcomeEmail(email, name, role, school, password); err != nil {
+		go func(email, name, role, schoolN, password string) {
+			if err := h.emailService.SendWelcomeEmail(email, name, role, schoolN, password); err != nil {
 				log.Printf("Failed to send welcome email to %s: %v", email, err)
 				
 				// Create admin notification for email failure
@@ -166,7 +262,11 @@ func (h *UserHandler) Create(c *gin.Context) {
 		}(user.Email, user.FullName, user.Role, schoolName, req.Password)
 	}
 
-	c.JSON(http.StatusCreated, user)
+	c.JSON(http.StatusCreated, gin.H{
+		"user":        user,
+		"employee_id": employeeID,
+		"message":     "School admin created successfully with employee ID: " + employeeID,
+	})
 }
 
 func (h *UserHandler) Get(c *gin.Context) {
