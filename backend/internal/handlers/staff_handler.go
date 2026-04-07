@@ -312,7 +312,7 @@ func (h *StaffHandler) CreateStaff(c *gin.Context) {
 	c.JSON(http.StatusCreated, staff)
 }
 
-// GetAllStaff retrieves all staff for a school
+// GetAllStaff retrieves all staff for a school (including school admins from users table)
 func (h *StaffHandler) GetAllStaff(c *gin.Context) {
 	schoolID := c.GetString("tenant_school_id")
 	if schoolID == "" {
@@ -347,27 +347,93 @@ func (h *StaffHandler) GetAllStaff(c *gin.Context) {
 		return
 	}
 
-	// If role is Teacher, include teacher_profile_id
-	if role == "Teacher" {
-		type StaffWithProfile struct {
-			models.Staff
-			TeacherProfileID *string `json:"teacher_profile_id"`
-		}
-		result := make([]StaffWithProfile, 0, len(staff))
-		for _, s := range staff {
-			var teacherProfile models.TeacherProfile
-			swp := StaffWithProfile{Staff: s}
-			if err := h.DB.Where("staff_id = ?", s.ID).First(&teacherProfile).Error; err == nil {
-				profileID := teacherProfile.ID.String()
-				swp.TeacherProfileID = &profileID
-			}
-			result = append(result, swp)
-		}
-		c.JSON(http.StatusOK, result)
-		return
+	// Convert to generic response format
+	type StaffResponse struct {
+		ID                 string     `json:"id"`
+		EmployeeID         string     `json:"employee_id,omitempty"`
+		FirstName          string     `json:"first_name"`
+		MiddleName         string     `json:"middle_name,omitempty"`
+		LastName           string     `json:"last_name"`
+		Email              string     `json:"email"`
+		Phone              string     `json:"phone,omitempty"`
+		Role               string     `json:"role"`
+		Department         string     `json:"department,omitempty"`
+		Status             string     `json:"status,omitempty"`
+		TeacherProfileID   *string    `json:"teacher_profile_id,omitempty"`
+		IsSchoolAdmin      bool       `json:"is_school_admin"`
 	}
 
-	c.JSON(http.StatusOK, staff)
+	result := make([]StaffResponse, 0)
+
+	// Add staff from staff table
+	for _, s := range staff {
+		sr := StaffResponse{
+			ID:            s.ID.String(),
+			EmployeeID:    s.EmployeeID,
+			FirstName:     s.FirstName,
+			MiddleName:    s.MiddleName,
+			LastName:      s.LastName,
+			Email:         s.Email,
+			Phone:         s.Phone,
+			Role:          s.Role,
+			Department:    s.Department,
+			Status:        s.Status,
+			IsSchoolAdmin: false,
+		}
+		
+		// If role is Teacher, include teacher_profile_id
+		if s.Role == "Teacher" {
+			var teacherProfile models.TeacherProfile
+			if err := h.DB.Where("staff_id = ?", s.ID).First(&teacherProfile).Error; err == nil {
+				profileID := teacherProfile.ID.String()
+				sr.TeacherProfileID = &profileID
+			}
+		}
+		
+		result = append(result, sr)
+	}
+
+	// Add school admins from users table (if no specific role filter or role is "School Admin")
+	if role == "" || role == "School Admin" {
+		var schoolAdmins []models.User
+		adminQuery := h.DB.Where("school_id = ? AND role = ?", schoolID, "school_admin")
+		if status == "" || status == "active" {
+			adminQuery = adminQuery.Where("is_active = ?", true)
+		}
+		if err := adminQuery.Find(&schoolAdmins).Error; err == nil {
+			for _, admin := range schoolAdmins {
+				// Parse full name into first and last name
+				nameParts := strings.Fields(admin.FullName)
+				firstName := ""
+				lastName := ""
+				if len(nameParts) > 0 {
+					firstName = nameParts[0]
+				}
+				if len(nameParts) > 1 {
+					lastName = strings.Join(nameParts[1:], " ")
+				}
+				
+				statusStr := "active"
+				if !admin.IsActive {
+					statusStr = "inactive"
+				}
+				
+				sr := StaffResponse{
+					ID:            admin.ID.String(),
+					EmployeeID:    "",
+					FirstName:     firstName,
+					LastName:      lastName,
+					Email:         admin.Email,
+					Role:          "School Admin",
+					Status:        statusStr,
+					IsSchoolAdmin: true,
+				}
+				result = append(result, sr)
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
 // GetStaffByID retrieves a single staff member
