@@ -429,6 +429,12 @@ func (h *StaffHandler) UpdateStaff(c *gin.Context) {
 		return
 	}
 
+	// Prevent changing role of School Admin
+	if staff.Role == "School Admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot modify School Admin role. School admins can only be managed through the Users management section."})
+		return
+	}
+
 	var req struct {
 		FirstName          string  `json:"first_name"`
 		MiddleName         string  `json:"middle_name"`
@@ -551,6 +557,18 @@ func (h *StaffHandler) UpdateStaff(c *gin.Context) {
 func (h *StaffHandler) DeleteStaff(c *gin.Context) {
 	staffID := c.Param("id")
 	schoolID := c.GetString("school_id")
+
+	// Check if this is a school admin
+	var staff models.Staff
+	if err := h.DB.Where("id = ? AND school_id = ?", staffID, schoolID).First(&staff).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Staff not found"})
+		return
+	}
+
+	if staff.Role == "School Admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot delete School Admin. School admins can only be managed through the Users management section."})
+		return
+	}
 
 	if err := h.DB.Where("id = ? AND school_id = ?", staffID, schoolID).Delete(&models.Staff{}).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete staff"})
