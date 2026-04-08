@@ -365,7 +365,7 @@ func (h *StaffHandler) GetAllStaff(c *gin.Context) {
 
 	result := make([]StaffResponse, 0)
 
-	// Add staff from staff table
+	// Return only staff from staff table
 	for _, s := range staff {
 		sr := StaffResponse{
 			ID:            s.ID.String(),
@@ -378,7 +378,7 @@ func (h *StaffHandler) GetAllStaff(c *gin.Context) {
 			Role:          s.Role,
 			Department:    s.Department,
 			Status:        s.Status,
-			IsSchoolAdmin: false,
+			IsSchoolAdmin: (s.Role == "School Admin"),
 		}
 		
 		// If role is Teacher, include teacher_profile_id
@@ -393,46 +393,6 @@ func (h *StaffHandler) GetAllStaff(c *gin.Context) {
 		result = append(result, sr)
 	}
 
-	// Add school admins from users table (if no specific role filter or role is "School Admin")
-	if role == "" || role == "School Admin" {
-		var schoolAdmins []models.User
-		adminQuery := h.DB.Where("school_id = ? AND role = ?", schoolID, "school_admin")
-		if status == "" || status == "active" {
-			adminQuery = adminQuery.Where("is_active = ?", true)
-		}
-		if err := adminQuery.Find(&schoolAdmins).Error; err == nil {
-			for _, admin := range schoolAdmins {
-				// Parse full name into first and last name
-				nameParts := strings.Fields(admin.FullName)
-				firstName := ""
-				lastName := ""
-				if len(nameParts) > 0 {
-					firstName = nameParts[0]
-				}
-				if len(nameParts) > 1 {
-					lastName = strings.Join(nameParts[1:], " ")
-				}
-				
-				statusStr := "active"
-				if !admin.IsActive {
-					statusStr = "inactive"
-				}
-				
-				sr := StaffResponse{
-					ID:            admin.ID.String(),
-					EmployeeID:    "",
-					FirstName:     firstName,
-					LastName:      lastName,
-					Email:         admin.Email,
-					Role:          "School Admin",
-					Status:        statusStr,
-					IsSchoolAdmin: true,
-				}
-				result = append(result, sr)
-			}
-		}
-	}
-
 	c.JSON(http.StatusOK, result)
 }
 
@@ -444,46 +404,6 @@ func (h *StaffHandler) GetStaffByID(c *gin.Context) {
 		schoolID = c.GetString("school_id")
 	}
 
-	// Check if this is a school admin (in users table)
-	var user models.User
-	if err := h.DB.Where("id = ? AND school_id = ? AND role = ?", staffID, schoolID, "school_admin").First(&user).Error; err == nil {
-		// Return school admin as staff response
-		nameParts := strings.Fields(user.FullName)
-		firstName := ""
-		lastName := ""
-		if len(nameParts) > 0 {
-			firstName = nameParts[0]
-		}
-		if len(nameParts) > 1 {
-			lastName = strings.Join(nameParts[1:], " ")
-		}
-
-		// Try to get staff record if it exists
-		var staff models.Staff
-		if err := h.DB.Where("user_id = ? AND school_id = ?", user.ID, schoolID).First(&staff).Error; err == nil {
-			c.JSON(http.StatusOK, staff)
-			return
-		}
-
-		// Return minimal staff info from user record
-		statusStr := "active"
-		if !user.IsActive {
-			statusStr = "inactive"
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"id":              user.ID.String(),
-			"first_name":      firstName,
-			"last_name":       lastName,
-			"email":           user.Email,
-			"role":            "School Admin",
-			"status":          statusStr,
-			"is_school_admin": true,
-		})
-		return
-	}
-
-	// Regular staff lookup
 	var staff models.Staff
 	if err := h.DB.Where("id = ? AND school_id = ?", staffID, schoolID).
 		Preload("User").
@@ -503,61 +423,6 @@ func (h *StaffHandler) UpdateStaff(c *gin.Context) {
 		schoolID = c.GetString("school_id")
 	}
 
-	// Check if this is a school admin (in users table) or regular staff
-	var user models.User
-	isSchoolAdmin := false
-	if err := h.DB.Where("id = ? AND school_id = ? AND role = ?", staffID, schoolID, "school_admin").First(&user).Error; err == nil {
-		isSchoolAdmin = true
-	}
-
-	if isSchoolAdmin {
-		// Update school admin in users table
-		var req struct {
-			FirstName string `json:"first_name"`
-			LastName  string `json:"last_name"`
-			Email     string `json:"email"`
-			Phone     string `json:"phone"`
-			Status    string `json:"status"`
-		}
-
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-
-		fullName := req.FirstName
-		if req.LastName != "" {
-			fullName += " " + req.LastName
-		}
-
-		updates := map[string]interface{}{
-			"full_name": fullName,
-			"email":     req.Email,
-		}
-
-		if req.Status != "" {
-			updates["is_active"] = (req.Status == "active")
-		}
-
-		if err := h.DB.Model(&user).Updates(updates).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update school admin"})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"id":              user.ID.String(),
-			"first_name":      req.FirstName,
-			"last_name":       req.LastName,
-			"email":           user.Email,
-			"phone":           req.Phone,
-			"role":            "School Admin",
-			"status":          req.Status,
-			"is_school_admin": true,
-		})
-		return
-	}
-
-	// Regular staff update
 	var staff models.Staff
 	if err := h.DB.Where("id = ? AND school_id = ?", staffID, schoolID).First(&staff).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Staff not found"})
@@ -661,6 +526,22 @@ func (h *StaffHandler) UpdateStaff(c *gin.Context) {
 	if err := h.DB.Save(&staff).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update staff"})
 		return
+	}
+
+	// If this is a school admin, also update the linked user record
+	if staff.Role == "School Admin" && staff.UserID != nil {
+		fullName := staff.FirstName
+		if staff.MiddleName != "" {
+			fullName += " " + staff.MiddleName
+		}
+		fullName += " " + staff.LastName
+
+		userUpdates := map[string]interface{}{
+			"full_name": fullName,
+			"email":     staff.Email,
+			"is_active": (staff.Status == "active"),
+		}
+		h.DB.Model(&models.User{}).Where("id = ?", staff.UserID).Updates(userUpdates)
 	}
 
 	c.JSON(http.StatusOK, staff)

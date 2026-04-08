@@ -222,6 +222,7 @@ func (h *UserHandler) Create(c *gin.Context) {
 		MiddleName: middleName,
 		LastName:   lastName,
 		Email:      req.Email,
+		Phone:      "",
 		Role:       "School Admin",
 		Status:     "active",
 	}
