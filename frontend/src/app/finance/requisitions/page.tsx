@@ -9,7 +9,7 @@ import * as XLSX from 'xlsx';
 import RequisitionReceipt from '@/components/RequisitionReceipt';
 
 export default function RequisitionsPage() {
-  const { user } = useRequireAuth(['bursar', 'school_admin', 'teacher']);
+  const { user } = useRequireAuth(['bursar', 'school_admin', 'teacher', 'nurse', 'librarian', 'storekeeper']);
   const [requisitions, setRequisitions] = useState<any[]>([]);
   const [budgets, setBudgets] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);

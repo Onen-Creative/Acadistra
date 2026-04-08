@@ -350,6 +350,7 @@ func (h *StaffHandler) GetAllStaff(c *gin.Context) {
 	// Convert to generic response format
 	type StaffResponse struct {
 		ID                 string     `json:"id"`
+		UserID             *string    `json:"user_id,omitempty"`
 		EmployeeID         string     `json:"employee_id,omitempty"`
 		FirstName          string     `json:"first_name"`
 		MiddleName         string     `json:"middle_name,omitempty"`
@@ -367,8 +368,15 @@ func (h *StaffHandler) GetAllStaff(c *gin.Context) {
 
 	// Return only staff from staff table
 	for _, s := range staff {
+		var userIDStr *string
+		if s.UserID != nil {
+			uid := s.UserID.String()
+			userIDStr = &uid
+		}
+		
 		sr := StaffResponse{
 			ID:            s.ID.String(),
+			UserID:        userIDStr,
 			EmployeeID:    s.EmployeeID,
 			FirstName:     s.FirstName,
 			MiddleName:    s.MiddleName,

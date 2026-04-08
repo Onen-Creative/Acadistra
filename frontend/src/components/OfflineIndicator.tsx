@@ -1,48 +1,55 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { offlineSync } from '@/utils/offlineSync'
+import { WifiOff, Wifi } from 'lucide-react'
 
 export function OfflineIndicator() {
   const [isOnline, setIsOnline] = useState(true)
-  const [offlineCount, setOfflineCount] = useState(0)
+  const [showNotification, setShowNotification] = useState(false)
 
   useEffect(() => {
-    const updateOnlineStatus = () => setIsOnline(navigator.onLine)
-    const updateOfflineCount = async () => {
-      const count = await offlineSync.getOfflineCount()
-      setOfflineCount(count)
+    const handleOnline = () => {
+      setIsOnline(true)
+      setShowNotification(true)
+      setTimeout(() => setShowNotification(false), 3000)
     }
 
-    updateOnlineStatus()
-    updateOfflineCount()
+    const handleOffline = () => {
+      setIsOnline(false)
+      setShowNotification(true)
+    }
 
-    window.addEventListener('online', updateOnlineStatus)
-    window.addEventListener('offline', updateOnlineStatus)
+    setIsOnline(navigator.onLine)
 
-    const interval = setInterval(updateOfflineCount, 5000)
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
 
     return () => {
-      window.removeEventListener('online', updateOnlineStatus)
-      window.removeEventListener('offline', updateOnlineStatus)
-      clearInterval(interval)
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
     }
   }, [])
 
-  if (isOnline && offlineCount === 0) return null
+  if (!showNotification && isOnline) return null
 
   return (
-    <div className="fixed bottom-4 left-4 z-50">
-      {!isOnline && (
-        <div className="bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
-          <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
-          <span className="font-semibold">Offline Mode</span>
-        </div>
-      )}
-      {offlineCount > 0 && (
-        <div className="bg-amber-500 text-white px-4 py-2 rounded-lg shadow-lg mt-2">
-          <span className="font-semibold">{offlineCount} marks pending sync</span>
-        </div>
+    <div
+      className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 transition-all ${
+        isOnline
+          ? 'bg-green-500 text-white'
+          : 'bg-red-500 text-white'
+      }`}
+    >
+      {isOnline ? (
+        <>
+          <Wifi className="w-5 h-5" />
+          <span className="font-medium">Back Online</span>
+        </>
+      ) : (
+        <>
+          <WifiOff className="w-5 h-5" />
+          <span className="font-medium">You are offline - Changes will sync when online</span>
+        </>
       )}
     </div>
   )

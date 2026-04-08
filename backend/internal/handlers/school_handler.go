@@ -518,7 +518,7 @@ func (h *SchoolHandler) GetSchoolLevels(c *gin.Context) {
 		return
 	}
 	
-	var levels []string
+	levels := []string{}
 	if school.Config != nil {
 		if configLevels, ok := school.Config["levels"].([]interface{}); ok {
 			for _, lvl := range configLevels {
@@ -562,6 +562,10 @@ func (h *SchoolHandler) GetSchoolLevels(c *gin.Context) {
 			school.Config["levels"] = levels
 			h.db.Save(&school)
 		}
+	}
+	
+	if levels == nil {
+		levels = []string{}
 	}
 	
 	c.JSON(http.StatusOK, gin.H{"levels": levels})

@@ -39,7 +39,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const handleLogout = async () => {
     try {
-      await api.post('/auth/logout', {})
+      const refreshToken = localStorage.getItem('refresh_token')
+      if (refreshToken) {
+        await api.post('/auth/logout', { refresh_token: refreshToken })
+      }
     } catch (error) {
       console.error('Logout error:', error)
     } finally {
@@ -242,6 +245,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         return [
           { href: '/storekeeper', label: 'Dashboard', icon: LayoutDashboard },
           { href: '/storekeeper/inventory', label: 'Inventory', icon: Package },
+          { href: '/finance/requisitions', label: 'Requisitions', icon: ClipboardList },
         ]
       case 'parent':
         return [

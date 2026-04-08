@@ -353,9 +353,17 @@ export default function StaffPage() {
                       </td>
                       <td className="px-6 py-4 text-right text-sm space-x-2">
                         <button onClick={() => setViewingStaff(s)} className="text-blue-600 hover:text-blue-900 font-medium">View</button>
-                        <button onClick={() => setEditingStaff(s)} className="text-indigo-600 hover:text-indigo-900 font-medium">Edit</button>
-                        {s.user_id && <button onClick={() => setResetPasswordStaff(s)} className="text-orange-600 hover:text-orange-900 font-medium">Reset Password</button>}
-                        <button onClick={() => setDeletingStaff(s)} className="text-red-600 hover:text-red-900 font-medium">Delete</button>
+                        {s.role === 'School Admin' ? (
+                          <>
+                            {s.user_id && <button onClick={() => setResetPasswordStaff(s)} className="text-orange-600 hover:text-orange-900 font-medium">Reset Password</button>}
+                          </>
+                        ) : (
+                          <>
+                            <button onClick={() => setEditingStaff(s)} className="text-indigo-600 hover:text-indigo-900 font-medium">Edit</button>
+                            {s.user_id && <button onClick={() => setResetPasswordStaff(s)} className="text-orange-600 hover:text-orange-900 font-medium">Reset Password</button>}
+                            <button onClick={() => setDeletingStaff(s)} className="text-red-600 hover:text-red-900 font-medium">Delete</button>
+                          </>
+                        )}
                       </td>
                     </tr>
                   ))}

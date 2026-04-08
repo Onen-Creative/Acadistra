@@ -72,11 +72,15 @@ export default function StudentRegistrationPage() {
       const response = await classesApi.list()
       return Array.isArray(response) ? { classes: response } : response
     },
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 
   const { data: levelsData } = useQuery({
     queryKey: ['school-levels'],
     queryFn: () => schoolsApi.getLevels(),
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 
   const createMutation = useMutation({
