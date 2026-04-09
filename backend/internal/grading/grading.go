@@ -7,11 +7,10 @@ import (
 )
 
 const (
-	RuleVersionNursery      = "NURSERY_V1"
-	RuleVersionPrimaryLower = "PRIMARY_LOWER_V1"
-	RuleVersionPrimaryUpper = "PRIMARY_UPPER_V1"
-	RuleVersionNCDC         = "NCDC_V1"
-	RuleVersionUACE         = "UACE_V1"
+	RuleVersionNursery = "NURSERY_V1"
+	RuleVersionPrimary = "PRIMARY_V1"
+	RuleVersionNCDC    = "NCDC_V1"
+	RuleVersionUACE    = "UACE_V1"
 )
 
 // GradeResult holds computed grade information
@@ -53,50 +52,10 @@ func (g *NurseryGrader) ComputeGrade(caMarks, examMarks, caMax, examMax float64)
 	}
 }
 
-// PrimaryLowerGrader implements P1-P3 grading (position-based, no points)
-type PrimaryLowerGrader struct{}
+// PrimaryGrader implements P1-P7 grading with CA (40) and Exam (60)
+type PrimaryGrader struct{}
 
-func (g *PrimaryLowerGrader) ComputeGrade(caMarks, examMarks, caMax, examMax float64) GradeResult {
-	caPercent := (caMarks / 40) * 40
-	examPercent := (examMarks / 60) * 60
-	total := caPercent + examPercent
-
-	grade := ""
-	switch {
-	case total >= 90:
-		grade = "D1"
-	case total >= 80:
-		grade = "D2"
-	case total >= 70:
-		grade = "C3"
-	case total >= 60:
-		grade = "C4"
-	case total >= 55:
-		grade = "C5"
-	case total >= 50:
-		grade = "C6"
-	case total >= 45:
-		grade = "P7"
-	case total >= 40:
-		grade = "P8"
-	default:
-		grade = "F9"
-	}
-
-	reason := fmt.Sprintf("CA: %.2f/40 (40%%) = %.2f, Exam: %.2f/60 (60%%) = %.2f, Total: %.2f → Grade %s (Position-based)",
-		caMarks, caPercent, examMarks, examPercent, total, grade)
-
-	return GradeResult{
-		FinalGrade:        grade,
-		ComputationReason: reason,
-		RuleVersionHash:   hashRuleVersion(RuleVersionPrimaryLower),
-	}
-}
-
-// PrimaryUpperGrader implements P4-P7 grading with aggregate
-type PrimaryUpperGrader struct{}
-
-func (g *PrimaryUpperGrader) ComputeGrade(caMarks, examMarks, caMax, examMax float64) GradeResult {
+func (g *PrimaryGrader) ComputeGrade(caMarks, examMarks, caMax, examMax float64) GradeResult {
 	caPercent := (caMarks / caMax) * 40
 	examPercent := (examMarks / examMax) * 60
 	total := caPercent + examPercent
@@ -129,7 +88,7 @@ func (g *PrimaryUpperGrader) ComputeGrade(caMarks, examMarks, caMax, examMax flo
 	return GradeResult{
 		FinalGrade:        grade,
 		ComputationReason: reason,
-		RuleVersionHash:   hashRuleVersion(RuleVersionPrimaryUpper),
+		RuleVersionHash:   hashRuleVersion(RuleVersionPrimary),
 	}
 }
 
@@ -141,22 +100,30 @@ func (g *NCDCGrader) ComputeGrade(schoolBasedMarks, externalMarks, schoolBasedMa
 	extPercent := (externalMarks / externalMax) * 80
 	total := sbPercent + extPercent
 
-	grade := ""
+	grade, points := "", 0
 	switch {
 	case total >= 80:
-		grade = "A"
+		grade, points = "D1", 1
+	case total >= 70:
+		grade, points = "D2", 2
 	case total >= 65:
-		grade = "B"
+		grade, points = "C3", 3
+	case total >= 60:
+		grade, points = "C4", 4
+	case total >= 55:
+		grade, points = "C5", 5
 	case total >= 50:
-		grade = "C"
+		grade, points = "C6", 6
+	case total >= 45:
+		grade, points = "P7", 7
 	case total >= 35:
-		grade = "D"
+		grade, points = "P8", 8
 	default:
-		grade = "E"
+		grade, points = "F9", 9
 	}
 
-	reason := fmt.Sprintf("School-Based: %.2f/%.0f (20%%) = %.2f, External: %.2f/%.0f (80%%) = %.2f, Total: %.2f → Grade %s",
-		schoolBasedMarks, schoolBasedMax, sbPercent, externalMarks, externalMax, extPercent, total, grade)
+	reason := fmt.Sprintf("AOI: %.2f/%.0f (20%%) = %.2f, Exam: %.2f/%.0f (80%%) = %.2f, Total: %.2f → Grade %s (Points: %d)",
+		schoolBasedMarks, schoolBasedMax, sbPercent, externalMarks, externalMax, extPercent, total, grade, points)
 
 	return GradeResult{
 		FinalGrade:        grade,
@@ -315,10 +282,8 @@ func GetGrader(level string) interface{} {
 	switch level {
 	case "Baby Class", "Middle Class", "Top Class", "Baby", "Middle", "Top", "Nursery":
 		return &NurseryGrader{}
-	case "P1", "P2", "P3":
-		return &PrimaryLowerGrader{}
-	case "P4", "P5", "P6", "P7":
-		return &PrimaryUpperGrader{}
+	case "P1", "P2", "P3", "P4", "P5", "P6", "P7":
+		return &PrimaryGrader{}
 	case "S1", "S2", "S3", "S4":
 		return &NCDCGrader{}
 	case "S5", "S6":

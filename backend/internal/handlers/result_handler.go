@@ -497,14 +497,10 @@ func (h *ResultHandler) CreateOrUpdate(c *gin.Context) {
 			// Nursery: CA out of 100, Exam out of 100
 			grader := &grading.NurseryGrader{}
 			gradeResult = grader.ComputeGrade(ca, exam, 100, 100)
-		case "P1", "P2", "P3":
-			// Lower Primary: CA out of 40, Exam out of 60
-			grader := &grading.PrimaryLowerGrader{}
+		case "P1", "P2", "P3", "P4", "P5", "P6", "P7":
+			// All Primary: CA out of 40, Exam out of 60
+			grader := &grading.PrimaryGrader{}
 			gradeResult = grader.ComputeGrade(ca, exam, 40, 60)
-		case "P4", "P5", "P6", "P7":
-			// Upper Primary: CA out of 20 (40%), Exam out of 80 (60%)
-			grader := &grading.PrimaryUpperGrader{}
-			gradeResult = grader.ComputeGrade(ca, exam, 20, 80)
 		case "S1", "S2", "S3", "S4":
 			// NCDC: School-Based out of 20 (20%), External out of 80 (80%)
 			// CA comes from AOI marks (out of 20)

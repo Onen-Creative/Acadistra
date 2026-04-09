@@ -142,7 +142,7 @@ export default function MarksEntryPage() {
     if (isAdvanced) return { mark: 100 } // Advanced level: single mark out of 100
     if (['Baby', 'Middle', 'Top'].includes(classLevel)) return { ca: 100, exam: 100 }
     if (['S1', 'S2', 'S3', 'S4'].includes(classLevel)) return { exam: 80 } // CA from AOI
-    return { ca: 40, exam: 60 }
+    return { ca: 40, exam: 60 } // All Primary P1-P7
   }
 
   const getLabels = () => {

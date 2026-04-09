@@ -47,14 +47,13 @@ export default function PrimaryReportCard({
     let aggregate = 0
     
     results.forEach((r: any) => {
-      const ca = r.raw_marks?.ca || 0
-      const exam = r.raw_marks?.exam || 0
-      const subjectTotal = ca + exam
+      const subjectTotal = r.raw_marks?.total || 0
       
-      if (ca > 0 || exam > 0) {
+      if (subjectTotal > 0) {
         total += subjectTotal
         count++
         
+        // Calculate aggregate based on weighted total (out of 100)
         if (subjectTotal >= 90) aggregate += 1
         else if (subjectTotal >= 80) aggregate += 2
         else if (subjectTotal >= 70) aggregate += 3
@@ -171,8 +170,8 @@ export default function PrimaryReportCard({
               <thead>
                 <tr style={{ background: 'white', color: '#000' }}>
                   <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'left', fontWeight: '700', fontSize: '11px' }}>SUBJECT</th>
-                  <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'center', fontWeight: '700', width: '60px', fontSize: '11px' }}>CA (30)</th>
-                  <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'center', fontWeight: '700', width: '60px', fontSize: '11px' }}>EXAM (70)</th>
+                  <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'center', fontWeight: '700', width: '60px', fontSize: '11px' }}>CA (40)</th>
+                  <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'center', fontWeight: '700', width: '60px', fontSize: '11px' }}>EXAM (60)</th>
                   <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'center', fontWeight: '700', width: '60px', fontSize: '11px' }}>TOTAL (100)</th>
                   <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'center', fontWeight: '700', width: '50px', fontSize: '11px' }}>GRADE</th>
                   <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'center', fontWeight: '700', width: '80px', fontSize: '11px' }}>REMARK</th>
@@ -183,28 +182,17 @@ export default function PrimaryReportCard({
                   const result = results?.find((r: any) => r.subject_id === subject.id)
                   const ca = result?.raw_marks?.ca || 0
                   const exam = result?.raw_marks?.exam || 0
-                  const total = ca + exam
+                  const total = result?.raw_marks?.total || (ca + exam)
                   const hasMarks = ca > 0 || exam > 0
-                  let grade = ''
-                  let remark = ''
-                  if (hasMarks) {
-                    if (total >= 90) grade = 'D1'
-                    else if (total >= 80) grade = 'D2'
-                    else if (total >= 70) grade = 'C3'
-                    else if (total >= 60) grade = 'C4'
-                    else if (total >= 55) grade = 'C5'
-                    else if (total >= 50) grade = 'C6'
-                    else if (total >= 45) grade = 'P7'
-                    else if (total >= 40) grade = 'P8'
-                    else grade = 'F9'
-                    remark = getGradeComment(total)
-                  }
+                  const grade = result?.final_grade || ''
+                  const remark = hasMarks ? getGradeComment(total) : ''
+                  
                   return (
                     <tr key={subject.id} style={{ background: index % 2 === 0 ? 'white' : '#f8fafc' }}>
                       <td style={{ border: '1px solid #000', padding: '5px', fontWeight: '600', color: '#000', fontSize: '10px' }}>{subject.name}</td>
                       <td style={{ border: '1px solid #000', padding: '5px', textAlign: 'center', fontSize: '10px' }}>{ca || ''}</td>
                       <td style={{ border: '1px solid #000', padding: '5px', textAlign: 'center', fontSize: '10px' }}>{exam || ''}</td>
-                      <td style={{ border: '1px solid #000', padding: '5px', textAlign: 'center', fontWeight: '700', fontSize: '11px', color: '#000' }}>{hasMarks ? total : ''}</td>
+                      <td style={{ border: '1px solid #000', padding: '5px', textAlign: 'center', fontWeight: '700', fontSize: '11px', color: '#000' }}>{hasMarks ? total.toFixed(1) : ''}</td>
                       <td style={{ border: '1px solid #000', padding: '5px', textAlign: 'center', fontWeight: '700', fontSize: '11px', color: '#000' }}>{grade}</td>
                       <td style={{ border: '1px solid #000', padding: '5px', textAlign: 'center', fontSize: '9px', fontStyle: 'italic', color: '#000' }}>{remark}</td>
                     </tr>
