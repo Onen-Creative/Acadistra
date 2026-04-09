@@ -1,349 +1,271 @@
-# 🎉 Acadistra - System Cleaned & Deployment Ready
+# Grading System Fix - Complete Deployment Package
 
-## ✅ Verification Complete
+## 📦 Package Contents
 
-All checks passed! The system is **production-ready** and can be deployed immediately.
+### ✅ Deployment Scripts
+1. **`deploy-grading-fix.sh`** - Automated full deployment
+2. **`recalculate-grades.sh`** - Standalone grade recalculation
+3. **`QUICKSTART_DEPLOYMENT.md`** - Quick start guide
+4. **`DEPLOYMENT_SCRIPTS_README.md`** - Detailed documentation
+5. **`GRADING_VERIFICATION.md`** - Grading system verification
 
----
-
-## 📦 What Was Created/Updated
-
-### 🐳 Docker & Deployment (NEW)
-- ✅ `backend/Dockerfile` - Production-optimized Go build
-- ✅ `backend/.dockerignore` - Exclude unnecessary files
-- ✅ `frontend/Dockerfile` - Next.js standalone build
-- ✅ `frontend/.dockerignore` - Exclude unnecessary files
-- ✅ `frontend/src/app/api/health/route.ts` - Health check endpoint
-- ✅ `docker-compose.prod.yml` - Updated with networks, security, health checks
-- ✅ `frontend/next.config.js` - Updated with standalone output
-
-### 🚀 Automation Scripts (NEW)
-- ✅ `deploy.sh` - One-command deployment with auto-setup
-- ✅ `health-check.sh` - System health monitoring
-- ✅ `verify-deployment.sh` - Pre-deployment verification
-- ✅ `Makefile` - Common operations shortcuts
-- ✅ `scripts/backup.sh` - Updated with better error handling
-
-### 📚 Documentation (NEW/UPDATED)
-- ✅ `README.md` - Clean, deployment-focused main readme
-- ✅ `QUICKSTART.md` - 5-minute deployment guide
-- ✅ `DEPLOYMENT_CHECKLIST_CLEAN.md` - Step-by-step checklist
-- ✅ `PRODUCTION_CHECKLIST.md` - Pre-deployment verification
-- ✅ `TROUBLESHOOTING.md` - Common issues & solutions
-- ✅ `DEPLOYMENT_READY.md` - This summary document
-- ✅ `CONTRIBUTING.md` - Contribution guidelines
-- ✅ `SECURITY.md` - Security policy & best practices
-- ✅ `CHANGELOG.md` - Version history
-- ✅ `LICENSE` - MIT License
-
-### ⚙️ Configuration (NEW/UPDATED)
-- ✅ `.env.production.example` - Template with all variables
-- ✅ `.gitignore` - Updated to exclude build artifacts
-- ✅ `Caddyfile` - Production reverse proxy config
-- ✅ `docs/archive/` - Internal docs archived
+### ✅ Code Changes
+1. **`backend/internal/grading/grading.go`** - Fixed S1-S4 grading scale
+2. **`backend/internal/handlers/result_handler.go`** - Grade recalculation + log cleanup
+3. **`backend/internal/handlers/staff_handler.go`** - Log cleanup
+4. **`frontend/src/app/results/page.tsx`** - UI label updates
 
 ---
 
-## 🚀 Deploy Now (3 Commands)
+## 🎯 What Was Fixed
 
+### Issue 1: S1-S4 Grading Scale
+**Before:** A/B/C/D/E (simplified scale)
+**After:** D1/D2/C3/C4/C5/C6/P7/P8/F9 (UNEB 9-point scale)
+
+**Example:**
+- 82 marks: A → **D1** ✅
+- 73 marks: B → **D2** ✅
+- 62 marks: C → **C4** ✅
+
+### Issue 2: Column Labels
+**Before:** S1-S4 showed "CA" column
+**After:** S1-S4 shows "AOI" column ✅
+
+### Issue 3: Grade Recalculation
+**Before:** No way to update existing grades
+**After:** Automated recalculation for all levels ✅
+
+### Issue 4: Log Noise
+**Before:** "record not found" logs cluttering output
+**After:** Silent queries for expected missing records ✅
+
+---
+
+## 🚀 Deployment Options
+
+### Option 1: Automated Script (Recommended)
 ```bash
-git clone https://github.com/yourusername/acadistra.git
-cd acadistra
-./deploy.sh
+./deploy-grading-fix.sh
 ```
+- ✅ Pulls code
+- ✅ Rebuilds services
+- ✅ Recalculates grades
+- ✅ Shows summary
 
-**That's it!** The script handles everything:
-- Installs Docker if needed
-- Generates secure passwords
-- Builds all services
-- Runs migrations
-- Creates admin user
-- Seeds standard subjects
-
----
-
-## 📊 System Status
-
-```
-✅ All required files present
-✅ All scripts executable
-✅ Docker configuration ready
-✅ Documentation complete
-✅ Security configured
-✅ Backup system ready
-✅ Health monitoring ready
-✅ Multi-tenant architecture ready
-```
-
----
-
-## 🎯 Quick Reference
-
-### Access URLs (After Deployment)
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8080
-- API Docs: http://localhost:8080/swagger/index.html
-- MinIO Console: http://localhost:9001
-
-### Default Credentials
-- Email: `sysadmin@acadistra.com`
-- Password: `Admin@123`
-- ⚠️ Change immediately after first login!
-
-### Common Commands
+### Option 2: Manual Deployment + Script
 ```bash
-make deploy      # Deploy system
-make start       # Start services
-make stop        # Stop services
-make restart     # Restart services
-make logs        # View logs
-make health      # Health check
-make backup      # Create backup
-make update      # Update from git
+# Deploy manually
+git pull
+docker compose -f docker-compose.prod.yml up -d --build
+
+# Then recalculate
+./recalculate-grades.sh
+```
+
+### Option 3: Browser Console
+```javascript
+fetch('https://acadistra.com/api/v1/recalculate-grades?term=Term%201&year=2026', {
+  method: 'POST',
+  headers: {'Authorization': 'Bearer ' + localStorage.getItem('access_token')}
+}).then(r => r.json()).then(console.log)
 ```
 
 ---
 
-## 📋 Pre-Deployment Checklist
+## 📊 Grading Systems Summary
 
-Run verification:
+### Nursery (Baby, Middle, Top)
+- **Marks:** CA(100) + Exam(100)
+- **Formula:** Average
+- **Grades:** Mastering, Secure, Developing, Emerging, Not Yet
+
+### Primary (P1-P7)
+- **Marks:** CA(40) + Exam(60)
+- **Formula:** (CA/40)×40 + (Exam/60)×60
+- **Grades:** D1, D2, C3, C4, C5, C6, P7, P8, F9
+
+### O-Level (S1-S4)
+- **Marks:** AOI(20) + Exam(80)
+- **Formula:** (AOI/20)×20 + (Exam/80)×80
+- **Grades:** D1, D2, C3, C4, C5, C6, P7, P8, F9
+- **Label:** "AOI" (not "CA")
+
+### A-Level (S5-S6)
+- **Marks:** Paper 1-4 (100 each)
+- **Formula:** Paper codes → Principal grade
+- **Grades:** A, B, C, D, E, O, F
+
+---
+
+## ✅ Pre-Deployment Checklist
+
+- [ ] Backend compiles successfully
+- [ ] All tests pass
+- [ ] Git repository is up to date
+- [ ] Docker Compose file is correct
+- [ ] Admin credentials are known
+- [ ] Database backup created (optional but recommended)
+
+---
+
+## 🔍 Post-Deployment Verification
+
+### 1. Check Services
 ```bash
-bash verify-deployment.sh
+docker compose -f docker-compose.prod.yml ps
 ```
+All services should show "running"
 
-Manual checklist:
-- [ ] Server has 2GB+ RAM
-- [ ] Server has 20GB+ disk space
-- [ ] Domain configured (optional for local)
-- [ ] SSH access configured
-- [ ] Firewall rules set (80, 443, 22)
-
----
-
-## 🏗️ Architecture
-
-### Multi-Tenant Design
-- **Single Database**: All schools share `acadistra` database
-- **Data Isolation**: `school_id` column in all tables
-- **Subdomain Routing**: `school1.acadistra.com` → filters by `school_id`
-- **Cost Effective**: €1-2 per school/month
-
-### Services
+### 2. Check Backend Health
+```bash
+curl https://acadistra.com/health
 ```
-┌─────────────────────────────────────┐
-│         Caddy (Reverse Proxy)       │
-│    Auto SSL, Subdomain Routing      │
-└──────────┬──────────────────────────┘
-           │
-    ┌──────┴──────┐
-    │             │
-┌───▼────┐   ┌───▼────┐
-│Frontend│   │Backend │
-│Next.js │   │  Go    │
-└────────┘   └───┬────┘
-                 │
-    ┌────────────┼────────────┐
-    │            │            │
-┌───▼───┐   ┌───▼───┐   ┌───▼───┐
-│Postgres│  │ Redis │   │ MinIO │
-│  DB    │  │ Cache │   │Storage│
-└────────┘  └───────┘   └───────┘
+Should return: `{"status":"ok"}`
+
+### 3. Check Grades
+- Visit: `https://acadistra.com/results`
+- Select P4 class
+- Verify: 60 marks → **C4** (not C3)
+- Verify: 80 marks → **D2** (not D1)
+
+### 4. Check Labels
+- Select S1 class
+- Verify: Column shows **"AOI"** (not "CA")
+
+### 5. Check Recalculation
+Script output should show:
+```json
+{
+  "message": "Grade recalculation completed",
+  "updated": 48,
+  "errors": 0,
+  "skipped": 5,
+  "total": 53
+}
 ```
 
 ---
 
-## 🔒 Security Features
-
-- ✅ JWT authentication with secure tokens
-- ✅ Argon2 password hashing
-- ✅ Role-based access control (7 roles)
-- ✅ SQL injection protection (GORM)
-- ✅ CORS configuration
-- ✅ Auto SSL via Caddy
-- ✅ Audit logging for all actions
-- ✅ Secure environment variables
-- ✅ Network isolation (Docker)
-- ✅ Health checks & monitoring
-
----
-
-## 📈 Scalability
-
-### Current Capacity
-- **Single Server**: 5-10 schools
-- **Database**: Shared with `school_id` isolation
-- **Cost**: €10/month (Hetzner CPX31)
-- **Per School**: €1-2/month
-
-### Scaling Options
-1. **Vertical**: Upgrade server (no code changes)
-2. **Horizontal**: Add read replicas (future)
-3. **Database**: Partition by `school_id` (future)
-
----
-
-## 🎓 Features
-
-### Core Functionality
-- ✅ Student & class management
-- ✅ Marks entry (online & offline)
-- ✅ UNEB/NCDC grading
-- ✅ PDF report cards
-- ✅ Attendance tracking
-- ✅ Finance management
-- ✅ Payroll system
-- ✅ Budget & requisitions
-- ✅ Library management
-- ✅ Clinic management
-- ✅ Inventory management
-- ✅ Parent portal
-- ✅ Audit logging
-
-### User Roles
-1. **System Admin** - Manage all schools
-2. **School Admin** - Manage school
-3. **Teacher** - Marks, attendance
-4. **Bursar** - Finance, fees
-5. **Librarian** - Library management
-6. **Nurse** - Clinic management
-7. **Parent** - View children's progress
-
----
-
-## 📚 Documentation Structure
+## 📁 File Structure
 
 ```
-Root Documentation:
-├── README.md                    # Main overview
-├── QUICKSTART.md               # 5-min deployment
-├── DEPLOYMENT.md               # Full deployment guide
-├── DEPLOYMENT_CHECKLIST_CLEAN.md
-├── PRODUCTION_CHECKLIST.md
-├── TROUBLESHOOTING.md
-├── SECURITY.md
-├── CONTRIBUTING.md
-├── CHANGELOG.md
-└── LICENSE
-
-Technical Docs:
-└── docs/
-    ├── BUDGET_REQUISITIONS.md
-    ├── BULK_MARKS_IMPORT.md
-    └── archive/              # Internal docs
+acadistra/
+├── deploy-grading-fix.sh              # Main deployment script
+├── recalculate-grades.sh              # Grade recalculation only
+├── QUICKSTART_DEPLOYMENT.md           # Quick start guide
+├── DEPLOYMENT_SCRIPTS_README.md       # Detailed docs
+├── GRADING_VERIFICATION.md            # Verification report
+├── DEPLOYMENT_SUMMARY.md              # This file
+├── backend/
+│   └── internal/
+│       ├── grading/
+│       │   └── grading.go             # ✅ Fixed grading logic
+│       └── handlers/
+│           ├── result_handler.go      # ✅ Recalculation + logs
+│           └── staff_handler.go       # ✅ Log cleanup
+└── frontend/
+    └── src/
+        └── app/
+            └── results/
+                └── page.tsx           # ✅ UI labels
 ```
 
 ---
 
-## 🛠️ Maintenance
+## 🛠️ System Requirements
 
-### Daily
-- Check service health: `make health`
-- Review logs: `make logs`
-- Verify backups ran
+### Required
+- ✅ bash
+- ✅ curl
+- ✅ git
+- ✅ docker & docker compose
+- ✅ PostgreSQL (via Docker)
+- ✅ Redis (via Docker)
 
-### Weekly
-- Review audit logs
-- Check disk space
-- Test backup restoration
-
-### Monthly
-- Update dependencies: `make update`
-- Security audit
-- Performance review
+### Optional
+- python3 or jq (for pretty JSON output)
 
 ---
 
-## 🎯 Next Steps
-
-1. **Review Documentation**
-   - Read [QUICKSTART.md](QUICKSTART.md)
-   - Review [PRODUCTION_CHECKLIST.md](PRODUCTION_CHECKLIST.md)
-
-2. **Deploy**
-   ```bash
-   ./deploy.sh
-   ```
-
-3. **Initial Setup**
-   - Login as system admin
-   - Create first school
-   - Create school admin
-   - Test basic features
-
-4. **Configure**
-   - Setup DNS (if using domain)
-   - Configure backups
-   - Setup monitoring
-   - Configure integrations (optional)
-
-5. **Go Live**
-   - Train users
-   - Import data
-   - Monitor system
-   - Gather feedback
-
----
-
-## 💡 Support & Resources
+## 📞 Support
 
 ### Documentation
-- 📖 [Quick Start](QUICKSTART.md)
-- 🚀 [Deployment Guide](DEPLOYMENT.md)
-- 🔧 [Troubleshooting](TROUBLESHOOTING.md)
-- 🔒 [Security Policy](SECURITY.md)
+- `QUICKSTART_DEPLOYMENT.md` - Quick start
+- `DEPLOYMENT_SCRIPTS_README.md` - Full documentation
+- `GRADING_VERIFICATION.md` - Grading details
 
-### Commands
+### Troubleshooting
+1. Check logs: `docker compose -f docker-compose.prod.yml logs backend`
+2. Check services: `docker compose -f docker-compose.prod.yml ps`
+3. Restart: `docker compose -f docker-compose.prod.yml restart`
+
+### Manual Recalculation
+If scripts fail, use browser console method (see QUICKSTART_DEPLOYMENT.md)
+
+---
+
+## 🎉 Success Criteria
+
+Deployment is successful when:
+
+- ✅ All Docker services are running
+- ✅ Backend health check passes
+- ✅ Grades show D1/D2/C3/C4 (not A/B/C)
+- ✅ S1-S4 shows "AOI" column (not "CA")
+- ✅ Grade recalculation completes without errors
+- ✅ No "record not found" logs in output
+
+---
+
+## 📈 Impact
+
+### Before
+- ❌ S1-S4 using wrong grading scale (A/B/C)
+- ❌ Incorrect column labels ("CA" instead of "AOI")
+- ❌ No way to update existing grades
+- ❌ Log spam from expected missing records
+
+### After
+- ✅ All levels use correct UNEB/NCDC grading
+- ✅ Proper labels for all levels
+- ✅ Automated grade recalculation
+- ✅ Clean logs
+
+---
+
+## 🔐 Security Notes
+
+- Scripts use admin credentials (keep secure)
+- Access tokens are temporary (expire after session)
+- Only System Admin and School Admin can recalculate grades
+- All changes are logged in audit trail
+
+---
+
+## 📅 Maintenance
+
+### Future Grade Recalculations
 ```bash
-make help        # Show all commands
-make health      # System health check
-make logs        # View logs
-make backup      # Create backup
+# Recalculate new term
+TERM="Term 2" YEAR="2026" ./recalculate-grades.sh
+
+# Recalculate specific level
+LEVEL="P5" ./recalculate-grades.sh
 ```
 
-### Getting Help
-1. Check documentation
-2. Run health check
-3. Review logs
-4. Check troubleshooting guide
-5. Open GitHub issue
-
----
-
-## ✨ What Makes This Special
-
-1. **One-Command Deploy** - `./deploy.sh` does everything
-2. **Multi-Tenant** - Cost-effective shared database
-3. **Production-Ready** - Security, monitoring, backups included
-4. **Well-Documented** - Comprehensive guides for everything
-5. **Ugandan Curriculum** - UNEB/NCDC compliant
-6. **Offline Support** - Works without internet
-7. **Complete System** - All school operations covered
-8. **Open Source** - MIT License, free to use
-
----
-
-## 🎉 Ready to Deploy!
-
-The system is **100% production-ready**. All files are in place, all checks passed.
-
-### Deploy Command:
+### Monitoring
 ```bash
-./deploy.sh
-```
+# Watch logs
+docker compose -f docker-compose.prod.yml logs -f backend
 
-### Verify First (Optional):
-```bash
-bash verify-deployment.sh
+# Check database
+docker exec -it acadistra_postgres psql -U acadistra -d acadistra
 ```
 
 ---
 
-**Built for Ugandan Schools** 🇺🇬  
-**ECCE → S6 | UNEB & NCDC Compliant**  
-**Status**: ✅ Production Ready | 🚀 Deploy Now
-
----
-
-*Last Updated: 2025-01-XX*  
-*Version: 1.0.0*  
-*License: MIT*
+**Version:** 1.0.0  
+**Date:** 2026-04-09  
+**Status:** ✅ Ready for Production Deployment  
+**Tested:** ✅ Backend compiles, scripts validated
