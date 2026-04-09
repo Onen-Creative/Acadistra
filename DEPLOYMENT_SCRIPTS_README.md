@@ -55,7 +55,9 @@ which python3 jq
 ### Usage
 
 ```bash
-# Basic usage (uses defaults)
+# Basic usage - requires credentials
+ADMIN_EMAIL="your-admin@email.com" \
+ADMIN_PASSWORD="YourPassword" \
 ./deploy-grading-fix.sh
 
 # With custom configuration
@@ -71,8 +73,8 @@ YEAR="2025" \
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ADMIN_EMAIL` | `admin@acadistra.com` | Admin email for authentication |
-| `ADMIN_PASSWORD` | `Admin@123` | Admin password |
+| `ADMIN_EMAIL` | _(required)_ | Admin email for authentication |
+| `ADMIN_PASSWORD` | _(required)_ | Admin password |
 | `API_URL` | `https://acadistra.com` | Your site URL |
 | `TERM` | `Term 1` | Term to recalculate |
 | `YEAR` | `2026` | Year to recalculate |
@@ -145,16 +147,30 @@ Response:
 
 ```bash
 # Recalculate all grades for Term 1, 2026
+ADMIN_EMAIL="your-admin@email.com" \
+ADMIN_PASSWORD="YourPassword" \
 ./recalculate-grades.sh
 
 # Recalculate specific term/year
-TERM="Term 2" YEAR="2025" ./recalculate-grades.sh
+ADMIN_EMAIL="your-admin@email.com" \
+ADMIN_PASSWORD="YourPassword" \
+TERM="Term 2" \
+YEAR="2025" \
+./recalculate-grades.sh
 
 # Recalculate specific level only
-LEVEL="P4" ./recalculate-grades.sh
+ADMIN_EMAIL="your-admin@email.com" \
+ADMIN_PASSWORD="YourPassword" \
+LEVEL="P4" \
+./recalculate-grades.sh
 
 # Recalculate S1 for Term 1, 2026
-TERM="Term 1" YEAR="2026" LEVEL="S1" ./recalculate-grades.sh
+ADMIN_EMAIL="your-admin@email.com" \
+ADMIN_PASSWORD="YourPassword" \
+TERM="Term 1" \
+YEAR="2026" \
+LEVEL="S1" \
+./recalculate-grades.sh
 
 # Custom API URL and credentials
 API_URL="https://myschool.com" \
@@ -167,8 +183,8 @@ ADMIN_PASSWORD="MyPass123" \
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ADMIN_EMAIL` | `admin@acadistra.com` | Admin email |
-| `ADMIN_PASSWORD` | `Admin@123` | Admin password |
+| `ADMIN_EMAIL` | _(required)_ | Admin email |
+| `ADMIN_PASSWORD` | _(required)_ | Admin password |
 | `API_URL` | `https://acadistra.com` | Your site URL |
 | `TERM` | `Term 1` | Term to recalculate (optional) |
 | `YEAR` | `2026` | Year to recalculate (optional) |

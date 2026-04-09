@@ -3,6 +3,7 @@
 .env.local
 .env.*.local
 .env.production
+.env.deployment
 
 # Backend
 backend/main

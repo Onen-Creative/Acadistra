@@ -13,8 +13,8 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-ADMIN_EMAIL="${ADMIN_EMAIL:-admin@acadistra.com}"
-ADMIN_PASSWORD="${ADMIN_PASSWORD:-Admin@123}"
+ADMIN_EMAIL="${ADMIN_EMAIL}"
+ADMIN_PASSWORD="${ADMIN_PASSWORD}"
 API_URL="${API_URL:-https://acadistra.com}"
 TERM="${TERM:-Term 1}"
 YEAR="${YEAR:-2026}"

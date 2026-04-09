@@ -13,8 +13,8 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 # Configuration (can be overridden with environment variables)
-ADMIN_EMAIL="${ADMIN_EMAIL:-admin@acadistra.com}"
-ADMIN_PASSWORD="${ADMIN_PASSWORD:-Admin@123}"
+ADMIN_EMAIL="${ADMIN_EMAIL}"
+ADMIN_PASSWORD="${ADMIN_PASSWORD}"
 API_URL="${API_URL:-https://acadistra.com}"
 TERM="${TERM:-Term 1}"
 YEAR="${YEAR:-2026}"

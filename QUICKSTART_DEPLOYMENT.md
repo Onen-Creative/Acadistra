@@ -9,7 +9,9 @@ ssh user@your-server-ip
 # Navigate to project
 cd /path/to/acadistra
 
-# Run deployment script
+# Run deployment script with your credentials
+ADMIN_EMAIL="your-admin@email.com" \
+ADMIN_PASSWORD="YourPassword" \
 ./deploy-grading-fix.sh
 ```
 
@@ -68,13 +70,20 @@ API_URL="https://myschool.acadistra.com" \
 If you already deployed manually and just need to recalculate:
 
 ```bash
+ADMIN_EMAIL="your-admin@email.com" \
+ADMIN_PASSWORD="YourPassword" \
 ./recalculate-grades.sh
 ```
 
 Or for specific term/level:
 
 ```bash
-TERM="Term 2" YEAR="2025" LEVEL="S1" ./recalculate-grades.sh
+ADMIN_EMAIL="your-admin@email.com" \
+ADMIN_PASSWORD="YourPassword" \
+TERM="Term 2" \
+YEAR="2025" \
+LEVEL="S1" \
+./recalculate-grades.sh
 ```
 
 ---
