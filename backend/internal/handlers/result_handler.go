@@ -223,7 +223,9 @@ func (h *ResultHandler) GetByStudent(c *gin.Context) {
 	var outstandingFees float64
 	if term != "" && year != "" {
 		var studentFees models.StudentFees
-		if err := h.db.Where("student_id = ? AND term = ? AND year = ?", studentID, term, year).First(&studentFees).Error; err == nil {
+		// Use silent query to avoid logging "record not found"
+		err := h.db.Session(&gorm.Session{Logger: h.db.Logger.LogMode(1)}).Where("student_id = ? AND term = ? AND year = ?", studentID, term, year).First(&studentFees).Error
+		if err == nil {
 			outstandingFees = studentFees.Outstanding
 		}
 	}
@@ -660,7 +662,7 @@ func (h *ResultHandler) RecalculateGrades(c *gin.Context) {
 	schoolID := c.GetString("tenant_school_id")
 	term := c.Query("term")
 	year := c.Query("year")
-	level := c.Query("level") // Optional: specific level like "S5", "S6"
+	level := c.Query("level") // Optional: specific level like "P4", "S1", etc.
 
 	// Get all results to recalculate
 	query := h.db.Model(&models.SubjectResult{})
@@ -682,82 +684,151 @@ func (h *ResultHandler) RecalculateGrades(c *gin.Context) {
 
 	updated := 0
 	errors := 0
+	skipped := 0
 
 	for _, result := range results {
 		// Get student's class level
 		var enrollment models.Enrollment
 		if err := h.db.Where("student_id = ?", result.StudentID).Order("created_at DESC").First(&enrollment).Error; err != nil {
+			skipped++
 			continue
 		}
 
 		var class models.Class
 		if err := h.db.First(&class, enrollment.ClassID).Error; err != nil {
+			skipped++
 			continue
 		}
 
 		// Skip if level filter is specified and doesn't match
 		if level != "" && class.Level != level {
-			continue
-		}
-
-		// Only recalculate UACE grades (S5, S6) for now
-		if class.Level != "S5" && class.Level != "S6" {
+			skipped++
 			continue
 		}
 
 		if result.RawMarks == nil {
+			skipped++
 			continue
 		}
 
-		// Get mark from raw_marks
-		mark := 0.0
-		if m, ok := result.RawMarks["mark"].(float64); ok {
-			mark = m
-		} else if t, ok := result.RawMarks["total"].(float64); ok {
-			mark = t
-		} else if e, ok := result.RawMarks["exam"].(float64); ok {
-			// Fallback for old format
-			if c, ok := result.RawMarks["ca"].(float64); ok {
-				mark = c + e
-			} else {
-				mark = e
-			}
-		}
-
-		if mark <= 0 {
-			continue
-		}
-
-		// Recalculate grade using UACE grader
-		grader := &grading.UACEGrader{}
-		code := grader.MapMarkToCode(mark)
-
+		var gradeResult grading.GradeResult
 		var newGrade string
-		switch code {
-		case 1:
-			newGrade = "D1"
-		case 2:
-			newGrade = "D2"
-		case 3:
-			newGrade = "C3"
-		case 4:
-			newGrade = "C4"
-		case 5:
-			newGrade = "C5"
-		case 6:
-			newGrade = "C6"
-		case 7:
-			newGrade = "P7"
-		case 8:
-			newGrade = "P8"
+
+		// Recalculate based on level
+		switch class.Level {
+		case "Baby", "Middle", "Top", "Nursery":
+			// Nursery: CA(100) + Exam(100), average
+			ca := 0.0
+			exam := 0.0
+			if c, ok := result.RawMarks["ca"].(float64); ok {
+				ca = c
+			}
+			if e, ok := result.RawMarks["exam"].(float64); ok {
+				exam = e
+			}
+			if ca <= 0 && exam <= 0 {
+				skipped++
+				continue
+			}
+			grader := &grading.NurseryGrader{}
+			gradeResult = grader.ComputeGrade(ca, exam, 100, 100)
+			newGrade = gradeResult.FinalGrade
+
+		case "P1", "P2", "P3", "P4", "P5", "P6", "P7":
+			// Primary: CA(40) + Exam(60) with 40%/60% weighting
+			ca := 0.0
+			exam := 0.0
+			if c, ok := result.RawMarks["ca"].(float64); ok {
+				ca = c
+			}
+			if e, ok := result.RawMarks["exam"].(float64); ok {
+				exam = e
+			}
+			if ca <= 0 && exam <= 0 {
+				skipped++
+				continue
+			}
+			grader := &grading.PrimaryGrader{}
+			gradeResult = grader.ComputeGrade(ca, exam, 40, 60)
+			newGrade = gradeResult.FinalGrade
+			// Calculate and update total in raw_marks
+			total := (ca/40)*40 + (exam/60)*60
+			result.RawMarks["total"] = total
+
+		case "S1", "S2", "S3", "S4":
+			// O-Level: AOI(20) + Exam(80) with 20%/80% weighting
+			ca := 0.0
+			exam := 0.0
+			if c, ok := result.RawMarks["ca"].(float64); ok {
+				ca = c
+			}
+			if e, ok := result.RawMarks["exam"].(float64); ok {
+				exam = e
+			}
+			if ca <= 0 && exam <= 0 {
+				skipped++
+				continue
+			}
+			grader := &grading.NCDCGrader{}
+			gradeResult = grader.ComputeGrade(ca, exam, 20, 80)
+			newGrade = gradeResult.FinalGrade
+			// Calculate and update total in raw_marks
+			total := (ca/20)*20 + (exam/80)*80
+			result.RawMarks["total"] = total
+
+		case "S5", "S6":
+			// A-Level: Paper-based grading
+			mark := 0.0
+			if m, ok := result.RawMarks["mark"].(float64); ok {
+				mark = m
+			} else if t, ok := result.RawMarks["total"].(float64); ok {
+				mark = t
+			} else if e, ok := result.RawMarks["exam"].(float64); ok {
+				if c, ok := result.RawMarks["ca"].(float64); ok {
+					mark = c + e
+				} else {
+					mark = e
+				}
+			}
+			if mark <= 0 {
+				skipped++
+				continue
+			}
+			grader := &grading.UACEGrader{}
+			code := grader.MapMarkToCode(mark)
+			switch code {
+			case 1:
+				newGrade = "D1"
+			case 2:
+				newGrade = "D2"
+			case 3:
+				newGrade = "C3"
+			case 4:
+				newGrade = "C4"
+			case 5:
+				newGrade = "C5"
+			case 6:
+				newGrade = "C6"
+			case 7:
+				newGrade = "P7"
+			case 8:
+				newGrade = "P8"
+			default:
+				newGrade = "F9"
+			}
+			gradeResult.FinalGrade = newGrade
+			gradeResult.ComputationReason = fmt.Sprintf("Recalculated: %.2f/100 → %s", mark, newGrade)
+
 		default:
-			newGrade = "F9"
+			skipped++
+			continue
 		}
 
 		// Update if grade changed
 		if result.FinalGrade != newGrade {
 			result.FinalGrade = newGrade
-			result.ComputationReason = fmt.Sprintf("Recalculated: %.2f/100 → %s", mark, newGrade)
+			result.ComputationReason = gradeResult.ComputationReason
+			result.RuleVersionHash = gradeResult.RuleVersionHash
 			
 			if err := h.db.Save(&result).Error; err != nil {
 				errors++
@@ -771,6 +842,7 @@ func (h *ResultHandler) RecalculateGrades(c *gin.Context) {
 		"message": "Grade recalculation completed",
 		"updated": updated,
 		"errors":  errors,
+		"skipped": skipped,
 		"total":   len(results),
 	})
 }

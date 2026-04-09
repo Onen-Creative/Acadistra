@@ -213,12 +213,14 @@ export default function ResultsPage() {
       const marks = result.raw_marks || {}
       const paper = marks.paper || null
       const isAdvanced = ['S5', 'S6'].includes(currentLevel)
+      const isOLevel = ['S1', 'S2', 'S3', 'S4'].includes(currentLevel)
+      const caLabel = isOLevel ? 'AOI' : 'CA'
       const row: any = {
         'Student': result.student_name || 'N/A',
         'Subject': result.subject_name,
         ...(isAdvanced && paper ? { 'Paper': `Paper ${paper}` } : {}),
         'Exam Type': result.exam_type || 'N/A',
-        'CA': marks.ca || 0,
+        [caLabel]: marks.ca || 0,
         'Exam': marks.exam || 0,
         'Total': marks.total || 0,
         'Grade': result.final_grade
@@ -447,7 +449,7 @@ export default function ResultsPage() {
                       )}
                       <th className="text-left py-4 px-4 font-semibold text-gray-700">Subject</th>
                       <th className="text-center py-4 px-4 font-semibold text-gray-700">Exam Type</th>
-                      <th className="text-center py-4 px-4 font-semibold text-gray-700">CA</th>
+                      <th className="text-center py-4 px-4 font-semibold text-gray-700">{['S1', 'S2', 'S3', 'S4'].includes(currentLevel) ? 'AOI' : 'CA'}</th>
                       <th className="text-center py-4 px-4 font-semibold text-gray-700">Exam</th>
                       <th className="text-center py-4 px-4 font-semibold text-gray-700">Total</th>
                       <th className="text-center py-4 px-4 font-semibold text-gray-700">Grade</th>

@@ -392,7 +392,9 @@ func (h *StaffHandler) GetAllStaff(c *gin.Context) {
 		// If role is Teacher, include teacher_profile_id
 		if s.Role == "Teacher" {
 			var teacherProfile models.TeacherProfile
-			if err := h.DB.Where("staff_id = ?", s.ID).First(&teacherProfile).Error; err == nil {
+			// Use silent query to avoid logging "record not found"
+			err := h.DB.Session(&gorm.Session{Logger: h.DB.Logger.LogMode(1)}).Where("staff_id = ?", s.ID).First(&teacherProfile).Error
+			if err == nil {
 				profileID := teacherProfile.ID.String()
 				sr.TeacherProfileID = &profileID
 			}
