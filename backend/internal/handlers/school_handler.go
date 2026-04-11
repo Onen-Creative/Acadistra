@@ -151,7 +151,20 @@ func (h *SchoolHandler) Get(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "School not found"})
 		return
 	}
-	c.JSON(http.StatusOK, school)
+
+	type SchoolDetails struct {
+		models.School
+		UserCount    int64 `json:"user_count"`
+		StaffCount   int64 `json:"staff_count"`
+		StudentCount int64 `json:"student_count"`
+	}
+
+	details := SchoolDetails{School: school}
+	h.db.Model(&models.User{}).Where("school_id = ? AND deleted_at IS NULL", id).Count(&details.UserCount)
+	h.db.Model(&models.Staff{}).Where("school_id = ? AND status = ?", id, "active").Count(&details.StaffCount)
+	h.db.Model(&models.Student{}).Where("school_id = ? AND status = ? AND deleted_at IS NULL", id, "active").Count(&details.StudentCount)
+
+	c.JSON(http.StatusOK, details)
 }
 
 func (h *SchoolHandler) GetMySchool(c *gin.Context) {

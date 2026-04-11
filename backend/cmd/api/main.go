@@ -177,6 +177,7 @@ func main() {
 	integrationActivityHandler := handlers.NewIntegrationActivityHandler(db)
 	analyticsHandler := handlers.NewAnalyticsHandler(db)
 	webVitalsHandler := handlers.NewWebVitalsHandler(db)
+	classRankingHandler := handlers.NewClassRankingHandler(db)
 	
 	// Initialize SMS and Email services
 	smsService := services.NewSMSService(
@@ -312,11 +313,11 @@ func main() {
 				sysAdmin.POST("/recalculate-grades", resultHandler.RecalculateGrades)
 			}
 
-			// Shared routes for school_admin, teacher, librarian, nurse, bursar, and parent
+			// Shared routes for school_admin, teacher, librarian, nurse, bursar, dos, director_of_studies, and parent
 			shared := protected.Group("")
 			shared.Use(func(c *gin.Context) {
 				userRole := c.GetString("user_role")
-				if userRole != "school_admin" && userRole != "teacher" && userRole != "librarian" && userRole != "nurse" && userRole != "bursar" && userRole != "parent" && userRole != "system_admin" {
+				if userRole != "school_admin" && userRole != "teacher" && userRole != "librarian" && userRole != "nurse" && userRole != "bursar" && userRole != "dos" && userRole != "director_of_studies" && userRole != "parent" && userRole != "system_admin" {
 					c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 					c.Abort()
 					return
@@ -446,26 +447,31 @@ func main() {
 				// Results management
 				schoolAdmin.DELETE("/results/:id", resultHandler.Delete)
 				
-				// Lesson Monitoring - School Admin only
-				lessonHandler := handlers.NewLessonHandler(db)
-				schoolAdmin.POST("/lessons", lessonHandler.CreateLesson)
-				schoolAdmin.GET("/lessons", lessonHandler.ListLessons)
-				schoolAdmin.GET("/lessons/:id", lessonHandler.GetLesson)
-				schoolAdmin.PUT("/lessons/:id", lessonHandler.UpdateLesson)
-				schoolAdmin.DELETE("/lessons/:id", lessonHandler.DeleteLesson)
-				schoolAdmin.GET("/lessons/stats", lessonHandler.GetStats)
-				schoolAdmin.GET("/lessons/export", lessonHandler.ExportReport)
-				schoolAdmin.GET("/lessons/subjects", lessonHandler.GetSchoolSubjects)
-				schoolAdmin.GET("/lessons/teachers", lessonHandler.GetSchoolTeachers)
-				
-				// Student import - School Admin only
-				schoolAdmin.POST("/import/students/upload", bulkImportXLSXHandler.UploadStudents)
-				
-				// Import management - School Admin only
-				schoolAdmin.GET("/import/list", bulkImportXLSXHandler.ListImports)
-				schoolAdmin.GET("/import/:id", bulkImportXLSXHandler.GetImportDetails)
-				schoolAdmin.POST("/import/:id/approve", bulkImportXLSXHandler.ApproveImport)
-				schoolAdmin.POST("/import/:id/reject", bulkImportXLSXHandler.RejectImport)
+				// School Admin and DOS routes
+				schoolAdminOrDOS := protected.Group("")
+				schoolAdminOrDOS.Use(middleware.RequireDOS())
+				{
+					// Lesson Monitoring - School Admin and DOS
+					lessonHandler := handlers.NewLessonHandler(db)
+					schoolAdminOrDOS.POST("/lessons", lessonHandler.CreateLesson)
+					schoolAdminOrDOS.GET("/lessons", lessonHandler.ListLessons)
+					schoolAdminOrDOS.GET("/lessons/:id", lessonHandler.GetLesson)
+					schoolAdminOrDOS.PUT("/lessons/:id", lessonHandler.UpdateLesson)
+					schoolAdminOrDOS.DELETE("/lessons/:id", lessonHandler.DeleteLesson)
+					schoolAdminOrDOS.GET("/lessons/stats", lessonHandler.GetStats)
+					schoolAdminOrDOS.GET("/lessons/export", lessonHandler.ExportReport)
+					schoolAdminOrDOS.GET("/lessons/subjects", lessonHandler.GetSchoolSubjects)
+					schoolAdminOrDOS.GET("/lessons/teachers", lessonHandler.GetSchoolTeachers)
+					
+					// Student import - School Admin and DOS
+					schoolAdminOrDOS.POST("/import/students/upload", bulkImportXLSXHandler.UploadStudents)
+					
+					// Import management - School Admin and DOS
+					schoolAdminOrDOS.GET("/import/list", bulkImportXLSXHandler.ListImports)
+					schoolAdminOrDOS.GET("/import/:id", bulkImportXLSXHandler.GetImportDetails)
+					schoolAdminOrDOS.POST("/import/:id/approve", bulkImportXLSXHandler.ApproveImport)
+					schoolAdminOrDOS.POST("/import/:id/reject", bulkImportXLSXHandler.RejectImport)
+				}
 			}
 			
 			// Template downloads - School Admin and Teachers (with query token support)
@@ -576,7 +582,7 @@ func main() {
 			requisitions := protected.Group("")
 			requisitions.Use(func(c *gin.Context) {
 				userRole := c.GetString("user_role")
-				if userRole != "bursar" && userRole != "school_admin" && userRole != "teacher" && userRole != "librarian" && userRole != "nurse" && userRole != "system_admin" {
+				if userRole != "bursar" && userRole != "school_admin" && userRole != "teacher" && userRole != "librarian" && userRole != "nurse" && userRole != "dos" && userRole != "director_of_studies" && userRole != "system_admin" {
 					c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 					c.Abort()
 					return
@@ -752,6 +758,11 @@ func main() {
 			protected.GET("/analytics/subject-comparison", analyticsHandler.SubjectComparison)
 			protected.GET("/analytics/term-comparison", analyticsHandler.TermComparison)
 			
+			// Class ranking routes
+			protected.GET("/analytics/class-ranking/:class_id", classRankingHandler.GetClassRanking)
+			protected.GET("/analytics/class-ranking/:class_id/export", classRankingHandler.ExportClassRanking)
+			protected.GET("/analytics/class-ranking/:class_id/terms-years", classRankingHandler.GetAvailableTermsYears)
+			
 			// Web vitals (optional auth)
 			protected.POST("/analytics/web-vitals", webVitalsHandler.RecordWebVital)
 			protected.GET("/analytics/web-vitals/stats", webVitalsHandler.GetWebVitalsStats)
@@ -826,6 +837,9 @@ func handleCommand(cmd string) {
 
 	case "seed-standard-subjects":
 		seedStandardSubjects(db)
+
+	case "add-missing-subjects":
+		addMissingSubjects(db)
 
 	case "seed-standard-fee-types":
 		seedStandardFeeTypes(db)
@@ -1065,6 +1079,55 @@ func seedStandardSubjects(db *gorm.DB) {
 		log.Fatal("Failed to seed standard subjects:", err)
 	}
 
+}
+
+func addMissingSubjects(db *gorm.DB) {
+	log.Println("🔍 Checking for missing subjects...")
+
+	// Define missing subjects (Leb Acoli and Luganda)
+	missingSubjects := []models.StandardSubject{
+		// S1-S4 Electives
+		{Name: "Leb Acoli", Code: "ACOLI", Level: "S1", IsCompulsory: false, Papers: 1, GradingType: "ncdc", Description: "Leb Acoli language"},
+		{Name: "Luganda", Code: "LUG", Level: "S1", IsCompulsory: false, Papers: 1, GradingType: "ncdc", Description: "Luganda language"},
+		{Name: "Leb Acoli", Code: "ACOLI", Level: "S2", IsCompulsory: false, Papers: 1, GradingType: "ncdc", Description: "Leb Acoli language"},
+		{Name: "Luganda", Code: "LUG", Level: "S2", IsCompulsory: false, Papers: 1, GradingType: "ncdc", Description: "Luganda language"},
+		{Name: "Leb Acoli", Code: "ACOLI", Level: "S3", IsCompulsory: false, Papers: 1, GradingType: "ncdc", Description: "Leb Acoli language"},
+		{Name: "Luganda", Code: "LUG", Level: "S3", IsCompulsory: false, Papers: 1, GradingType: "ncdc", Description: "Luganda language"},
+		{Name: "Leb Acoli", Code: "ACOLI", Level: "S4", IsCompulsory: false, Papers: 1, GradingType: "ncdc", Description: "Leb Acoli language"},
+		{Name: "Luganda", Code: "LUG", Level: "S4", IsCompulsory: false, Papers: 1, GradingType: "ncdc", Description: "Luganda language"},
+		// S5-S6 Principal Subjects
+		{Name: "Leb Acoli", Code: "ACOLI", Level: "S5", IsCompulsory: false, Papers: 2, GradingType: "uneb", Description: "Leb Acoli language and literature"},
+		{Name: "Leb Acoli", Code: "ACOLI", Level: "S6", IsCompulsory: false, Papers: 2, GradingType: "uneb", Description: "Leb Acoli language and literature"},
+	}
+
+	addedCount := 0
+	skippedCount := 0
+
+	for _, subject := range missingSubjects {
+		// Check if subject already exists
+		var existing models.StandardSubject
+		if err := db.Where("code = ? AND level = ?", subject.Code, subject.Level).First(&existing).Error; err == nil {
+			log.Printf("   ⏭️  Skipped: %s (%s) at level %s - already exists", subject.Name, subject.Code, subject.Level)
+			skippedCount++
+			continue
+		}
+
+		// Add the subject
+		if err := db.Create(&subject).Error; err != nil {
+			log.Printf("   ❌ Failed to add %s (%s) at level %s: %v", subject.Name, subject.Code, subject.Level, err)
+			continue
+		}
+
+		log.Printf("   ✅ Added: %s (%s) at level %s - %d papers", subject.Name, subject.Code, subject.Level, subject.Papers)
+		addedCount++
+	}
+
+	log.Printf("\n" + "============================================================")
+	log.Printf("📊 Summary:")
+	log.Printf("   ✅ Added: %d subjects", addedCount)
+	log.Printf("   ⏭️  Skipped (already exist): %d subjects", skippedCount)
+	log.Printf("============================================================")
+	log.Println("✨ Missing subjects check completed!")
 }
 
 func seedStandardFeeTypes(db *gorm.DB) {

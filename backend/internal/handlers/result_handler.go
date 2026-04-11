@@ -496,7 +496,8 @@ func (h *ResultHandler) CreateOrUpdate(c *gin.Context) {
 		
 		switch class.Level {
 		case "Baby", "Middle", "Top", "Nursery":
-			// Nursery: CA out of 100, Exam out of 100
+			// Nursery: CA out of 100, Exam out of 100, average
+			total = (ca + exam) / 2
 			grader := &grading.NurseryGrader{}
 			gradeResult = grader.ComputeGrade(ca, exam, 100, 100)
 		case "P1", "P2", "P3", "P4", "P5", "P6", "P7":
@@ -570,11 +571,16 @@ func (h *ResultHandler) CreateOrUpdate(c *gin.Context) {
 		}
 	}
 	
-	// Store total in raw_marks
+	// Store total/mark in raw_marks
 	if req.RawMarks == nil {
 		req.RawMarks = make(models.JSONB)
 	}
-	req.RawMarks["total"] = total
+	// For nursery, store average in 'mark' field; for others, store total in 'total' field
+	if class.Level == "Baby" || class.Level == "Middle" || class.Level == "Top" || class.Level == "Nursery" {
+		req.RawMarks["mark"] = total
+	} else {
+		req.RawMarks["total"] = total
+	}
 	
 	if err == gorm.ErrRecordNotFound {
 		result = models.SubjectResult{
@@ -733,6 +739,9 @@ func (h *ResultHandler) RecalculateGrades(c *gin.Context) {
 			grader := &grading.NurseryGrader{}
 			gradeResult = grader.ComputeGrade(ca, exam, 100, 100)
 			newGrade = gradeResult.FinalGrade
+			// Store average in 'mark' field
+			average := (ca + exam) / 2
+			result.RawMarks["mark"] = average
 
 		case "P1", "P2", "P3", "P4", "P5", "P6", "P7":
 			// Primary: CA(40) + Exam(60) with 40%/60% weighting

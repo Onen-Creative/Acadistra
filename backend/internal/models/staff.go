@@ -11,7 +11,7 @@ type Staff struct {
 	BaseModel
 	SchoolID           uuid.UUID  `gorm:"type:char(36);not null;index" json:"school_id"`
 	UserID             *uuid.UUID `gorm:"type:char(36);index" json:"user_id,omitempty"`
-	EmployeeID         string     `gorm:"type:varchar(50);not null;uniqueIndex:idx_employee_school" json:"employee_id"`
+	EmployeeID         string     `gorm:"type:varchar(50);not null" json:"employee_id"`
 	FirstName          string     `gorm:"type:varchar(100);not null" json:"first_name"`
 	MiddleName         string     `gorm:"type:varchar(100)" json:"middle_name"`
 	LastName           string     `gorm:"type:varchar(100);not null" json:"last_name"`

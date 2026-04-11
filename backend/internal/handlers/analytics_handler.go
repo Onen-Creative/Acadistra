@@ -33,15 +33,31 @@ func (h *AnalyticsHandler) SubjectPerformanceTrend(c *gin.Context) {
 		TotalStudents int  `json:"total_students"`
 	}
 
+	// Determine if nursery level
+	nurseryLevels := []string{"Baby", "Middle", "Top"}
+	isNursery := false
+	for _, nl := range nurseryLevels {
+		if level == nl {
+			isNursery = true
+			break
+		}
+	}
+
+	// For nursery, use mark field; for others use total
+	markCalc := "COALESCE((sr.raw_marks->>'total')::float, 0)"
+	if isNursery {
+		markCalc = "(COALESCE((sr.raw_marks->>'ca')::float, 0) + COALESCE((sr.raw_marks->>'exam')::float, 0)) / 2.0"
+	}
+
 	query := `
 		SELECT 
 			sr.term,
 			sr.year,
 			sr.exam_type,
-			AVG(COALESCE((sr.raw_marks->>'total')::float, 0)) as average,
-			MAX(COALESCE((sr.raw_marks->>'total')::float, 0)) as highest,
-			MIN(COALESCE((sr.raw_marks->>'total')::float, 0)) as lowest,
-			COUNT(CASE WHEN COALESCE((sr.raw_marks->>'total')::float, 0) >= 50 THEN 1 END)::float / 
+			AVG(` + markCalc + `) as average,
+			MAX(` + markCalc + `) as highest,
+			MIN(` + markCalc + `) as lowest,
+			COUNT(CASE WHEN ` + markCalc + ` >= 50 THEN 1 END)::float / 
 				NULLIF(COUNT(*), 0) * 100 as pass_rate,
 			COUNT(DISTINCT sr.student_id) as total_students
 		FROM subject_results sr
@@ -87,6 +103,7 @@ func (h *AnalyticsHandler) StudentProgressTracking(c *gin.Context) {
 		Total        float64 `json:"total"`
 		Grade        string  `json:"grade"`
 		ClassAverage float64 `json:"class_average"`
+		Level        string  `json:"level"`
 	}
 
 	query := `
@@ -95,10 +112,21 @@ func (h *AnalyticsHandler) StudentProgressTracking(c *gin.Context) {
 			sr.year,
 			sr.exam_type,
 			ss.name as subject_name,
-			COALESCE((sr.raw_marks->>'total')::float, 0) as total,
+			ss.level,
+			CASE 
+				WHEN ss.level IN ('Baby', 'Middle', 'Top') THEN 
+					(COALESCE((sr.raw_marks->>'ca')::float, 0) + COALESCE((sr.raw_marks->>'exam')::float, 0)) / 2.0
+				ELSE COALESCE((sr.raw_marks->>'total')::float, 0)
+			END as total,
 			sr.final_grade as grade,
 			(
-				SELECT AVG(COALESCE((sr2.raw_marks->>'total')::float, 0))
+				SELECT AVG(
+					CASE 
+						WHEN ss.level IN ('Baby', 'Middle', 'Top') THEN 
+							(COALESCE((sr2.raw_marks->>'ca')::float, 0) + COALESCE((sr2.raw_marks->>'exam')::float, 0)) / 2.0
+						ELSE COALESCE((sr2.raw_marks->>'total')::float, 0)
+					END
+				)
 				FROM subject_results sr2
 				WHERE sr2.class_id = sr.class_id
 					AND sr2.subject_id = sr.subject_id
@@ -140,9 +168,20 @@ func (h *AnalyticsHandler) ClassComparison(c *gin.Context) {
 		SELECT 
 			c.name as class_name,
 			c.level,
-			AVG(COALESCE((sr.raw_marks->>'total')::float, 0)) as average,
+			AVG(
+				CASE 
+					WHEN c.level IN ('Baby', 'Middle', 'Top') THEN 
+						(COALESCE((sr.raw_marks->>'ca')::float, 0) + COALESCE((sr.raw_marks->>'exam')::float, 0)) / 2.0
+					ELSE COALESCE((sr.raw_marks->>'total')::float, 0)
+				END
+			) as average,
 			COUNT(DISTINCT sr.student_id) as total_students,
-			COUNT(CASE WHEN COALESCE((sr.raw_marks->>'total')::float, 0) >= 50 THEN 1 END)::float / 
+			COUNT(CASE WHEN 
+				CASE 
+					WHEN c.level IN ('Baby', 'Middle', 'Top') THEN 
+						(COALESCE((sr.raw_marks->>'ca')::float, 0) + COALESCE((sr.raw_marks->>'exam')::float, 0)) / 2.0
+					ELSE COALESCE((sr.raw_marks->>'total')::float, 0)
+				END >= 50 THEN 1 END)::float / 
 				NULLIF(COUNT(*), 0) * 100 as pass_rate
 		FROM subject_results sr
 		JOIN classes c ON sr.class_id = c.id
@@ -180,10 +219,33 @@ func (h *AnalyticsHandler) SubjectComparison(c *gin.Context) {
 	query := `
 		SELECT 
 			ss.name as subject_name,
-			AVG(COALESCE((sr.raw_marks->>'total')::float, 0)) as average,
-			MAX(COALESCE((sr.raw_marks->>'total')::float, 0)) as highest,
-			MIN(COALESCE((sr.raw_marks->>'total')::float, 0)) as lowest,
-			COUNT(CASE WHEN COALESCE((sr.raw_marks->>'total')::float, 0) >= 50 THEN 1 END)::float / 
+			AVG(
+				CASE 
+					WHEN ss.level IN ('Baby', 'Middle', 'Top') THEN 
+						(COALESCE((sr.raw_marks->>'ca')::float, 0) + COALESCE((sr.raw_marks->>'exam')::float, 0)) / 2.0
+					ELSE COALESCE((sr.raw_marks->>'total')::float, 0)
+				END
+			) as average,
+			MAX(
+				CASE 
+					WHEN ss.level IN ('Baby', 'Middle', 'Top') THEN 
+						(COALESCE((sr.raw_marks->>'ca')::float, 0) + COALESCE((sr.raw_marks->>'exam')::float, 0)) / 2.0
+					ELSE COALESCE((sr.raw_marks->>'total')::float, 0)
+				END
+			) as highest,
+			MIN(
+				CASE 
+					WHEN ss.level IN ('Baby', 'Middle', 'Top') THEN 
+						(COALESCE((sr.raw_marks->>'ca')::float, 0) + COALESCE((sr.raw_marks->>'exam')::float, 0)) / 2.0
+					ELSE COALESCE((sr.raw_marks->>'total')::float, 0)
+				END
+			) as lowest,
+			COUNT(CASE WHEN 
+				CASE 
+					WHEN ss.level IN ('Baby', 'Middle', 'Top') THEN 
+						(COALESCE((sr.raw_marks->>'ca')::float, 0) + COALESCE((sr.raw_marks->>'exam')::float, 0)) / 2.0
+					ELSE COALESCE((sr.raw_marks->>'total')::float, 0)
+				END >= 50 THEN 1 END)::float / 
 				NULLIF(COUNT(*), 0) * 100 as pass_rate,
 			COUNT(DISTINCT sr.student_id) as total_students
 		FROM subject_results sr
@@ -220,11 +282,23 @@ func (h *AnalyticsHandler) TermComparison(c *gin.Context) {
 		SELECT 
 			sr.term,
 			sr.exam_type,
-			AVG(COALESCE((sr.raw_marks->>'total')::float, 0)) as average,
-			COUNT(CASE WHEN COALESCE((sr.raw_marks->>'total')::float, 0) >= 50 THEN 1 END)::float / 
+			AVG(
+				CASE 
+					WHEN c.level IN ('Baby', 'Middle', 'Top') THEN 
+						(COALESCE((sr.raw_marks->>'ca')::float, 0) + COALESCE((sr.raw_marks->>'exam')::float, 0)) / 2.0
+					ELSE COALESCE((sr.raw_marks->>'total')::float, 0)
+				END
+			) as average,
+			COUNT(CASE WHEN 
+				CASE 
+					WHEN c.level IN ('Baby', 'Middle', 'Top') THEN 
+						(COALESCE((sr.raw_marks->>'ca')::float, 0) + COALESCE((sr.raw_marks->>'exam')::float, 0)) / 2.0
+					ELSE COALESCE((sr.raw_marks->>'total')::float, 0)
+				END >= 50 THEN 1 END)::float / 
 				NULLIF(COUNT(*), 0) * 100 as pass_rate,
 			COUNT(DISTINCT sr.student_id) as total_students
 		FROM subject_results sr
+		JOIN classes c ON sr.class_id = c.id
 		WHERE sr.school_id = ? AND sr.class_id = ? AND sr.year = ?
 		GROUP BY sr.term, sr.exam_type
 		ORDER BY sr.term, sr.exam_type

@@ -79,3 +79,7 @@ func RequireSchoolAdmin() gin.HandlerFunc {
 func RequireTeacher() gin.HandlerFunc {
 	return RequireRole("system_admin", "school_admin", "teacher")
 }
+
+func RequireDOS() gin.HandlerFunc {
+	return RequireRole("system_admin", "school_admin", "dos", "director_of_studies")
+}

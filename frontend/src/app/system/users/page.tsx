@@ -381,7 +381,7 @@ export default function SystemUsersPage() {
           )}
 
           {isModalOpen && (
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div key={editingUser?.id || 'new'} className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-3xl w-full max-w-3xl max-h-[95vh] overflow-hidden shadow-2xl">
                 {/* Header */}
                 <div className="relative bg-gradient-to-br from-blue-600 via-purple-600 to-pink-500 p-6">

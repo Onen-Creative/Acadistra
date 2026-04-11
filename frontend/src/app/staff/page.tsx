@@ -453,7 +453,7 @@ export default function StaffPage() {
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
-            <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget); const data: any = {}; fd.forEach((v, k) => { if (v) data[k] = v }); handleUpdate(editingStaff.id, data); }} className="p-6">
+            <form key={editingStaff.id} onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget); const data: any = {}; fd.forEach((v, k) => { if (v) data[k] = v }); handleUpdate(editingStaff.id, data); }} className="p-6">
               <div className="space-y-6">
                 <div>
                   <h3 className="text-lg font-semibold mb-4">Personal Information</h3>

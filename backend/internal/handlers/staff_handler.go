@@ -32,7 +32,7 @@ func NewStaffHandler(db *gorm.DB, cfg *config.Config, emailService *services.Ema
 
 // CreateStaff creates a new staff member
 // This is the PRIMARY method for creating users with system access (except school_admin)
-// Roles that get user accounts: Teacher, Bursar, Librarian, Nurse, Store Keeper
+// Roles that get user accounts: Teacher, Director of Studies, Bursar, Librarian, Nurse, Store Keeper
 // Other roles (Security, Cook, Cleaner, etc.) are for record-keeping only
 func (h *StaffHandler) CreateStaff(c *gin.Context) {
 	var req struct {
@@ -178,12 +178,12 @@ func (h *StaffHandler) CreateStaff(c *gin.Context) {
 		}
 	}()
 
-	// Find last employee number for this school
+	// Find last employee number for this school (excluding soft-deleted records)
 	var lastStaff models.Staff
 	var sequence int = 0
 	currentYear := time.Now().Year()
 	pattern := fmt.Sprintf("%s/STF/%d/%%", schoolInitials, currentYear)
-	if err := tx.Where("school_id = ? AND employee_id LIKE ?", schoolID, pattern).
+	if err := tx.Unscoped().Where("school_id = ? AND employee_id LIKE ? AND deleted_at IS NULL", schoolID, pattern).
 		Order("employee_id DESC").First(&lastStaff).Error; err == nil {
 		parts := strings.Split(lastStaff.EmployeeID, "/")
 		if len(parts) == 4 {
@@ -217,6 +217,9 @@ func (h *StaffHandler) CreateStaff(c *gin.Context) {
 		case "Teacher":
 			userRole = "teacher"
 			defaultPassword = "Teacher@123"
+		case "Director of Studies":
+			userRole = "director_of_studies"
+			defaultPassword = "DOS@123"
 		case "Bursar":
 			userRole = "bursar"
 			defaultPassword = "Bursar@123"
@@ -544,23 +547,68 @@ func (h *StaffHandler) UpdateStaff(c *gin.Context) {
 		return
 	}
 
-	// If this is a school admin, also update the linked user record
-	if staff.Role == "School Admin" && staff.UserID != nil {
+	// Track if role changed for notification
+	roleChanged := false
+
+	// If staff has a linked user account, update it
+	if staff.UserID != nil {
 		fullName := staff.FirstName
 		if staff.MiddleName != "" {
 			fullName += " " + staff.MiddleName
 		}
 		fullName += " " + staff.LastName
 
+		// Map staff role to user role
+		userRole := ""
+		switch staff.Role {
+		case "Teacher":
+			userRole = "teacher"
+		case "Director of Studies":
+			userRole = "director_of_studies"
+		case "Bursar":
+			userRole = "bursar"
+		case "Librarian":
+			userRole = "librarian"
+		case "Nurse":
+			userRole = "nurse"
+		case "Store Keeper":
+			userRole = "store_keeper"
+		case "School Admin":
+			userRole = "school_admin"
+		}
+
+		// Get current user to check if role changed
+		var currentUser models.User
+		if err := h.DB.First(&currentUser, "id = ?", staff.UserID).Error; err == nil {
+			if userRole != "" && currentUser.Role != userRole {
+				roleChanged = true
+			}
+		}
+
 		userUpdates := map[string]interface{}{
 			"full_name": fullName,
 			"email":     staff.Email,
 			"is_active": (staff.Status == "active"),
 		}
+		
+		// Only update role if it's a valid system role
+		if userRole != "" {
+			userUpdates["role"] = userRole
+		}
+
 		h.DB.Model(&models.User{}).Where("id = ?", staff.UserID).Updates(userUpdates)
 	}
 
-	c.JSON(http.StatusOK, staff)
+	c.JSON(http.StatusOK, gin.H{
+		"staff": staff,
+		"role_changed": roleChanged,
+		"message": func() string {
+			if roleChanged {
+				return "Staff role updated. User must log out and log back in for changes to take effect."
+			}
+			return "Staff updated successfully"
+		}(),
+	})
 }
 
 // DeleteStaff soft deletes a staff member

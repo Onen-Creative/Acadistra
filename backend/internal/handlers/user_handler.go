@@ -52,6 +52,7 @@ func (h *UserHandler) List(c *gin.Context) {
 	}
 	search := c.Query("search")
 	role := c.Query("role")
+	schoolID := c.Query("school_id")
 	offset := (page - 1) * limit
 
 	query := h.db.Model(&models.User{}).Preload("School")
@@ -60,6 +61,9 @@ func (h *UserHandler) List(c *gin.Context) {
 	}
 	if role != "" {
 		query = query.Where("role = ?", role)
+	}
+	if schoolID != "" {
+		query = query.Where("school_id = ?", schoolID)
 	}
 
 	var total int64
@@ -478,6 +482,10 @@ func (h *UserHandler) UpdateSchoolUser(c *gin.Context) {
 		return
 	}
 
+	// Track if role changed
+	roleChanged := false
+	oldRole := user.Role
+
 	if req.Email != "" {
 		user.Email = req.Email
 	}
@@ -485,7 +493,7 @@ func (h *UserHandler) UpdateSchoolUser(c *gin.Context) {
 		user.FullName = req.FullName
 	}
 	if req.Role != "" {
-		allowedRoles := []string{"teacher", "bursar", "librarian", "nurse", "store_keeper", "security", "cleaner", "cook", "driver", "gardener", "maintenance", "receptionist"}
+		allowedRoles := []string{"teacher", "bursar", "librarian", "nurse", "store_keeper", "dos", "director_of_studies", "security", "cleaner", "cook", "driver", "gardener", "maintenance", "receptionist"}
 		validRole := false
 		for _, role := range allowedRoles {
 			if req.Role == role {
@@ -494,8 +502,11 @@ func (h *UserHandler) UpdateSchoolUser(c *gin.Context) {
 			}
 		}
 		if !validRole {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role. Allowed: teacher, bursar, librarian, nurse, store_keeper, security, cleaner, cook, driver, gardener, maintenance, receptionist"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role. Allowed: teacher, bursar, librarian, nurse, dos, director_of_studies, store_keeper, security, cleaner, cook, driver, gardener, maintenance, receptionist"})
 			return
+		}
+		if req.Role != oldRole {
+			roleChanged = true
 		}
 		user.Role = req.Role
 	}
@@ -508,7 +519,16 @@ func (h *UserHandler) UpdateSchoolUser(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	c.JSON(http.StatusOK, gin.H{
+		"user": user,
+		"role_changed": roleChanged,
+		"message": func() string {
+			if roleChanged {
+				return "User role updated. User must log out and log back in for changes to take effect."
+			}
+			return "User updated successfully"
+		}(),
+	})
 }
 
 func (h *UserHandler) DeleteSchoolUser(c *gin.Context) {
