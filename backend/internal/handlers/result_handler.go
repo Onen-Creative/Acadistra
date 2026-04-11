@@ -887,6 +887,7 @@ func (h *ResultHandler) GetPerformanceSummary(c *gin.Context) {
 		Subjects    []SubjectMark `json:"subjects"`
 		TotalMarks  float64       `json:"total_marks"`
 		Average     float64       `json:"average"`
+		Aggregate   int           `json:"aggregate"`
 		Grade       string        `json:"grade"`
 		Position    int           `json:"position"`
 		Division    string        `json:"division"`
@@ -934,6 +935,7 @@ func (h *ResultHandler) GetPerformanceSummary(c *gin.Context) {
 			
 			subjects := []SubjectMark{}
 			totalMarks := 0.0
+			aggregate := 0 // For P4-P7 aggregate calculation
 			
 			for _, r := range results {
 				subjects = append(subjects, SubjectMark{
@@ -944,6 +946,30 @@ func (h *ResultHandler) GetPerformanceSummary(c *gin.Context) {
 					Grade:       r.Grade,
 				})
 				totalMarks += r.Total
+				
+				// Calculate aggregate for P4-P7 (sum of grade points)
+				if class.Level == "P4" || class.Level == "P5" || class.Level == "P6" || class.Level == "P7" {
+					switch r.Grade {
+					case "D1":
+						aggregate += 1
+					case "D2":
+						aggregate += 2
+					case "C3":
+						aggregate += 3
+					case "C4":
+						aggregate += 4
+					case "C5":
+						aggregate += 5
+					case "C6":
+						aggregate += 6
+					case "P7":
+						aggregate += 7
+					case "P8":
+						aggregate += 8
+					case "F9":
+						aggregate += 9
+					}
+				}
 			}
 			
 			average := 0.0
@@ -953,21 +979,51 @@ func (h *ResultHandler) GetPerformanceSummary(c *gin.Context) {
 			
 			grade := ""
 			division := ""
-			if average >= 80 {
-				grade = "A"
-				division = "I"
-			} else if average >= 65 {
-				grade = "B"
-				division = "II"
-			} else if average >= 50 {
-				grade = "C"
-				division = "III"
-			} else if average >= 35 {
-				grade = "D"
-				division = "IV"
+			
+			// For P4-P7, use aggregate-based division
+			if class.Level == "P4" || class.Level == "P5" || class.Level == "P6" || class.Level == "P7" {
+				if aggregate >= 4 && aggregate <= 12 {
+					division = "I"
+				} else if aggregate >= 13 && aggregate <= 23 {
+					division = "II"
+				} else if aggregate >= 24 && aggregate <= 29 {
+					division = "III"
+				} else if aggregate >= 30 {
+					division = "IV"
+				} else {
+					division = "U"
+				}
+				
+				// Set grade based on average for display
+				if average >= 80 {
+					grade = "A"
+				} else if average >= 65 {
+					grade = "B"
+				} else if average >= 50 {
+					grade = "C"
+				} else if average >= 35 {
+					grade = "D"
+				} else {
+					grade = "E"
+				}
 			} else {
-				grade = "E"
-				division = "U"
+				// For other levels, use average-based grading
+				if average >= 80 {
+					grade = "A"
+					division = "I"
+				} else if average >= 65 {
+					grade = "B"
+					division = "II"
+				} else if average >= 50 {
+					grade = "C"
+					division = "III"
+				} else if average >= 35 {
+					grade = "D"
+					division = "IV"
+				} else {
+					grade = "E"
+					division = "U"
+				}
 			}
 			
 			studentName := student.FirstName
@@ -984,6 +1040,7 @@ func (h *ResultHandler) GetPerformanceSummary(c *gin.Context) {
 				Subjects:    subjects,
 				TotalMarks:  totalMarks,
 				Average:     average,
+				Aggregate:   aggregate,
 				Grade:       grade,
 				Division:    division,
 			})
