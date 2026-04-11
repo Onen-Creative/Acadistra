@@ -1019,15 +1019,8 @@ func seedStandardSubjects(db *gorm.DB) {
 	allSubjects := []models.StandardSubject{}
 	allSubjects = append(allSubjects, nurseryDomains...)
 
-	// Replicate P1-P3 subjects for P2 and P3
-	for _, subject := range p13Subjects {
-		allSubjects = append(allSubjects, subject)
-		for _, level := range []string{"P2", "P3"} {
-			subjectCopy := subject
-			subjectCopy.Level = level
-			allSubjects = append(allSubjects, subjectCopy)
-		}
-	}
+	// P1-P3 subjects are already defined for all three levels, just add them
+	allSubjects = append(allSubjects, p13Subjects...)
 
 	// Replicate P4-P7 subjects for P5, P6, and P7
 	for _, subject := range p47Subjects {

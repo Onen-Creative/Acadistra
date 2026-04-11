@@ -465,18 +465,51 @@ func (h *ClassRankingHandler) getPrimaryRankings(students []models.Student, term
 					percentage := ((ca / 40) * 40) + ((exam / 60) * 60)
 					totalMarks += percentage
 					
-					// Calculate aggregate (1-4 scale)
-					var subjectAggregate int
-					if percentage >= 80 {
-						subjectAggregate = 1
-					} else if percentage >= 65 {
-						subjectAggregate = 2
-					} else if percentage >= 50 {
-						subjectAggregate = 3
-					} else {
-						subjectAggregate = 4
+					// Calculate aggregate using final_grade (D1=1, D2=2, C3=3, etc.)
+					grade := result.FinalGrade
+					var gradePoints int
+					switch grade {
+					case "D1":
+						gradePoints = 1
+					case "D2":
+						gradePoints = 2
+					case "C3":
+						gradePoints = 3
+					case "C4":
+						gradePoints = 4
+					case "C5":
+						gradePoints = 5
+					case "C6":
+						gradePoints = 6
+					case "P7":
+						gradePoints = 7
+					case "P8":
+						gradePoints = 8
+					case "F9":
+						gradePoints = 9
+					default:
+						// Fallback: calculate from percentage if grade is missing
+						if percentage >= 90 {
+							gradePoints = 1
+						} else if percentage >= 80 {
+							gradePoints = 2
+						} else if percentage >= 70 {
+							gradePoints = 3
+						} else if percentage >= 60 {
+							gradePoints = 4
+						} else if percentage >= 55 {
+							gradePoints = 5
+						} else if percentage >= 50 {
+							gradePoints = 6
+						} else if percentage >= 45 {
+							gradePoints = 7
+						} else if percentage >= 40 {
+							gradePoints = 8
+						} else {
+							gradePoints = 9
+						}
 					}
-					aggregate += subjectAggregate
+					aggregate += gradePoints
 					count++
 				}
 			}
@@ -488,17 +521,18 @@ func (h *ClassRankingHandler) getPrimaryRankings(students []models.Student, term
 
 		avgMarks := totalMarks / float64(count)
 		
-		// Determine division
+		// Determine division based on total aggregate (not average)
 		division := ""
-		avgAggregate := float64(aggregate) / float64(count)
-		if avgAggregate <= 1.5 {
+		if aggregate >= 4 && aggregate <= 12 {
 			division = "I"
-		} else if avgAggregate <= 2.5 {
+		} else if aggregate >= 13 && aggregate <= 23 {
 			division = "II"
-		} else if avgAggregate <= 3.5 {
+		} else if aggregate >= 24 && aggregate <= 29 {
 			division = "III"
-		} else {
+		} else if aggregate >= 30 {
 			division = "IV"
+		} else {
+			division = "U"
 		}
 
 		rankings = append(rankings, StudentRanking{

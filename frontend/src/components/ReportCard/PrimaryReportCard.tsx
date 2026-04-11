@@ -48,21 +48,25 @@ export default function PrimaryReportCard({
     
     results.forEach((r: any) => {
       const subjectTotal = r.raw_marks?.total || 0
+      const grade = r.final_grade || ''
       
       if (subjectTotal > 0) {
         total += subjectTotal
         count++
         
-        // Calculate aggregate based on weighted total (out of 100)
-        if (subjectTotal >= 90) aggregate += 1
-        else if (subjectTotal >= 80) aggregate += 2
-        else if (subjectTotal >= 70) aggregate += 3
-        else if (subjectTotal >= 60) aggregate += 4
-        else if (subjectTotal >= 55) aggregate += 5
-        else if (subjectTotal >= 50) aggregate += 6
-        else if (subjectTotal >= 45) aggregate += 7
-        else if (subjectTotal >= 40) aggregate += 8
-        else aggregate += 9
+        // Calculate aggregate based on grade (D1=1, D2=2, etc.)
+        switch (grade) {
+          case 'D1': aggregate += 1; break
+          case 'D2': aggregate += 2; break
+          case 'C3': aggregate += 3; break
+          case 'C4': aggregate += 4; break
+          case 'C5': aggregate += 5; break
+          case 'C6': aggregate += 6; break
+          case 'P7': aggregate += 7; break
+          case 'P8': aggregate += 8; break
+          case 'F9': aggregate += 9; break
+          default: aggregate += 9; break // Treat missing/invalid grades as F9
+        }
       }
     })
     
