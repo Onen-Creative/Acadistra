@@ -92,15 +92,32 @@ export default function ReportCardPage() {
 
 
   const { data: examTypesData } = useQuery({
-    queryKey: ['exam-types', selectedStudent, selectedYear, selectedTerm],
+    queryKey: ['exam-types', selectedStudent, selectedClass, selectedYear, selectedTerm, bulkPrintMode],
     queryFn: async () => {
+      if (bulkPrintMode && selectedClass) {
+        // In bulk mode, get exam types from all students in the class
+        const students = studentsData?.students || []
+        if (students.length === 0) return []
+        const allExamTypes = new Set<string>()
+        await Promise.all(
+          students.slice(0, 5).map(async (student: any) => {
+            const params: any = { year: selectedYear, term: selectedTerm }
+            const res = await resultsApi.getByStudent(student.id, params)
+            const results = res.results || []
+            results.forEach((r: any) => {
+              if (r.exam_type) allExamTypes.add(r.exam_type)
+            })
+          })
+        )
+        return Array.from(allExamTypes)
+      }
       if (!selectedStudent) return []
       const params: any = { year: selectedYear, term: selectedTerm }
       const res = await resultsApi.getByStudent(selectedStudent, params)
       const results = res.results || []
       return [...new Set(results.map((r: any) => r.exam_type).filter(Boolean))]
     },
-    enabled: !!selectedStudent
+    enabled: bulkPrintMode ? !!selectedClass && !!studentsData : !!selectedStudent
   })
 
   const currentResults = bulkPrintMode ? [] : (Array.isArray(resultsData) ? [] : resultsData?.results || [])
@@ -227,7 +244,7 @@ export default function ReportCardPage() {
                 onChange={(e) => setSelectedExamType(e.target.value)}
                 label="Exam Type"
                 icon="📝"
-                disabled={!selectedStudent}
+                disabled={bulkPrintMode ? !selectedClass : !selectedStudent}
                 options={[
                   { value: '', label: 'Select Exam Type' },
                   ...(examTypesData?.map((et: any) => ({ value: et, label: et })) || [])
@@ -366,14 +383,24 @@ export default function ReportCardPage() {
               const studentResultData = Array.isArray(resultsData) ? resultsData?.find((r: any) => r.student_id === studentId) : null
               const studentResults = studentResultData?.results || []
               const studentOutstandingFees = studentResultData?.outstanding_fees || 0
-              const mergedStudentSubjects = allSubjectsData?.subjects?.map((subject: any) => {
-                const result = studentResults?.find((r: any) => r.subject_id === subject.id)
-                return result || { subject_name: subject.name, subject_id: subject.id, raw_marks: {}, final_grade: '' }
-              }) || []
+              const isLastStudent = index === selectedStudents.length - 1
               
               return (
-                <div key={studentId}>
-                  {['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7'].includes(selectedClassData?.level || '') ? (
+                <div key={studentId} className={!isLastStudent ? 'print:break-after-page' : ''}>
+                  {['Baby', 'Middle', 'Top'].includes(selectedClassData?.level || '') ? (
+                    <NurseryReportCard
+                      student={{ ...studentData, class_name: selectedClassData?.name, class_level: selectedClassData?.level }}
+                      results={studentResults}
+                      subjects={allSubjectsData?.subjects || []}
+                      term={selectedTerm}
+                      year={selectedYear.toString()}
+                      examType={selectedExamType}
+                      school={schoolData}
+                      outstandingBalance={studentOutstandingFees}
+                      nextTermBegins={nextTermBegins}
+                      nextTermEnds={nextTermEnds}
+                    />
+                  ) : ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7'].includes(selectedClassData?.level || '') ? (
                     <PrimaryReportCard
                       student={{ ...studentData, class_name: selectedClassData?.name, class_level: selectedClassData?.level, class_id: selectedClass }}
                       results={studentResults}
@@ -385,7 +412,32 @@ export default function ReportCardPage() {
                       outstandingBalance={studentOutstandingFees}
                       nextTermBegins={nextTermBegins}
                       nextTermEnds={nextTermEnds}
-                      pageBreak={index < selectedStudents.length - 1}
+                    />
+                  ) : ['S1', 'S2', 'S3', 'S4'].includes(selectedClassData?.level || '') ? (
+                    <OrdinaryLevelReportCard
+                      student={{ ...studentData, class_name: selectedClassData?.name, class_level: selectedClassData?.level }}
+                      results={studentResults}
+                      subjects={allSubjectsData?.subjects || []}
+                      term={selectedTerm}
+                      year={selectedYear.toString()}
+                      examType={selectedExamType}
+                      school={schoolData}
+                      outstandingBalance={studentOutstandingFees}
+                      nextTermBegins={nextTermBegins}
+                      nextTermEnds={nextTermEnds}
+                    />
+                  ) : ['S5', 'S6'].includes(selectedClassData?.level || '') ? (
+                    <AdvancedLevelReportCard
+                      student={{ ...studentData, class_name: selectedClassData?.name, class_level: selectedClassData?.level }}
+                      results={studentResults}
+                      subjects={allSubjectsData?.subjects || []}
+                      term={selectedTerm}
+                      year={selectedYear.toString()}
+                      examType={selectedExamType}
+                      school={schoolData}
+                      outstandingBalance={studentOutstandingFees}
+                      nextTermBegins={nextTermBegins}
+                      nextTermEnds={nextTermEnds}
                     />
                   ) : null}
                 </div>

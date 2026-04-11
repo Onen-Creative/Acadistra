@@ -48,6 +48,7 @@ export default function LoginPage() {
         const route = result.user.role === 'parent' ? '/parent'
           : result.user.role === 'system_admin' ? '/dashboard/system-admin' 
           : result.user.role === 'school_admin' ? '/dashboard/school-admin'
+          : result.user.role === 'director_of_studies' ? '/dashboard'
           : result.user.role === 'nurse' ? '/clinic'
           : result.user.role === 'storekeeper' ? '/storekeeper'
           : '/dashboard'

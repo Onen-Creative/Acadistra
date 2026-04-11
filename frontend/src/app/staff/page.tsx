@@ -48,7 +48,7 @@ interface Staff {
   notes?: string
 }
 
-const ROLES = ['Teacher', 'Admin', 'Bursar', 'Librarian', 'Nurse', 'Store Keeper', 'Security', 'Cook', 'Cleaner', 'Driver', 'Accountant', 'IT Support']
+const ROLES = ['Teacher', 'Director of Studies', 'Admin', 'Bursar', 'Librarian', 'Nurse', 'Store Keeper', 'Security', 'Cook', 'Cleaner', 'Driver', 'Accountant', 'IT Support']
 const EMPLOYMENT_TYPES = ['Permanent', 'Contract', 'Part-time', 'Volunteer']
 
 export default function StaffPage() {

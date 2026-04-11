@@ -131,6 +131,22 @@ export default function PerformanceAnalytics() {
           <p className="text-gray-600 mt-1">Track and analyze student performance across subjects, classes, and terms</p>
         </div>
 
+        {/* Quick Links */}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">Class Rankings</h3>
+              <p className="text-xs text-gray-600">View student rankings by class with export to Excel</p>
+            </div>
+            <a
+              href="/analytics/class-rankings"
+              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              View Rankings
+            </a>
+          </div>
+        </div>
+
         {/* Filters */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">

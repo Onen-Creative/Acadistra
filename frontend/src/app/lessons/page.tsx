@@ -8,7 +8,7 @@ import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 
 export default function LessonMonitoringPage() {
-  const { user } = useRequireAuth(['school_admin']);
+  const { user } = useRequireAuth(['school_admin', 'director_of_studies', 'dos']);
   const [lessons, setLessons] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);

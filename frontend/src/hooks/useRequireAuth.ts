@@ -24,6 +24,8 @@ export function useRequireAuth(allowedRoles?: string[]) {
         // Redirect to appropriate page based on role
         const redirectPath = parsedUser.role === 'system_admin' ? '/dashboard/system-admin'
           : parsedUser.role === 'school_admin' ? '/dashboard/school-admin'
+          : parsedUser.role === 'director_of_studies' ? '/dashboard'
+          : parsedUser.role === 'dos' ? '/dashboard'
           : parsedUser.role === 'nurse' ? '/clinic'
           : parsedUser.role === 'storekeeper' ? '/storekeeper'
           : '/dashboard'

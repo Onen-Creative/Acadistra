@@ -23,6 +23,7 @@ type UserFormData = z.infer<typeof userSchema>
 export default function SystemUsersPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
+  const [schoolFilter, setSchoolFilter] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<any>(null)
@@ -34,13 +35,14 @@ export default function SystemUsersPage() {
   })
 
   const { data: users, isLoading } = useQuery({
-    queryKey: ['system-users', searchTerm, roleFilter, currentPage],
+    queryKey: ['system-users', searchTerm, roleFilter, schoolFilter, currentPage],
     queryFn: () => api.get('/api/v1/users', { 
       params: { 
         search: searchTerm, 
         role: roleFilter,
+        school_id: schoolFilter,
         page: currentPage,
-        limit: 10 // Show 10 users per page
+        limit: 10
       } 
     }).then(res => res.data),
   })
@@ -114,43 +116,55 @@ export default function SystemUsersPage() {
           />
 
           <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-            <div className="flex justify-between items-center mb-4">
-              <div className="flex gap-4">
-                <input
-                  type="text"
-                  placeholder="🔍 Search users..."
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value)
-                    setCurrentPage(1) // Reset to first page when searching
-                  }}
-                  className="input flex-1 border-2 border-gray-200 focus:border-blue-500 rounded-xl"
-                />
-                <select 
-                  value={roleFilter} 
-                  onChange={(e) => {
-                    setRoleFilter(e.target.value)
-                    setCurrentPage(1) // Reset to first page when filtering
-                  }} 
-                  className="input w-48 border-2 border-gray-200 focus:border-blue-500 rounded-xl"
-                >
-                  <option value="">All Roles</option>
-                  <option value="system_admin">System Admin</option>
-                  <option value="school_admin">School Admin</option>
-                  <option value="teacher">Teacher</option>
-                  <option value="bursar">Bursar</option>
-                  <option value="librarian">Librarian</option>
-                  <option value="nurse">Nurse</option>
-                  <option value="storekeeper">Store Keeper</option>
-                  <option value="parent">Parent</option>
-                </select>
-              </div>
-              {users?.total && (
-                <div className="text-sm text-gray-600">
-                  Showing {startUser}-{endUser} of {users.total} users
-                </div>
-              )}
+            <div className="flex flex-wrap gap-4 mb-4">
+              <input
+                type="text"
+                placeholder="🔍 Search users..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value)
+                  setCurrentPage(1)
+                }}
+                className="input flex-1 min-w-[200px] border-2 border-gray-200 focus:border-blue-500 rounded-xl"
+              />
+              <select 
+                value={roleFilter} 
+                onChange={(e) => {
+                  setRoleFilter(e.target.value)
+                  setCurrentPage(1)
+                }} 
+                className="input w-48 border-2 border-gray-200 focus:border-blue-500 rounded-xl"
+              >
+                <option value="">All Roles</option>
+                <option value="system_admin">System Admin</option>
+                <option value="school_admin">School Admin</option>
+                <option value="director_of_studies">Director of Studies</option>
+                <option value="teacher">Teacher</option>
+                <option value="bursar">Bursar</option>
+                <option value="librarian">Librarian</option>
+                <option value="nurse">Nurse</option>
+                <option value="storekeeper">Store Keeper</option>
+                <option value="parent">Parent</option>
+              </select>
+              <select 
+                value={schoolFilter} 
+                onChange={(e) => {
+                  setSchoolFilter(e.target.value)
+                  setCurrentPage(1)
+                }} 
+                className="input w-56 border-2 border-gray-200 focus:border-blue-500 rounded-xl"
+              >
+                <option value="">All Schools</option>
+                {schools?.schools?.map((school: any) => (
+                  <option key={school.id} value={school.id}>{school.name}</option>
+                ))}
+              </select>
             </div>
+            {users?.total && (
+              <div className="text-sm text-gray-600 mb-4">
+                Showing {startUser}-{endUser} of {users.total} users
+              </div>
+            )}
 
             {isLoading ? (
               <LoadingSpinner />
@@ -367,44 +381,129 @@ export default function SystemUsersPage() {
           )}
 
           {isModalOpen && (
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-              <div className="bg-white rounded-2xl p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
-                <h2 className="text-2xl font-bold mb-6 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  {editingUser ? 'Edit User' : 'Create New User'}
-                </h2>
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                  <div>
-                    <label className="label">Full Name *</label>
-                    <input {...register('full_name')} className="input" />
-                    {errors.full_name && <p className="text-red-500 text-sm mt-1">{errors.full_name.message}</p>}
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-3xl w-full max-w-3xl max-h-[95vh] overflow-hidden shadow-2xl">
+                {/* Header */}
+                <div className="relative bg-gradient-to-br from-blue-600 via-purple-600 to-pink-500 p-6">
+                  <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    {editingUser ? 'Edit User' : 'Create New User'}
+                  </h2>
+                  <p className="text-white/80 text-sm mt-1">Fill in the details below to {editingUser ? 'update' : 'create'} a user account</p>
+                </div>
+
+                {/* Form Content */}
+                <form onSubmit={handleSubmit(onSubmit)} className="overflow-y-auto" style={{ maxHeight: 'calc(95vh - 180px)' }}>
+                  <div className="p-6 space-y-6">
+                    {/* Personal Information */}
+                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6">
+                      <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        Personal Information
+                      </h3>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name *</label>
+                          <input 
+                            {...register('full_name')} 
+                            className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all outline-none"
+                            placeholder="Enter full name"
+                          />
+                          {errors.full_name && <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            {errors.full_name.message}
+                          </p>}
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">Email Address *</label>
+                          <input 
+                            {...register('email')} 
+                            type="email"
+                            className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all outline-none"
+                            placeholder="user@example.com"
+                          />
+                          {errors.email && <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            {errors.email.message}
+                          </p>}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* School Assignment */}
+                    <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-6">
+                      <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                        School Assignment
+                      </h3>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">Select School *</label>
+                        <select 
+                          {...register('school_id')} 
+                          className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all outline-none"
+                        >
+                          <option value="">Choose a school</option>
+                          {schools?.schools?.map((school: any) => (
+                            <option key={school.id} value={school.id}>{school.name}</option>
+                          ))}
+                        </select>
+                        {errors.school_id && <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                          {errors.school_id.message}
+                        </p>}
+                        <p className="text-xs text-gray-500 mt-2">The user will be assigned to this school</p>
+                      </div>
+                    </div>
+
+                    {/* Security */}
+                    <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6">
+                      <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        Security & Access
+                      </h3>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">Password *</label>
+                        <input 
+                          {...register('password')} 
+                          type="password"
+                          className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all outline-none"
+                          placeholder="Minimum 8 characters"
+                        />
+                        {errors.password && <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                          {errors.password.message}
+                        </p>}
+                        <p className="text-xs text-gray-500 mt-2">
+                          <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          User will be created as School Admin with full access to their school
+                        </p>
+                      </div>
+                    </div>
+
+                    <input type="hidden" {...register('role')} value="school_admin" />
                   </div>
 
-                  <div>
-                    <label className="label">Email *</label>
-                    <input {...register('email')} type="email" className="input" />
-                    {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>}
-                  </div>
-
-                  <div>
-                    <label className="label">School *</label>
-                    <select {...register('school_id')} className="input">
-                      <option value="">Select School</option>
-                      {schools?.schools?.map((school: any) => (
-                        <option key={school.id} value={school.id}>{school.name}</option>
-                      ))}
-                    </select>
-                    {errors.school_id && <p className="text-red-500 text-sm mt-1">{errors.school_id.message}</p>}
-                  </div>
-
-                  <div>
-                    <label className="label">Password *</label>
-                    <input {...register('password')} type="password" className="input" placeholder="Min 8 characters" />
-                    {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password.message}</p>}
-                  </div>
-
-                  <input type="hidden" {...register('role')} value="school_admin" />
-
-                  <div className="flex justify-end space-x-3 pt-4">
+                  {/* Action Buttons - Sticky */}
+                  <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
                     <button
                       type="button"
                       onClick={() => {
@@ -412,12 +511,18 @@ export default function SystemUsersPage() {
                         setEditingUser(null)
                         reset()
                       }}
-                      className="btn-secondary"
+                      className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-all"
                     >
                       Cancel
                     </button>
-                    <button type="submit" className="btn-primary">
-                      {editingUser ? 'Update' : 'Create'}
+                    <button 
+                      type="submit" 
+                      className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all hover:scale-105 flex items-center gap-2"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      {editingUser ? 'Update User' : 'Create User'}
                     </button>
                   </div>
                 </form>

@@ -19,6 +19,10 @@ function RoleBasedDashboard() {
       case 'teacher':
         router.push('/dashboard/teacher')
         break
+      case 'director_of_studies':
+      case 'dos':
+        router.push('/dashboard/dos')
+        break
       case 'bursar':
         router.push('/dashboard/bursar')
         break

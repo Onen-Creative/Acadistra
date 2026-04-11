@@ -195,9 +195,27 @@ export default function ResultsPage() {
 
   const stats = {
     totalResults: resultsData?.length || 0,
-    avgMarks: resultsData?.length ? (resultsData.reduce((sum: number, r: any) => sum + (r.raw_marks?.total || 0), 0) / resultsData.length).toFixed(1) : 0,
-    passed: resultsData?.filter((r: any) => (r.raw_marks?.total || 0) >= 50).length || 0,
-    failed: resultsData?.filter((r: any) => (r.raw_marks?.total || 0) < 50).length || 0,
+    avgMarks: resultsData?.length ? (() => {
+      const isNursery = ['Baby', 'Middle', 'Top'].includes(currentLevel)
+      const sum = resultsData.reduce((sum: number, r: any) => {
+        const marks = r.raw_marks || {}
+        const total = isNursery ? (marks.mark || 0) : (marks.total || 0)
+        return sum + total
+      }, 0)
+      return (sum / resultsData.length).toFixed(1)
+    })() : 0,
+    passed: resultsData?.filter((r: any) => {
+      const isNursery = ['Baby', 'Middle', 'Top'].includes(currentLevel)
+      const marks = r.raw_marks || {}
+      const total = isNursery ? (marks.mark || 0) : (marks.total || 0)
+      return total >= 50
+    }).length || 0,
+    failed: resultsData?.filter((r: any) => {
+      const isNursery = ['Baby', 'Middle', 'Top'].includes(currentLevel)
+      const marks = r.raw_marks || {}
+      const total = isNursery ? (marks.mark || 0) : (marks.total || 0)
+      return total < 50
+    }).length || 0,
   }
 
   const exportToExcel = () => {
@@ -214,7 +232,9 @@ export default function ResultsPage() {
       const paper = marks.paper || null
       const isAdvanced = ['S5', 'S6'].includes(currentLevel)
       const isOLevel = ['S1', 'S2', 'S3', 'S4'].includes(currentLevel)
+      const isNursery = ['Baby', 'Middle', 'Top'].includes(currentLevel)
       const caLabel = isOLevel ? 'AOI' : 'CA'
+      const totalLabel = isNursery ? 'Average' : 'Total'
       const row: any = {
         'Student': result.student_name || 'N/A',
         'Subject': result.subject_name,
@@ -222,7 +242,7 @@ export default function ResultsPage() {
         'Exam Type': result.exam_type || 'N/A',
         [caLabel]: marks.ca || 0,
         'Exam': marks.exam || 0,
-        'Total': marks.total || 0,
+        [totalLabel]: marks.total || marks.mark || 0,
         'Grade': result.final_grade
       }
       return row
@@ -451,14 +471,16 @@ export default function ResultsPage() {
                       <th className="text-center py-4 px-4 font-semibold text-gray-700">Exam Type</th>
                       <th className="text-center py-4 px-4 font-semibold text-gray-700">{['S1', 'S2', 'S3', 'S4'].includes(currentLevel) ? 'AOI' : 'CA'}</th>
                       <th className="text-center py-4 px-4 font-semibold text-gray-700">Exam</th>
-                      <th className="text-center py-4 px-4 font-semibold text-gray-700">Total</th>
+                      <th className="text-center py-4 px-4 font-semibold text-gray-700">{['Baby', 'Middle', 'Top'].includes(currentLevel) ? 'Average' : 'Total'}</th>
                       <th className="text-center py-4 px-4 font-semibold text-gray-700">Grade</th>
                     </tr>
                   </thead>
                   <tbody>
                     {resultsData.map((result: any, idx: number) => {
                       const marks = result.raw_marks || {}
-                      const total = marks.total || 0
+                      const isNursery = ['Baby', 'Middle', 'Top'].includes(currentLevel)
+                      // For nursery, use 'mark' field; for others use 'total'
+                      const total = isNursery ? (marks.mark || 0) : (marks.total || 0)
                       const ca = marks.ca || 0
                       const exam = marks.exam || 0
                       const examType = result.exam_type || 'N/A'

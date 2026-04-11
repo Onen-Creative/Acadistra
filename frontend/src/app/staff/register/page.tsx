@@ -6,7 +6,7 @@ import { DashboardLayout } from '@/components/DashboardLayout'
 import api from '@/services/api'
 import toast from 'react-hot-toast'
 
-const ROLES = ['Teacher', 'Bursar', 'Librarian', 'Nurse', 'Store Keeper', 'Security', 'Cook', 'Cleaner', 'Driver', 'Accountant', 'IT Support', 'Receptionist']
+const ROLES = ['Teacher', 'Director of Studies', 'Bursar', 'Librarian', 'Nurse', 'Store Keeper', 'Security', 'Cook', 'Cleaner', 'Driver', 'Accountant', 'IT Support', 'Receptionist']
 const EMPLOYMENT_TYPES = ['Permanent', 'Contract', 'Part-time', 'Volunteer']
 
 export default function StaffRegisterPage() {

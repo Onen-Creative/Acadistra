@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -28,6 +28,7 @@ export default function ClassesPage() {
   const [editingClass, setEditingClass] = useState<any>(null)
   const [user, setUser] = useState<any>(null)
   const queryClient = useQueryClient()
+  const notificationShownRef = useRef(false)
 
   useEffect(() => {
     const userData = localStorage.getItem('user')
@@ -36,35 +37,53 @@ export default function ClassesPage() {
     }
   }, [])
 
-  const { data: levelsData, isLoading: levelsLoading, error: levelsError } = useQuery({
+  const { data: levelsData, isLoading: levelsLoading, error: levelsError, isSuccess } = useQuery({
     queryKey: ['school-levels'],
     queryFn: async () => {
       const response = await schoolsApi.getLevels()
       return response
     },
     retry: 2,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+    enabled: !!user, // Only run query when user is loaded
   })
 
   const availableLevels = levelsData?.levels || []
 
   useEffect(() => {
-    if (levelsError) {
+    // Only show notification once and only if there's an actual error
+    if (levelsError && !notificationShownRef.current) {
       console.error('Failed to load levels:', levelsError)
       notifications.show({ 
+        id: 'levels-error',
         title: 'Warning', 
         message: 'Failed to load school levels. Please refresh the page.', 
-        color: 'orange' 
+        color: 'orange',
+        autoClose: 5000,
       })
+      notificationShownRef.current = true
     }
-    if (!levelsLoading && availableLevels.length === 0) {
+    
+    // Only show "no levels" notification if:
+    // 1. The query has completed successfully (isSuccess)
+    // 2. Not currently loading
+    // 3. levelsData exists and has levels property
+    // 4. The levels array is actually empty (length is 0)
+    // 5. Notification hasn't been shown yet
+    if (isSuccess && !levelsLoading && levelsData?.levels && levelsData.levels.length === 0 && !notificationShownRef.current) {
       console.warn('No levels configured for this school')
       notifications.show({ 
+        id: 'no-levels',
         title: 'No Levels Configured', 
         message: 'Your school has no levels configured. Please contact your system administrator to set up school levels.', 
-        color: 'yellow' 
+        color: 'yellow',
+        autoClose: false,
       })
+      notificationShownRef.current = true
     }
-  }, [levelsError, levelsLoading, availableLevels])
+  }, [levelsError, isSuccess, levelsLoading, levelsData])
 
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<ClassFormData>({
     resolver: zodResolver(classSchema),

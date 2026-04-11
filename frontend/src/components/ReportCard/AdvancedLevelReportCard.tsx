@@ -84,22 +84,22 @@ export default function AdvancedLevelReportCard({
               src={school.logo_url} 
               alt="School Logo" 
               className="object-contain bg-white rounded border-2 border-black p-1"
-              style={{ height: '50px', width: '50px' }}
+              style={{ height: '50px', width: '50px', flexShrink: 0 }}
               fallback="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='50' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2'%3E%3Cpath d='M22 10v6M2 10l10-5 10 5-10 5z'/%3E%3Cpath d='M6 12v5c3 3 9 3 12 0v-5'/%3E%3C/svg%3E"
             />
           )}
-          <div style={{ flex: 1 }}>
-            <h1 style={{ fontSize: '20px', fontWeight: '700', margin: '0 0 3px 0', textTransform: 'uppercase', letterSpacing: '1px' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h1 style={{ fontSize: '18px', fontWeight: '700', margin: '0 0 2px 0', textTransform: 'uppercase', letterSpacing: '0.5px', lineHeight: '1.2' }}>
               {school?.name}
             </h1>
-            <p style={{ fontSize: '11px', margin: '0 0 2px 0', fontStyle: 'italic' }}>
+            <p style={{ fontSize: '12px', margin: '0 0 2px 0', fontStyle: 'italic', lineHeight: '1.2' }}>
               {school?.motto}
             </p>
-            <p style={{ fontSize: '10px', margin: 0 }}>
+            <p style={{ fontSize: '9px', margin: 0, lineHeight: '1.2' }}>
               {school?.address} • {school?.phone} • {school?.contact_email}
             </p>
           </div>
-          <div style={{ textAlign: 'right' }}>
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
             <div style={{ background: 'white', color: '#000', padding: '8px 14px', borderRadius: '4px', border: '2px solid #000' }}>
               <p style={{ fontSize: '12px', fontWeight: '700', margin: 0 }}>UACE REPORT</p>
               <p style={{ fontSize: '10px', margin: '2px 0 0 0' }}>{year} • {term}</p>
@@ -111,11 +111,11 @@ export default function AdvancedLevelReportCard({
               src={student.photo_url}
               alt="Student Photo"
               className="object-cover rounded border-2 border-black"
-              style={{ height: '50px', width: '50px' }}
+              style={{ height: '50px', width: '50px', flexShrink: 0 }}
               fallback="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='50' viewBox='0 0 24 24' fill='%23f3f4f6'%3E%3Cpath d='M12 12C14.7614 12 17 9.76142 17 7C17 4.23858 14.7614 2 12 2C9.23858 2 7 4.23858 7 7C7 9.76142 9.23858 12 12 12Z' fill='%239CA3AF'/%3E%3Cpath d='M12 14C7.58172 14 4 17.5817 4 22H20C20 17.5817 16.4183 14 12 14Z' fill='%239CA3AF'/%3E%3C/svg%3E"
             />
           ) : (
-            <div style={{ height: '50px', width: '50px', background: '#f3f4f6', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #000' }}>
+            <div style={{ height: '50px', width: '50px', background: '#f3f4f6', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #000', flexShrink: 0 }}>
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M12 12C14.7614 12 17 9.76142 17 7C17 4.23858 14.7614 2 12 2C9.23858 2 7 4.23858 7 7C7 9.76142 9.23858 12 12 12Z" fill="#9CA3AF"/>
                 <path d="M12 14C7.58172 14 4 17.5817 4 22H20C20 17.5817 16.4183 14 12 14Z" fill="#9CA3AF"/>

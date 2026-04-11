@@ -68,7 +68,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       const searchLower = query.toLowerCase().trim()
 
       // Search students
-      if (['school_admin', 'teacher', 'bursar', 'nurse'].includes(user?.role)) {
+      if (['school_admin', 'teacher', 'bursar', 'nurse', 'dos', 'director_of_studies'].includes(user?.role)) {
         try {
           const studentsRes = await api.get('/students')
           if (studentsRes.data) {
@@ -124,7 +124,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       }
 
       // Search classes
-      if (['school_admin', 'teacher'].includes(user?.role)) {
+      if (['school_admin', 'teacher', 'dos', 'director_of_studies'].includes(user?.role)) {
         try {
           const classesRes = await api.get('/classes')
           if (classesRes.data) {
@@ -211,6 +211,19 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
           { href: '/marks/enter', label: 'Enter Marks', icon: Edit3 },
           { href: '/view-marks', label: 'View Marks', icon: Eye },
+          { href: '/attendance', label: 'Attendance', icon: Calendar },
+          { href: '/finance/requisitions', label: 'Requisitions', icon: ClipboardList },
+        ]
+      case 'dos':
+      case 'director_of_studies':
+        return [
+          { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+          { href: '/classes', label: 'Classes', icon: BookOpen },
+          { href: '/students', label: 'Students', icon: GraduationCap },
+          { href: '/results', label: 'Results', icon: ClipboardList },
+          { href: '/report-cards', label: 'Report Cards', icon: FileText },
+          { href: '/lessons', label: 'Lesson Monitoring', icon: BookOpen },
+          { href: '/analytics', label: 'Performance Analytics', icon: BarChart3 },
           { href: '/attendance', label: 'Attendance', icon: Calendar },
           { href: '/finance/requisitions', label: 'Requisitions', icon: ClipboardList },
         ]

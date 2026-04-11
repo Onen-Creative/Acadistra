@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -49,6 +49,7 @@ type StudentForm = z.infer<typeof studentSchema>
 
 export default function StudentRegistrationPage() {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const [step, setStep] = useState(0)
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
@@ -87,6 +88,7 @@ export default function StudentRegistrationPage() {
     mutationFn: (data: any) => studentsApi.create(data),
     onSuccess: () => {
       notifications.show({ title: 'Success', message: 'Student registered', color: 'green' })
+      queryClient.invalidateQueries({ queryKey: ['students'] })
       router.push('/students')
     },
     onError: (error: any) => {
