@@ -79,15 +79,15 @@ export default function SystemUsersPage() {
 
   const onSubmit = (data: UserFormData) => {
     // Remove password if empty when editing
-    const payload = { ...data }
+    const payload: Partial<UserFormData> = { ...data }
     if (editingUser && !payload.password) {
       delete payload.password
     }
     
     if (editingUser) {
-      updateMutation.mutate({ id: editingUser.id, data: payload })
+      updateMutation.mutate({ id: editingUser.id, data: payload as UserFormData })
     } else {
-      createMutation.mutate(payload)
+      createMutation.mutate(payload as UserFormData)
     }
   }
 
