@@ -13,9 +13,9 @@ import api from '@/services/api'
 const userSchema = z.object({
   full_name: z.string().min(3),
   email: z.string().email(),
-  role: z.enum(['school_admin']),
+  role: z.enum(['school_admin', 'director_of_studies', 'teacher', 'bursar', 'librarian', 'nurse', 'storekeeper']),
   school_id: z.string().min(1, 'School is required'),
-  password: z.string().min(8),
+  password: z.string().min(8).or(z.literal('')),
 })
 
 type UserFormData = z.infer<typeof userSchema>
@@ -78,10 +78,16 @@ export default function SystemUsersPage() {
   })
 
   const onSubmit = (data: UserFormData) => {
+    // Remove password if empty when editing
+    const payload = { ...data }
+    if (editingUser && !payload.password) {
+      delete payload.password
+    }
+    
     if (editingUser) {
-      updateMutation.mutate({ id: editingUser.id, data })
+      updateMutation.mutate({ id: editingUser.id, data: payload })
     } else {
-      createMutation.mutate(data)
+      createMutation.mutate(payload)
     }
   }
 
@@ -476,30 +482,51 @@ export default function SystemUsersPage() {
                         </svg>
                         Security & Access
                       </h3>
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">Password *</label>
-                        <input 
-                          {...register('password')} 
-                          type="password"
-                          className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all outline-none"
-                          placeholder="Minimum 8 characters"
-                        />
-                        {errors.password && <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                          </svg>
-                          {errors.password.message}
-                        </p>}
-                        <p className="text-xs text-gray-500 mt-2">
-                          <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          User will be created as School Admin with full access to their school
-                        </p>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">Role *</label>
+                          <select 
+                            {...register('role')} 
+                            className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all outline-none"
+                          >
+                            <option value="school_admin">School Admin</option>
+                            <option value="director_of_studies">Director of Studies</option>
+                            <option value="teacher">Teacher</option>
+                            <option value="bursar">Bursar</option>
+                            <option value="librarian">Librarian</option>
+                            <option value="nurse">Nurse</option>
+                            <option value="storekeeper">Store Keeper</option>
+                          </select>
+                          {errors.role && <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            {errors.role.message}
+                          </p>}
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">Password {editingUser ? '(leave blank to keep current)' : '*'}</label>
+                          <input 
+                            {...register('password')} 
+                            type="password"
+                            className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all outline-none"
+                            placeholder={editingUser ? 'Leave blank to keep current password' : 'Minimum 8 characters'}
+                          />
+                          {errors.password && <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            {errors.password.message}
+                          </p>}
+                          <p className="text-xs text-gray-500 mt-2">
+                            <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            User will have access based on their assigned role
+                          </p>
+                        </div>
                       </div>
                     </div>
-
-                    <input type="hidden" {...register('role')} value="school_admin" />
                   </div>
 
                   {/* Action Buttons - Sticky */}

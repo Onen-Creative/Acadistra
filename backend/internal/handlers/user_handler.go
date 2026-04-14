@@ -305,6 +305,7 @@ func (h *UserHandler) Update(c *gin.Context) {
 		Email    string `json:"email"`
 		FullName string `json:"full_name"`
 		Role     string `json:"role"`
+		Password string `json:"password"`
 		IsActive *bool  `json:"is_active"`
 	}
 
@@ -321,6 +322,15 @@ func (h *UserHandler) Update(c *gin.Context) {
 	}
 	if req.Role != "" {
 		user.Role = req.Role
+	}
+	if req.Password != "" {
+		// Use argon2id for password hashing (same as the rest of the system)
+		hashedPassword, err := h.authService.HashPassword(req.Password)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+			return
+		}
+		user.PasswordHash = hashedPassword
 	}
 	if req.IsActive != nil {
 		user.IsActive = *req.IsActive
