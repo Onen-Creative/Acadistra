@@ -406,9 +406,7 @@ func main() {
 				
 				// Student registration (comprehensive with guardians)
 				schoolAdmin.POST("/students", registrationHandler.RegisterStudent)
-				schoolAdmin.PUT("/students/:id", studentHandler.Update)
 				schoolAdmin.DELETE("/students/:id", studentHandler.Delete)
-				schoolAdmin.POST("/students/:id/promote", studentHandler.PromoteOrDemote)
 				
 				// Guardian management
 				schoolAdmin.POST("/guardians", guardianHandler.Create)
@@ -463,6 +461,10 @@ func main() {
 					schoolAdminOrDOS.GET("/lessons/subjects", lessonHandler.GetSchoolSubjects)
 					schoolAdminOrDOS.GET("/lessons/teachers", lessonHandler.GetSchoolTeachers)
 					
+					// Student management - School Admin and DOS
+					schoolAdminOrDOS.PUT("/students/:id", studentHandler.Update)
+					schoolAdminOrDOS.POST("/students/:id/promote", studentHandler.PromoteOrDemote)
+					
 					// Student import - School Admin and DOS
 					schoolAdminOrDOS.POST("/import/students/upload", bulkImportXLSXHandler.UploadStudents)
 					
@@ -474,14 +476,14 @@ func main() {
 				}
 			}
 			
-			// Template downloads - School Admin and Teachers (with query token support)
+			// Template downloads - School Admin, DOS, and Teachers (with query token support)
 			templateDL := v1.Group("/import/templates")
 			templateDL.Use(middleware.AllowQueryToken())
 			templateDL.Use(middleware.AuthMiddleware(authService))
 			templateDL.Use(middleware.TenantMiddleware())
 			templateDL.Use(func(c *gin.Context) {
 				userRole := c.GetString("user_role")
-				if userRole != "teacher" && userRole != "school_admin" && userRole != "system_admin" {
+				if userRole != "teacher" && userRole != "school_admin" && userRole != "dos" && userRole != "system_admin" {
 					c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 					c.Abort()
 					return
@@ -493,11 +495,11 @@ func main() {
 				templateDL.GET("/marks", bulkImportXLSXHandler.DownloadMarksTemplate)
 			}
 			
-			// Marks import - Teachers and School Admins
+			// Marks import - Teachers, DOS, and School Admins
 			teacherOrAdmin := protected.Group("")
 			teacherOrAdmin.Use(func(c *gin.Context) {
 				userRole := c.GetString("user_role")
-				if userRole != "teacher" && userRole != "school_admin" && userRole != "system_admin" {
+				if userRole != "teacher" && userRole != "school_admin" && userRole != "dos" && userRole != "system_admin" {
 					c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 					c.Abort()
 					return
