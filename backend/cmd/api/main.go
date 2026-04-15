@@ -404,10 +404,6 @@ func main() {
 				schoolAdmin.GET("/school-settings", settingsHandler.GetSchoolSettings)
 				schoolAdmin.PUT("/school-settings", settingsHandler.UpdateSchoolSettings)
 				
-				// Student registration (comprehensive with guardians)
-				schoolAdmin.POST("/students", registrationHandler.RegisterStudent)
-				schoolAdmin.DELETE("/students/:id", studentHandler.Delete)
-				
 				// Guardian management
 				schoolAdmin.POST("/guardians", guardianHandler.Create)
 				schoolAdmin.GET("/guardians", guardianHandler.List)
@@ -461,8 +457,10 @@ func main() {
 					schoolAdminOrDOS.GET("/lessons/subjects", lessonHandler.GetSchoolSubjects)
 					schoolAdminOrDOS.GET("/lessons/teachers", lessonHandler.GetSchoolTeachers)
 					
-					// Student management - School Admin and DOS
+					// Student management - School Admin and DOS (Full CRUD)
+					schoolAdminOrDOS.POST("/students", registrationHandler.RegisterStudent)
 					schoolAdminOrDOS.PUT("/students/:id", studentHandler.Update)
+					schoolAdminOrDOS.DELETE("/students/:id", studentHandler.Delete)
 					schoolAdminOrDOS.POST("/students/:id/promote", studentHandler.PromoteOrDemote)
 					
 					// Student import - School Admin and DOS
