@@ -483,7 +483,7 @@ func main() {
 			templateDL.Use(middleware.TenantMiddleware())
 			templateDL.Use(func(c *gin.Context) {
 				userRole := c.GetString("user_role")
-				if userRole != "teacher" && userRole != "school_admin" && userRole != "dos" && userRole != "system_admin" {
+				if userRole != "teacher" && userRole != "school_admin" && userRole != "dos" && userRole != "director_of_studies" && userRole != "system_admin" {
 					c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 					c.Abort()
 					return
@@ -499,7 +499,7 @@ func main() {
 			teacherOrAdmin := protected.Group("")
 			teacherOrAdmin.Use(func(c *gin.Context) {
 				userRole := c.GetString("user_role")
-				if userRole != "teacher" && userRole != "school_admin" && userRole != "dos" && userRole != "system_admin" {
+				if userRole != "teacher" && userRole != "school_admin" && userRole != "dos" && userRole != "director_of_studies" && userRole != "system_admin" {
 					c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 					c.Abort()
 					return
