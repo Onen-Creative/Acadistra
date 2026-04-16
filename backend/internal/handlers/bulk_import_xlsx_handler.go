@@ -1,8 +1,11 @@
 package handlers
 
 import (
+	"fmt"
+	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -26,10 +29,27 @@ func NewBulkImportXLSXHandler(db *gorm.DB) *BulkImportXLSXHandler {
 // DownloadStudentTemplate generates XLSX template
 func (h *BulkImportXLSXHandler) DownloadStudentTemplate(c *gin.Context) {
 	classID := c.Query("class_id")
+	year := c.Query("year")
+	term := c.Query("term")
+	
+	log.Printf("[DEBUG] DownloadStudentTemplate - classID: %s, year: %s, term: %s", classID, year, term)
+	
 	if classID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "class_id is required"})
 		return
 	}
+
+	// Get class info for filename
+	var class struct {
+		Name  string `gorm:"column:name"`
+		Level string `gorm:"column:level"`
+	}
+	if err := h.db.Table("classes").Select("name, level").Where("id = ?", classID).First(&class).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Class not found"})
+		return
+	}
+	
+	log.Printf("[DEBUG] Class info - Name: %s, Level: %s", class.Name, class.Level)
 
 	file, err := h.service.GenerateStudentTemplate(uuid.MustParse(classID))
 	if err != nil {
@@ -37,8 +57,22 @@ func (h *BulkImportXLSXHandler) DownloadStudentTemplate(c *gin.Context) {
 		return
 	}
 
+	// Generate descriptive filename
+	var filename string
+	if year != "" && term != "" {
+		// Format: student_import_ClassName_Level_Year_Term.xlsx
+		filename = fmt.Sprintf("student_import_%s_%s_%s_%s.xlsx", class.Name, class.Level, year, term)
+	} else {
+		// Format: student_import_ClassName_Level.xlsx
+		filename = fmt.Sprintf("student_import_%s_%s.xlsx", class.Name, class.Level)
+	}
+	// Sanitize filename (remove spaces and special chars)
+	filename = sanitizeFilename(filename)
+	
+	log.Printf("[DEBUG] Generated filename: %s", filename)
+
 	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	c.Header("Content-Disposition", "attachment; filename=student_import_template.xlsx")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
 	
 	if err := file.Write(c.Writer); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to write file"})
@@ -316,4 +350,12 @@ func (h *BulkImportXLSXHandler) RejectImport(c *gin.Context) {
 
 func isXLSXFile(filename string) bool {
 	return len(filename) > 5 && (filename[len(filename)-5:] == ".xlsx" || filename[len(filename)-4:] == ".xls")
+}
+
+func sanitizeFilename(filename string) string {
+	// Replace spaces with underscores and remove special characters
+	filename = strings.ReplaceAll(filename, " ", "_")
+	filename = strings.ReplaceAll(filename, "/", "_")
+	filename = strings.ReplaceAll(filename, "\\", "_")
+	return filename
 }

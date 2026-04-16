@@ -329,10 +329,24 @@ export default function StudentsPage() {
       const token = localStorage.getItem('access_token')
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/v1/import/templates/students?year=${importYear}&term=${importTerm}&class_id=${importClass}&token=${token}`)
       const blob = await res.blob()
+      
+      // Extract filename from Content-Disposition header
+      const contentDisposition = res.headers.get('Content-Disposition')
+      console.log('Content-Disposition:', contentDisposition)
+      let filename = `student_import_template.xlsx`
+      if (contentDisposition) {
+        // Match: attachment; filename=something.xlsx or attachment; filename="something.xlsx"
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=(['"]?)([^'"\n]*?)\1(?:;|$)/)
+        if (filenameMatch && filenameMatch[2]) {
+          filename = filenameMatch[2]
+        }
+      }
+      console.log('Extracted filename:', filename)
+      
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = `student_import_template_${importYear}_T${importTerm}.xlsx`
+      link.download = filename
       document.body.appendChild(link)
       link.click()
       link.remove()

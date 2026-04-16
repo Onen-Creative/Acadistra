@@ -182,13 +182,20 @@ export default function AOIMarksEntryPage() {
                   {selectedClass?.name} • {subjectsData?.subjects?.find((s: any) => s.id === subjectId)?.name} • 5 Activities (0-3 each)
                 </p>
               </div>
-              <button
-                onClick={handleSave}
-                disabled={Object.keys(aoiMarks).length === 0 || !subjectId || !classId || (hasExistingMarks && userRole !== 'school_admin')}
-                className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold bg-gradient-to-r from-green-500 to-green-700 text-white hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
-              >
-                💾 {hasExistingMarks ? 'Update' : 'Save'} {Object.keys(aoiMarks).length}
-              </button>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Link href="/results/aoi">
+                  <button className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold bg-gradient-to-r from-purple-500 to-purple-700 text-white hover:shadow-xl transition-all text-sm sm:text-base">
+                    📊 View Results
+                  </button>
+                </Link>
+                <button
+                  onClick={handleSave}
+                  disabled={Object.keys(aoiMarks).length === 0 || !subjectId || !classId || (hasExistingMarks && userRole !== 'school_admin')}
+                  className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold bg-gradient-to-r from-green-500 to-green-700 text-white hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+                >
+                  💾 {hasExistingMarks ? 'Update' : 'Save'} {Object.keys(aoiMarks).length}
+                </button>
+              </div>
             </div>
 
             {hasExistingMarks && userRole !== 'school_admin' && (
