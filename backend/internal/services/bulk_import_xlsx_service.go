@@ -66,6 +66,12 @@ func (s *BulkImportXLSXService) GenerateStudentTemplate(classID uuid.UUID) (*exc
 	})
 	lastCol, _ := excelize.ColumnNumberToName(len(headers))
 	f.SetCellStyle(sheet, "A2", lastCol+"2", style)
+	
+	// Format Date of Birth column (D) as TEXT to prevent Excel auto-conversion
+	dateColStyle, _ := f.NewStyle(&excelize.Style{
+		NumFmt: 49, // Text format (@)
+	})
+	f.SetColStyle(sheet, "D", dateColStyle)
 
 	// Add instruction note
 	instructionStyle, _ := f.NewStyle(&excelize.Style{
@@ -589,20 +595,27 @@ func (s *BulkImportXLSXService) validateStudentRow(row []string, _ uuid.UUID, cl
 		return nil, errors.New("missing required fields: first name and last name")
 	}
 
-	// Parse date - ONLY accept YYYY-MM-DD format (ISO 8601) to match backend API
+	// Parse date - Handle both YYYY-MM-DD format and Excel serial numbers
 	var dob time.Time
 	var err error
 	if dobStr != "" {
-		// Only accept ISO format: YYYY-MM-DD (same as all API endpoints)
-		dob, err = time.Parse("2006-01-02", dobStr)
-		
-		if err != nil {
-			return nil, fmt.Errorf("invalid date format: must be YYYY-MM-DD (e.g., 2005-03-03). Got: %s", dobStr)
+		// First, try to parse as Excel serial number (e.g., "44927")
+		if serialNum, parseErr := strconv.ParseFloat(dobStr, 64); parseErr == nil {
+			// Excel date serial number (days since 1900-01-01, with 1900-02-29 bug)
+			excelEpoch := time.Date(1899, 12, 30, 0, 0, 0, 0, time.UTC)
+			dob = excelEpoch.Add(time.Duration(serialNum * 24 * float64(time.Hour)))
+		} else {
+			// Try to parse as ISO format: YYYY-MM-DD
+			dob, err = time.Parse("2006-01-02", dobStr)
+			
+			if err != nil {
+				return nil, fmt.Errorf("invalid date format: must be YYYY-MM-DD (e.g., 2005-03-03) or Excel will auto-convert it. Got: %s", dobStr)
+			}
 		}
 		
 		// Validate date is reasonable for a student (born between 1990 and today)
 		if dob.Year() < 1990 || dob.After(time.Now()) {
-			return nil, fmt.Errorf("invalid birth date: year must be between 1990 and %d", time.Now().Year())
+			return nil, fmt.Errorf("invalid birth date: year must be between 1990 and %d. Got: %s (parsed as %s)", time.Now().Year(), dobStr, dob.Format("2006-01-02"))
 		}
 	}
 
