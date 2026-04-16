@@ -911,10 +911,11 @@ func (s *BulkImportXLSXService) createStudent(tx *gorm.DB, data map[string]inter
 		}
 	}
 
-	// Find last admission number
+	// Find last admission number and check for duplicates
 	var lastStudent models.Student
 	var sequence int = 0
 	pattern := fmt.Sprintf("%s/%s/%d/%%", schoolInitials, class.Name, class.Year)
+	// Exclude soft-deleted students by using Unscoped() is NOT needed - GORM automatically excludes them
 	if err := tx.Where("school_id = ? AND admission_no LIKE ?", schoolID, pattern).
 		Order("admission_no DESC").First(&lastStudent).Error; err == nil {
 		parts := strings.Split(lastStudent.AdmissionNo, "/")
@@ -926,6 +927,23 @@ func (s *BulkImportXLSXService) createStudent(tx *gorm.DB, data map[string]inter
 	}
 	sequence++
 	admissionNo := fmt.Sprintf("%s/%s/%d/%03d", schoolInitials, class.Name, class.Year, sequence)
+	
+	// Check if admission number already exists (including soft-deleted records)
+	var existingStudent models.Student
+	if err := tx.Unscoped().Where("school_id = ? AND admission_no = ?", schoolID, admissionNo).First(&existingStudent).Error; err == nil {
+		// Admission number exists (even if soft-deleted), try next sequence
+		for i := 0; i < 100; i++ { // Try up to 100 times
+			sequence++
+			admissionNo = fmt.Sprintf("%s/%s/%d/%03d", schoolInitials, class.Name, class.Year, sequence)
+			if err := tx.Unscoped().Where("school_id = ? AND admission_no = ?", schoolID, admissionNo).First(&existingStudent).Error; err != nil {
+				// Found available admission number
+				break
+			}
+			if i == 99 {
+				return fmt.Errorf("unable to generate unique admission number after 100 attempts")
+			}
+		}
+	}
 
 	student := models.Student{
 		SchoolID:      schoolID,
@@ -972,6 +990,10 @@ func (s *BulkImportXLSXService) createStudent(tx *gorm.DB, data map[string]inter
 	}
 
 	if err := tx.Create(&student).Error; err != nil {
+		// Check if it's a duplicate key error
+		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "idx_admission_school") {
+			return fmt.Errorf("student with admission number %s already exists", admissionNo)
+		}
 		return err
 	}
 

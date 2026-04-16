@@ -190,7 +190,7 @@ func (h *RegistrationHandler) RegisterStudent(c *gin.Context) {
 		}
 	}
 
-	// Find last admission number
+	// Find last admission number (excluding soft-deleted)
 	var lastStudent models.Student
 	var sequence int = 0
 	pattern := fmt.Sprintf("%s/%s/%d/%%", schoolInitials, class.Name, req.Year)
@@ -205,6 +205,25 @@ func (h *RegistrationHandler) RegisterStudent(c *gin.Context) {
 	}
 	sequence++
 	admissionNo := fmt.Sprintf("%s/%s/%d/%03d", schoolInitials, class.Name, req.Year, sequence)
+	
+	// Check if admission number already exists (including soft-deleted records)
+	var existingStudent models.Student
+	if err := tx.Unscoped().Where("school_id = ? AND admission_no = ?", school.ID, admissionNo).First(&existingStudent).Error; err == nil {
+		// Admission number exists (even if soft-deleted), try next sequence
+		for i := 0; i < 100; i++ { // Try up to 100 times
+			sequence++
+			admissionNo = fmt.Sprintf("%s/%s/%d/%03d", schoolInitials, class.Name, req.Year, sequence)
+			if err := tx.Unscoped().Where("school_id = ? AND admission_no = ?", school.ID, admissionNo).First(&existingStudent).Error; err != nil {
+				// Found available admission number
+				break
+			}
+			if i == 99 {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Unable to generate unique admission number after 100 attempts"})
+				return
+			}
+		}
+	}
 
 	// Set defaults
 	nationality := req.Nationality
