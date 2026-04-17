@@ -206,8 +206,9 @@ func (h *StaffHandler) CreateStaff(c *gin.Context) {
 	// Create staff record first
 	if err := tx.Create(&staff).Error; err != nil {
 		tx.Rollback()
+		log.Printf("Failed to create staff: %v", err)
 		if strings.Contains(err.Error(), "duplicate key") {
-			c.JSON(http.StatusConflict, gin.H{"error": "Staff record already exists"})
+			c.JSON(http.StatusConflict, gin.H{"error": "Staff record already exists: " + err.Error()})
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create staff: " + err.Error()})
 		}
