@@ -185,7 +185,7 @@ func (h *StaffHandler) CreateStaff(c *gin.Context) {
 		}
 	}()
 
-	// Find last employee number for this school (excluding soft-deleted records)
+	// Find last employee number for this school (excluding soft-deleted records from count)
 	var lastStaff models.Staff
 	var sequence int = 0
 	currentYear := time.Now().Year()
@@ -200,8 +200,26 @@ func (h *StaffHandler) CreateStaff(c *gin.Context) {
 			}
 		}
 	}
-	sequence++
-	staff.EmployeeID = fmt.Sprintf("%s/STF/%d/%03d", schoolInitials, currentYear, sequence)
+	
+	// Auto-increment sequence if employee_id already exists (including soft-deleted)
+	for attempts := 0; attempts < 100; attempts++ {
+		sequence++
+		staff.EmployeeID = fmt.Sprintf("%s/STF/%d/%03d", schoolInitials, currentYear, sequence)
+		
+		// Check if this employee_id exists (including soft-deleted)
+		var existingStaff models.Staff
+		if err := tx.Unscoped().Where("school_id = ? AND employee_id = ?", schoolID, staff.EmployeeID).First(&existingStaff).Error; err != nil {
+			// employee_id is unique, break the loop
+			break
+		}
+		// employee_id exists, continue to next sequence
+	}
+	
+	if sequence >= 100 {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate unique employee ID after 100 attempts"})
+		return
+	}
 
 	// Create staff record first
 	if err := tx.Create(&staff).Error; err != nil {
