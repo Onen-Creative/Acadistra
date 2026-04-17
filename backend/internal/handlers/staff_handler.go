@@ -88,9 +88,16 @@ func (h *StaffHandler) CreateStaff(c *gin.Context) {
 
 	// Check if email already exists BEFORE starting transaction
 	if req.Email != "" {
+		// Check users table (including soft-deleted)
 		var existingUser models.User
-		if err := h.DB.Where("email = ?", req.Email).First(&existingUser).Error; err == nil {
-			c.JSON(http.StatusConflict, gin.H{"error": "Email already exists"})
+		if err := h.DB.Unscoped().Where("email = ?", req.Email).First(&existingUser).Error; err == nil {
+			c.JSON(http.StatusConflict, gin.H{"error": "Email already exists in users table"})
+			return
+		}
+		// Check staff table (including soft-deleted)
+		var existingStaff models.Staff
+		if err := h.DB.Unscoped().Where("email = ? AND school_id = ?", req.Email, schoolID).First(&existingStaff).Error; err == nil {
+			c.JSON(http.StatusConflict, gin.H{"error": "Email already exists in staff records"})
 			return
 		}
 	}
