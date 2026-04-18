@@ -57,6 +57,7 @@ export default function StaffPage() {
   const [loading, setLoading] = useState(true)
   const [selectedRole, setSelectedRole] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [totalStaff, setTotalStaff] = useState(0)
   const [viewingStaff, setViewingStaff] = useState<Staff | null>(null)
@@ -68,14 +69,23 @@ export default function StaffPage() {
   const [isResettingPassword, setIsResettingPassword] = useState(false)
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+      setCurrentPage(1) // Reset to first page when searching
+    }, 500) // 500ms debounce
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
+  useEffect(() => {
     fetchStaff()
-  }, [selectedRole, currentPage]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedRole, debouncedSearchTerm, currentPage]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchStaff = async () => {
     try {
       setLoading(true)
       const response = await staffApi.list({
         role: selectedRole || undefined,
+        search: debouncedSearchTerm || undefined,
         page: currentPage,
         limit: 10
       })
@@ -182,7 +192,7 @@ export default function StaffPage() {
 
   const exportToXLSX = () => {
     const XLSX = require('xlsx')
-    const exportData = filteredStaff.map(s => ({
+    const exportData = staff.map(s => ({
       'Employee ID': s.employee_id,
       'First Name': s.first_name,
       'Middle Name': s.middle_name || '',
@@ -201,12 +211,6 @@ export default function StaffPage() {
     XLSX.utils.book_append_sheet(wb, ws, 'Staff')
     XLSX.writeFile(wb, `staff_${selectedRole || 'all'}_${new Date().toISOString().split('T')[0]}.xlsx`)
   }
-
-  const filteredStaff = staff.filter(s =>
-    `${s.first_name} ${s.last_name} ${s.employee_id} ${s.email}`
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase())
-  )
 
   const stats = {
     total: totalStaff,
@@ -321,7 +325,7 @@ export default function StaffPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredStaff.map((s) => (
+                  {staff.map((s) => (
                     <tr key={s.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4">
                         <div className="flex items-center">

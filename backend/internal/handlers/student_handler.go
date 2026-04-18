@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/school-system/backend/internal/models"
+	"github.com/school-system/backend/internal/utils"
 	"gorm.io/gorm"
 )
 
@@ -87,13 +88,13 @@ func (h *StudentHandler) Update(c *gin.Context) {
 
 	// Update fields
 	if req.FirstName != "" {
-		student.FirstName = strings.Title(strings.ToLower(req.FirstName))
+		student.FirstName = strings.Title(strings.ToLower(utils.NormalizeText(req.FirstName)))
 	}
 	if req.MiddleName != "" {
-		student.MiddleName = strings.Title(strings.ToLower(req.MiddleName))
+		student.MiddleName = strings.Title(strings.ToLower(utils.NormalizeText(req.MiddleName)))
 	}
 	if req.LastName != "" {
-		student.LastName = strings.Title(strings.ToLower(req.LastName))
+		student.LastName = strings.Title(strings.ToLower(utils.NormalizeText(req.LastName)))
 	}
 	if req.Nationality != "" {
 		student.Nationality = req.Nationality
@@ -237,22 +238,23 @@ func (h *StudentHandler) List(c *gin.Context) {
 	// Allow flexible limit with reasonable defaults and maximum
 	limit := 50 // Default to 50 per page
 	if l := c.Query("limit"); l != "" {
-		if parsedLimit, err := strconv.Atoi(l); err == nil && parsedLimit > 0 {
-			// Cap at 1000 to prevent performance issues
-			if parsedLimit > 1000 {
-				limit = 1000
-			} else {
-				limit = parsedLimit
+		if parsedLimit, err := strconv.Atoi(l); err == nil {
+			// Special case: if limit is -1, return all students (no pagination)
+			if parsedLimit == -1 {
+				limit = 0 // GORM treats 0 as no limit
+			} else if parsedLimit > 0 {
+				// Cap at 1000 to prevent performance issues
+				if parsedLimit > 1000 {
+					limit = 1000
+				} else {
+					limit = parsedLimit
+				}
 			}
 		}
 	}
 	
-	// Special case: if limit is -1, return all students (no pagination)
-	var offset int
-	if c.Query("limit") == "-1" {
-		limit = 0 // GORM treats 0 as no limit
-		offset = 0
-	} else {
+	offset := 0
+	if limit > 0 {
 		offset = (page - 1) * limit
 	}
 

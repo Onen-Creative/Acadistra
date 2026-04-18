@@ -19,6 +19,7 @@ export default function MarksEntryPage() {
   const [examType, setExamType] = useState('')
   const [subjectId, setSubjectId] = useState('')
   const [paperNumber, setPaperNumber] = useState('1')
+  const [searchTerm, setSearchTerm] = useState('')
   const [marks, setMarks] = useState<Record<string, { ca?: number; exam?: number; mark?: number }>>({})
   const [existingMarks, setExistingMarks] = useState<Record<string, any>>({})
   const [userRole, setUserRole] = useState('')
@@ -402,9 +403,26 @@ export default function MarksEntryPage() {
               </p>
             </div>
 
+            {/* Search Filter */}
+            <div className="mb-4">
+              <input
+                type="text"
+                placeholder="🔍 Search students by name or admission number..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+              />
+            </div>
+
             {/* Mobile Excel-like View */}
             <div className="block lg:hidden space-y-2">
-              {studentsData?.students?.map((student: any, index: number) => {
+              {studentsData?.students?.filter((student: any) => {
+                if (!searchTerm) return true
+                const fullName = `${student.first_name} ${student.middle_name || ''} ${student.last_name}`.toLowerCase()
+                const admissionNo = student.admission_no?.toLowerCase() || ''
+                const search = searchTerm.toLowerCase()
+                return fullName.includes(search) || admissionNo.includes(search)
+              }).map((student: any, index: number) => {
                 const studentMarks = marks[student.id] || (isAdvanced ? { mark: 0 } : (['S1', 'S2', 'S3', 'S4'].includes(classLevel) ? { exam: 0 } : { ca: 0, exam: 0 }))
                 const total = isAdvanced ? (studentMarks.mark || 0) : (['S1', 'S2', 'S3', 'S4'].includes(classLevel) ? (studentMarks.exam || 0) : ((studentMarks.ca || 0) + (studentMarks.exam || 0)))
                 const hasExisting = !!existingMarks[student.id]
@@ -540,7 +558,13 @@ export default function MarksEntryPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {studentsData?.students?.map((student: any, index: number) => {
+                  {studentsData?.students?.filter((student: any) => {
+                    if (!searchTerm) return true
+                    const fullName = `${student.first_name} ${student.middle_name || ''} ${student.last_name}`.toLowerCase()
+                    const admissionNo = student.admission_no?.toLowerCase() || ''
+                    const search = searchTerm.toLowerCase()
+                    return fullName.includes(search) || admissionNo.includes(search)
+                  }).map((student: any, index: number) => {
                     const studentMarks = marks[student.id] || (isAdvanced ? { mark: 0 } : (['S1', 'S2', 'S3', 'S4'].includes(classLevel) ? { exam: 0 } : { ca: 0, exam: 0 }))
                     const total = isAdvanced ? (studentMarks.mark || 0) : (['S1', 'S2', 'S3', 'S4'].includes(classLevel) ? (studentMarks.exam || 0) : ((studentMarks.ca || 0) + (studentMarks.exam || 0)))
                     const hasExisting = !!existingMarks[student.id]

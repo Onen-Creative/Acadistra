@@ -309,6 +309,10 @@ export default function StudentsPage() {
     }
   }
 
+  const normalizeText = (text: string) => {
+    return text.normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+  }
+
   const calculateAge = (dob: string) => {
     const birthDate = new Date(dob)
     const today = new Date()
@@ -620,7 +624,7 @@ export default function StudentsPage() {
                           </div>
                           <div className="min-w-0">
                             <div className="text-sm font-medium text-gray-900 truncate">
-                              {student.first_name} {student.middle_name ? student.middle_name + ' ' : ''}{student.last_name}
+                              {normalizeText(student.first_name)} {student.middle_name ? normalizeText(student.middle_name) + ' ' : ''}{normalizeText(student.last_name)}
                             </div>
                             <div className="text-xs text-gray-500 truncate">{student.email || student.phone || 'No contact'}</div>
                           </div>

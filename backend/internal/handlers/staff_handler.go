@@ -355,6 +355,7 @@ func (h *StaffHandler) GetAllStaff(c *gin.Context) {
 	role := c.Query("role")
 	department := c.Query("department")
 	status := c.Query("status")
+	search := c.Query("search")
 
 	query := h.DB.Where("school_id = ?", schoolID)
 
@@ -368,6 +369,13 @@ func (h *StaffHandler) GetAllStaff(c *gin.Context) {
 		query = query.Where("status = ?", status)
 	} else {
 		query = query.Where("status = ?", "active")
+	}
+	if search != "" {
+		searchPattern := "%" + strings.ToLower(search) + "%"
+		query = query.Where(
+			"LOWER(first_name) LIKE ? OR LOWER(middle_name) LIKE ? OR LOWER(last_name) LIKE ? OR LOWER(employee_id) LIKE ? OR LOWER(email) LIKE ? OR LOWER(phone) LIKE ?",
+			searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern,
+		)
 	}
 
 	var staff []models.Staff

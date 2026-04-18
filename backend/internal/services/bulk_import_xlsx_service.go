@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/school-system/backend/internal/models"
+	"github.com/school-system/backend/internal/utils"
 	"github.com/xuri/excelize/v2"
 	"gorm.io/gorm"
 )
@@ -561,9 +562,9 @@ func (s *BulkImportXLSXService) ParseMarksXLSX(file *excelize.File, schoolID uui
 }
 
 func (s *BulkImportXLSXService) validateStudentRow(row []string, _ uuid.UUID, classID uuid.UUID) (map[string]interface{}, error) {
-	firstName := strings.TrimSpace(row[0])
-	middleName := strings.TrimSpace(row[1])
-	lastName := strings.TrimSpace(row[2])
+	firstName := utils.NormalizeText(strings.TrimSpace(row[0]))
+	middleName := utils.NormalizeText(strings.TrimSpace(row[1]))
+	lastName := utils.NormalizeText(strings.TrimSpace(row[2]))
 	dobStr := strings.TrimSpace(row[3])
 	gender := strings.ToLower(strings.TrimSpace(row[4]))
 	nationality := strings.TrimSpace(row[5])
@@ -961,14 +962,14 @@ func (s *BulkImportXLSXService) createStudent(tx *gorm.DB, data map[string]inter
 	student := models.Student{
 		SchoolID:      schoolID,
 		AdmissionNo:   admissionNo,
-		FirstName:     strings.Title(strings.ToLower(data["first_name"].(string))),
-		LastName:      strings.Title(strings.ToLower(data["last_name"].(string))),
+		FirstName:     strings.Title(strings.ToLower(utils.NormalizeText(data["first_name"].(string)))),
+		LastName:      strings.Title(strings.ToLower(utils.NormalizeText(data["last_name"].(string)))),
 		Status:        "active",
 		AdmissionDate: &now,
 	}
 
 	if middleName, ok := data["middle_name"].(string); ok && middleName != "" {
-		student.MiddleName = strings.Title(strings.ToLower(middleName))
+		student.MiddleName = strings.Title(strings.ToLower(utils.NormalizeText(middleName)))
 	}
 	if dobStr, ok := data["date_of_birth"].(string); ok && dobStr != "" {
 		dob, _ := time.Parse("2006-01-02", dobStr)
