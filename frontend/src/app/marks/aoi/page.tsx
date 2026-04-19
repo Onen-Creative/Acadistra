@@ -51,7 +51,7 @@ export default function AOIMarksEntryPage() {
     queryKey: ['students', classId],
     queryFn: async () => {
       if (!classId) return { students: [] }
-      const res = await studentsApi.list({ class_id: classId })
+      const res = await studentsApi.list({ class_id: classId, limit: -1 })
       return Array.isArray(res) ? { students: res } : res
     },
     enabled: !!classId

@@ -26,36 +26,57 @@ if [ "$1" == "--dry-run" ]; then
     echo ""
 fi
 
-# Get database connection details from environment or docker
-if [ -f .env.production ]; then
-    source .env.production
-elif [ -f .env ]; then
-    source .env
-fi
-
-# Default to docker container if no env vars
-DB_HOST=${DB_HOST:-localhost}
-DB_PORT=${DB_PORT:-5432}
-DB_NAME=${DB_NAME:-acadistra}
-DB_USER=${DB_USER:-postgres}
-DB_PASSWORD=${DB_PASSWORD:-postgres}
-
 # Check if we should use docker
 USE_DOCKER=false
-if docker ps | grep -q acadistra_postgres; then
+if docker ps 2>/dev/null | grep -q postgres; then
     USE_DOCKER=true
     echo -e "${GREEN}✓ Found PostgreSQL container${NC}"
+    
+    # Get container name
+    CONTAINER_NAME=$(docker ps --format '{{.Names}}' | grep postgres | head -1)
+    echo "Container: $CONTAINER_NAME"
+    
+    # Try to get database name from container
+    DB_NAME=$(docker exec "$CONTAINER_NAME" printenv POSTGRES_DB 2>/dev/null || echo "acadistra")
+    DB_USER=$(docker exec "$CONTAINER_NAME" printenv POSTGRES_USER 2>/dev/null || echo "postgres")
+    
+    echo "Database: $DB_NAME"
+    echo "User: $DB_USER"
 else
     echo -e "${YELLOW}⚠ PostgreSQL container not found, using direct connection${NC}"
+    
+    # Try to load from .env files
+    if [ -f .env.production ]; then
+        source .env.production
+    elif [ -f .env ]; then
+        source .env
+    fi
+    
+    # Default values
+    DB_HOST=${DB_HOST:-localhost}
+    DB_PORT=${DB_PORT:-5432}
+    DB_NAME=${DB_NAME:-acadistra}
+    DB_USER=${DB_USER:-postgres}
+    DB_PASSWORD=${DB_PASSWORD:-}
+    
+    echo "Host: $DB_HOST:$DB_PORT"
+    echo "Database: $DB_NAME"
+    echo "User: $DB_USER"
 fi
+
+echo ""
 
 # Function to execute SQL
 execute_sql() {
     local sql="$1"
     if [ "$USE_DOCKER" = true ]; then
-        docker exec -i acadistra_postgres psql -U "$DB_USER" -d "$DB_NAME" -t -A -c "$sql"
+        docker exec -i "$CONTAINER_NAME" psql -U "$DB_USER" -d "$DB_NAME" -t -A -c "$sql" 2>&1
     else
-        PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -A -c "$sql"
+        if [ -n "$DB_PASSWORD" ]; then
+            PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -A -c "$sql" 2>&1
+        else
+            psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -A -c "$sql" 2>&1
+        fi
     fi
 }
 
@@ -63,20 +84,38 @@ execute_sql() {
 execute_sql_file() {
     local sql="$1"
     if [ "$USE_DOCKER" = true ]; then
-        echo "$sql" | docker exec -i acadistra_postgres psql -U "$DB_USER" -d "$DB_NAME"
+        echo "$sql" | docker exec -i "$CONTAINER_NAME" psql -U "$DB_USER" -d "$DB_NAME" 2>&1
     else
-        echo "$sql" | PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME"
+        if [ -n "$DB_PASSWORD" ]; then
+            echo "$sql" | PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" 2>&1
+        else
+            echo "$sql" | psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" 2>&1
+        fi
     fi
 }
 
 # Check database connection
 echo "Testing database connection..."
-if ! execute_sql "SELECT 1;" > /dev/null 2>&1; then
+CONN_TEST=$(execute_sql "SELECT 1;" 2>&1)
+if echo "$CONN_TEST" | grep -q "1"; then
+    echo -e "${GREEN}✓ Database connection successful${NC}"
+else
     echo -e "${RED}❌ Failed to connect to database${NC}"
-    echo "Please check your database credentials"
+    echo "Error: $CONN_TEST"
+    echo ""
+    echo "Please check:"
+    echo "1. Database container is running: docker ps | grep postgres"
+    echo "2. Database credentials are correct"
+    echo "3. You have permission to access the database"
+    echo ""
+    echo "To manually connect, try:"
+    if [ "$USE_DOCKER" = true ]; then
+        echo "  docker exec -it $CONTAINER_NAME psql -U $DB_USER -d $DB_NAME"
+    else
+        echo "  psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME"
+    fi
     exit 1
 fi
-echo -e "${GREEN}✓ Database connection successful${NC}"
 echo ""
 
 # Count affected records

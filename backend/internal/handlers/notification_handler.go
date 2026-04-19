@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -21,10 +22,22 @@ func (h *NotificationHandler) GetNotifications(c *gin.Context) {
 	userID := c.GetString("user_id")
 	schoolID := c.GetString("school_id")
 
+	// Allow pagination with default limit of 50
+	limit := 50
+	if l := c.Query("limit"); l != "" {
+		if parsedLimit, err := strconv.Atoi(l); err == nil && parsedLimit > 0 {
+			if parsedLimit > 500 {
+				limit = 500 // Cap at 500
+			} else {
+				limit = parsedLimit
+			}
+		}
+	}
+
 	var notifications []models.Notification
 	query := h.db.Where("user_id = ? OR school_id = ? OR (user_id IS NULL AND school_id IS NULL)", userID, schoolID).
 		Order("created_at DESC").
-		Limit(50)
+		Limit(limit)
 
 	if err := query.Find(&notifications).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch notifications"})

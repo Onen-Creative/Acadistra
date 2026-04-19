@@ -49,7 +49,7 @@ export default function ResultsPage() {
     queryKey: ['students', selectedClass, selectedYear, selectedTerm],
     queryFn: async () => {
       if (!selectedClass) return { students: [] }
-      const res = await studentsApi.list({ class_id: selectedClass, year: Number(selectedYear), term: selectedTerm })
+      const res = await studentsApi.list({ class_id: selectedClass, year: Number(selectedYear), term: selectedTerm, limit: -1 })
       return Array.isArray(res) ? { students: res } : res
     },
     enabled: !!selectedClass
@@ -59,7 +59,7 @@ export default function ResultsPage() {
     queryKey: ['modal-students', modalClassId],
     queryFn: async () => {
       if (!modalClassId) return { students: [] }
-      const res = await studentsApi.list({ class_id: modalClassId })
+      const res = await studentsApi.list({ class_id: modalClassId, limit: -1 })
       return Array.isArray(res) ? { students: res } : res
     },
     enabled: !!modalClassId

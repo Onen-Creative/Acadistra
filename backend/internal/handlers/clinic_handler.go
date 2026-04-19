@@ -823,7 +823,7 @@ func (h *ClinicHandler) GetConsumableUsage(c *gin.Context) {
 	consumableID := c.Query("consumable_id")
 	visitID := c.Query("visit_id")
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "200"))
 	
 	query := h.db.Where("consumable_usages.school_id = ?", schoolID)
 	if consumableID != "" {

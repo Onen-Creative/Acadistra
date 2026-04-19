@@ -43,7 +43,7 @@ export default function ReportCardPage() {
     queryKey: ['students', selectedClass],
     queryFn: async () => {
       if (!selectedClass) return { students: [] }
-      const res = await studentsApi.list({ class_id: selectedClass })
+      const res = await studentsApi.list({ class_id: selectedClass, limit: -1 })
       return Array.isArray(res) ? { students: res } : res
     },
     enabled: !!selectedClass

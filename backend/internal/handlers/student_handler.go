@@ -236,16 +236,16 @@ func (h *StudentHandler) List(c *gin.Context) {
 	}
 	
 	// Allow flexible limit with reasonable defaults and maximum
-	limit := 50 // Default to 50 per page
+	limit := 200 // Default to 200 per page (increased from 50 for better UX)
 	if l := c.Query("limit"); l != "" {
 		if parsedLimit, err := strconv.Atoi(l); err == nil {
 			// Special case: if limit is -1, return all students (no pagination)
 			if parsedLimit == -1 {
 				limit = 0 // GORM treats 0 as no limit
 			} else if parsedLimit > 0 {
-				// Cap at 1000 to prevent performance issues
-				if parsedLimit > 1000 {
-					limit = 1000
+				// Cap at 2000 to prevent performance issues
+				if parsedLimit > 2000 {
+					limit = 2000
 				} else {
 					limit = parsedLimit
 				}

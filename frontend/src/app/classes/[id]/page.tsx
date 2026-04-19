@@ -19,7 +19,7 @@ export default function ClassDetailsPage() {
 
   const { data: studentsData, isLoading: studentsLoading } = useQuery({
     queryKey: ['students', classId],
-    queryFn: () => studentsApi.list({ class_id: classId }),
+    queryFn: () => studentsApi.list({ class_id: classId, limit: -1 }),
     enabled: !!classId,
   })
 
