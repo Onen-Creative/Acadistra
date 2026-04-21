@@ -327,6 +327,8 @@ func main() {
 			})
 			{
 				shared.GET("/students", studentHandler.List)
+				studentExportHandler := handlers.NewStudentExportHandler(db)
+				shared.GET("/students/export", studentExportHandler.ExportStudents)
 				shared.GET("/staff", staffHandler.GetAllStaff)
 				shared.GET("/school", schoolHandler.GetMySchool)
 			}

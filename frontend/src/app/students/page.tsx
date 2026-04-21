@@ -372,6 +372,38 @@ export default function StudentsPage() {
     uploadMutation.mutate(file)
   }
 
+  const handleExportStudents = async () => {
+    try {
+      const params = new URLSearchParams()
+      if (searchTerm) params.append('search', searchTerm)
+      if (selectedClass) params.append('class_id', selectedClass)
+      if (selectedGender) params.append('gender', selectedGender)
+      if (selectedLevel) params.append('level', selectedLevel)
+      if (selectedYear) params.append('year', selectedYear)
+      if (selectedTerm) params.append('term', selectedTerm)
+      
+      const token = localStorage.getItem('access_token')
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/v1/students/export?${params.toString()}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      
+      if (!res.ok) throw new Error('Export failed')
+      
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `students_${selectedLevel || 'all'}_${selectedYear}_${selectedTerm.replace(' ', '')}.xlsx`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      
+      notifications.show({ title: 'Success', message: 'Students exported successfully', color: 'green' })
+    } catch (error) {
+      notifications.show({ title: 'Error', message: 'Failed to export students', color: 'red' })
+    }
+  }
+
   const maleCount = studentsData?.students?.filter((s: Student) => s.gender === 'Male').length || 0
   const femaleCount = studentsData?.students?.filter((s: Student) => s.gender === 'Female').length || 0
 
@@ -386,6 +418,15 @@ export default function StudentsPage() {
               <p className="text-indigo-100">{selectedLevel || selectedClass ? `Academic Year ${selectedYear}, Term ${selectedTerm}` : 'All Students'}</p>
             </div>
             <div className="flex gap-3">
+              <button
+                onClick={handleExportStudents}
+                className="bg-white/20 hover:bg-white/30 text-white px-6 py-3 rounded-lg font-medium shadow-lg transition-colors flex items-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Export
+              </button>
               <button
                 onClick={openPhotoUpload}
                 className="bg-white/20 hover:bg-white/30 text-white px-6 py-3 rounded-lg font-medium shadow-lg transition-colors flex items-center gap-2"
