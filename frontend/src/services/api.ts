@@ -176,6 +176,68 @@ export const marksApi = {
     const { data } = await api.put(`/marks/${id}`, markData);
     return data;
   },
+
+  // Bulk import
+  bulkImport: async (formData: FormData) => {
+    const { data } = await api.post('/marks/bulk-import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data;
+  },
+
+  // Exam marks import (new)
+  bulkImportExam: async (formData: FormData) => {
+    const { data } = await api.post('/marks/exam-import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data;
+  },
+
+  // AOI marks import (new)
+  bulkImportAOI: async (formData: FormData) => {
+    const { data } = await api.post('/marks/aoi-import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data;
+  },
+
+  listImports: async () => {
+    const { data } = await api.get('/marks/imports');
+    return data;
+  },
+
+  getImport: async (id: string) => {
+    const { data } = await api.get(`/marks/imports/${id}`);
+    return data;
+  },
+
+  approveImport: async (id: string) => {
+    const { data } = await api.post(`/marks/imports/${id}/approve`);
+    return data;
+  },
+
+  rejectImport: async (id: string, reason: string) => {
+    const { data } = await api.post(`/marks/imports/${id}/reject`, { reason });
+    return data;
+  },
+
+  downloadTemplate: async (classId?: string) => {
+    const params = classId ? { class_id: classId } : {};
+    const { data } = await api.get('/marks/import-template', { params, responseType: 'blob' });
+    return data;
+  },
+
+  // Exam marks template (new)
+  downloadExamTemplate: async (params: { class_id?: string; subject_name?: string; level?: string; year?: string; term?: string; exam_type?: string; paper?: string }) => {
+    const { data } = await api.get('/marks/exam-template', { params, responseType: 'blob' });
+    return data;
+  },
+
+  // AOI marks template (new)
+  downloadAOITemplate: async (params: { class_id?: string; subject_name?: string; level?: string; year?: string; term?: string }) => {
+    const { data } = await api.get('/marks/aoi-template', { params, responseType: 'blob' });
+    return data;
+  },
 };
 
 // Reports API

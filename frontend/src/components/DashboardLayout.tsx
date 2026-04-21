@@ -9,7 +9,7 @@ import {
   LayoutDashboard, School, UserPlus, Users, Settings, FileText, BarChart3,
   GraduationCap, BookOpen, ClipboardList, DollarSign, Package,
   Calendar, Edit3, Eye, Library, Stethoscope, Pill, Menu as MenuIcon,
-  LogOut, User, Moon, Sun, Bell, Search, ChevronDown, X
+  LogOut, User, Moon, Sun, Bell, Search, ChevronDown, X, Upload
 } from 'lucide-react'
 
 interface DashboardLayoutProps {

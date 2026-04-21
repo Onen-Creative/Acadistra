@@ -24,8 +24,11 @@ export default function MarksEntryPage() {
   const [existingMarks, setExistingMarks] = useState<Record<string, any>>({})
   const [userRole, setUserRole] = useState('')
   const [showBulkImport, setShowBulkImport] = useState(false)
+  const [importType, setImportType] = useState<'ca' | 'exam'>('exam') // 'ca' for AOI, 'exam' for exam marks
   const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [validationResult, setValidationResult] = useState<any>(null)
+  const [showValidation, setShowValidation] = useState(false)
   const [imports, setImports] = useState<any[]>([])
   const queryClient = useQueryClient()
 
@@ -172,9 +175,43 @@ export default function MarksEntryPage() {
   const handleDownloadTemplate = async () => {
     try {
       const token = localStorage.getItem('access_token')
-      const url = classId 
-        ? `${process.env.NEXT_PUBLIC_API_URL || 'https://acadistra.com'}/api/v1/marks/import-template?class_id=${classId}`
-        : `${process.env.NEXT_PUBLIC_API_URL || 'https://acadistra.com'}/api/v1/marks/import-template`
+      const isPrimaryOrNursery = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'Baby', 'Middle', 'Top', 'Nursery'].includes(classLevel)
+      
+      let url = ''
+      let filename = 'marks_template.xlsx'
+      
+      if (importType === 'ca' && isPrimaryOrNursery) {
+        // CA template for Primary/Nursery
+        const params = new URLSearchParams()
+        if (classId) params.append('class_id', classId)
+        if (subjectId) {
+          const subject = subjectsData?.subjects?.find((s: any) => s.id === subjectId)
+          if (subject) params.append('subject_name', subject.name)
+        }
+        if (classLevel) params.append('level', classLevel)
+        if (year) params.append('year', year)
+        if (term) params.append('term', term)
+        if (examType) params.append('exam_type', examType)
+        
+        url = `${process.env.NEXT_PUBLIC_API_URL || 'https://acadistra.com'}/api/v1/marks/ca-template?${params.toString()}`
+        filename = 'ca_marks_template.xlsx'
+      } else {
+        // Exam marks template
+        const params = new URLSearchParams()
+        if (classId) params.append('class_id', classId)
+        if (subjectId) {
+          const subject = subjectsData?.subjects?.find((s: any) => s.id === subjectId)
+          if (subject) params.append('subject_name', subject.name)
+        }
+        if (classLevel) params.append('level', classLevel)
+        if (year) params.append('year', year)
+        if (term) params.append('term', term)
+        if (examType) params.append('exam_type', examType)
+        if (isAdvanced && paperNumber) params.append('paper', paperNumber)
+        
+        url = `${process.env.NEXT_PUBLIC_API_URL || 'https://acadistra.com'}/api/v1/marks/exam-template?${params.toString()}`
+        filename = 'exam_marks_template.xlsx'
+      }
       
       const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -184,7 +221,7 @@ export default function MarksEntryPage() {
       const downloadUrl = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = downloadUrl
-      a.download = 'marks_template.xlsx'
+      a.download = filename
       document.body.appendChild(a)
       a.click()
       window.URL.revokeObjectURL(downloadUrl)
@@ -199,14 +236,18 @@ export default function MarksEntryPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0])
+      setValidationResult(null)
+      setShowValidation(false)
     }
   }
 
-  const handleBulkUpload = async () => {
+  const handleValidate = async () => {
     if (!file || !classId || !subjectId) {
       toast.error('Please select class, subject, and file')
       return
     }
+
+    const isPrimaryOrNursery = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'Baby', 'Middle', 'Top', 'Nursery'].includes(classLevel)
 
     setUploading(true)
     const formData = new FormData()
@@ -216,16 +257,81 @@ export default function MarksEntryPage() {
     formData.append('term', term)
     formData.append('year', year)
     formData.append('exam_type', examType)
+    if (isAdvanced && paperNumber) {
+      formData.append('paper', paperNumber)
+    }
 
     try {
-      const res = await api.post('/api/v1/marks/bulk-import', formData, {
+      let endpoint = ''
+      if (importType === 'ca' && isPrimaryOrNursery) {
+        endpoint = '/api/v1/marks/ca-validate'
+      } else {
+        endpoint = '/api/v1/marks/exam-validate'
+      }
+      
+      const res = await api.post(endpoint, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+      
+      setValidationResult(res.data)
+      setShowValidation(true)
+      toast.success('Validation complete')
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Validation failed')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleBulkUpload = async () => {
+    if (!file || !classId || !subjectId) {
+      toast.error('Please select class, subject, and file')
+      return
+    }
+
+    if (!validationResult) {
+      toast.error('Please validate the file first')
+      return
+    }
+
+    if (validationResult.valid_rows === 0) {
+      toast.error('No valid marks to import')
+      return
+    }
+
+    const isPrimaryOrNursery = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'Baby', 'Middle', 'Top', 'Nursery'].includes(classLevel)
+
+    setUploading(true)
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('class_id', classId)
+    formData.append('subject_id', subjectId)
+    formData.append('term', term)
+    formData.append('year', year)
+    formData.append('exam_type', examType)
+    if (isAdvanced && paperNumber) {
+      formData.append('paper', paperNumber)
+    }
+
+    try {
+      let endpoint = ''
+      if (importType === 'ca' && isPrimaryOrNursery) {
+        endpoint = '/api/v1/marks/ca-import'
+      } else {
+        endpoint = '/api/v1/marks/exam-import'
+      }
+      
+      const res = await api.post(endpoint, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       })
       
       toast.success(res.data.message)
       setFile(null)
+      setValidationResult(null)
+      setShowValidation(false)
       setShowBulkImport(false)
       fetchImports()
+      queryClient.invalidateQueries({ queryKey: ['results'] })
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Import failed')
     } finally {
@@ -235,9 +341,10 @@ export default function MarksEntryPage() {
 
   const handleApprove = async (importId: string) => {
     try {
-      await api.post(`/marks/imports/${importId}/approve`)
+      await api.post(`/api/v1/marks/imports/${importId}/approve`)
       toast.success('Import approved and processed')
       fetchImports()
+      queryClient.invalidateQueries({ queryKey: ['results'] })
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to approve')
     }
@@ -248,7 +355,7 @@ export default function MarksEntryPage() {
     if (!reason) return
 
     try {
-      await api.post(`/marks/imports/${importId}/reject`, { reason })
+      await api.post(`/api/v1/marks/imports/${importId}/reject`, { reason })
       toast.success('Import rejected')
       fetchImports()
     } catch (error: any) {
@@ -397,9 +504,6 @@ export default function MarksEntryPage() {
             <div className="bg-blue-50 p-3 rounded-lg mb-4">
               <p className="text-sm text-blue-900">
                 <strong>Grading:</strong> {isAdvanced ? `${labels.mark}` : (['S1', 'S2', 'S3', 'S4'].includes(classLevel) ? `${labels.exam} (CA from AOI)` : `${labels.ca} (Max: ${maxMarks.ca}) + ${labels.exam} (Max: ${maxMarks.exam})`)}
-                {!isAdmin && Object.keys(existingMarks).length > 0 && (
-                  <span className="ml-4 text-amber-700">⚠️ Only admins can edit existing marks</span>
-                )}
               </p>
             </div>
 
@@ -426,7 +530,7 @@ export default function MarksEntryPage() {
                 const studentMarks = marks[student.id] || (isAdvanced ? { mark: 0 } : (['S1', 'S2', 'S3', 'S4'].includes(classLevel) ? { exam: 0 } : { ca: 0, exam: 0 }))
                 const total = isAdvanced ? (studentMarks.mark || 0) : (['S1', 'S2', 'S3', 'S4'].includes(classLevel) ? (studentMarks.exam || 0) : ((studentMarks.ca || 0) + (studentMarks.exam || 0)))
                 const hasExisting = !!existingMarks[student.id]
-                const canEdit = isAdmin || !hasExisting
+                const canEdit = true
                 
                 return (
                   <div key={student.id} className={`border-2 rounded-lg p-3 ${hasExisting ? 'bg-yellow-50 border-yellow-300' : 'bg-white border-gray-200'}`}>
@@ -568,7 +672,7 @@ export default function MarksEntryPage() {
                     const studentMarks = marks[student.id] || (isAdvanced ? { mark: 0 } : (['S1', 'S2', 'S3', 'S4'].includes(classLevel) ? { exam: 0 } : { ca: 0, exam: 0 }))
                     const total = isAdvanced ? (studentMarks.mark || 0) : (['S1', 'S2', 'S3', 'S4'].includes(classLevel) ? (studentMarks.exam || 0) : ((studentMarks.ca || 0) + (studentMarks.exam || 0)))
                     const hasExisting = !!existingMarks[student.id]
-                    const canEdit = isAdmin || !hasExisting
+                    const canEdit = true
                     
                     return (
                       <tr key={student.id} className={`border-b border-gray-100 ${hasExisting ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
@@ -674,16 +778,47 @@ export default function MarksEntryPage() {
               <h3 className="text-lg font-bold text-gray-800 mb-4">📥 Bulk Import from Excel</h3>
               
               <div className="space-y-4">
+                {/* Import Type Selection - Only for Primary/Nursery */}
+                {['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'Baby', 'Middle', 'Top', 'Nursery'].includes(classLevel) && (
+                  <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-lg border-2 border-purple-200">
+                    <p className="text-sm font-semibold text-gray-800 mb-3">Select Import Type:</p>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setImportType('ca')}
+                        className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all ${
+                          importType === 'ca'
+                            ? 'bg-purple-600 text-white shadow-lg'
+                            : 'bg-white text-gray-700 hover:bg-purple-100'
+                        }`}
+                      >
+                        📝 CA Marks
+                      </button>
+                      <button
+                        onClick={() => setImportType('exam')}
+                        className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all ${
+                          importType === 'exam'
+                            ? 'bg-blue-600 text-white shadow-lg'
+                            : 'bg-white text-gray-700 hover:bg-blue-100'
+                        }`}
+                      >
+                        📄 Exam Marks
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="bg-blue-50 p-4 rounded-lg">
                   <p className="text-sm text-blue-900 mb-2">
                     <strong>Instructions:</strong>
                   </p>
                   <ol className="list-decimal list-inside text-sm text-blue-800 space-y-1">
                     <li>Select filters above (Year, Term, Class, Exam Type, Subject)</li>
+                    {['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'Baby', 'Middle', 'Top', 'Nursery'].includes(classLevel) && <li>Choose import type: CA or Exam marks</li>}
                     <li>Download the Excel template</li>
-                    <li>Fill in CA and Exam marks for each student</li>
+                    <li>Fill in {importType === 'ca' && ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'Baby', 'Middle', 'Top', 'Nursery'].includes(classLevel) ? 'CA marks' : 'exam marks'} for each student</li>
                     <li>Upload the completed file</li>
-                    {!isAdmin && <li className="text-amber-700">Your import will require admin approval</li>}
+                    {!isAdmin && importType === 'exam' && <li className="text-amber-700">Exam imports may require admin approval</li>}
+                    {['S1', 'S2', 'S3', 'S4'].includes(classLevel) && <li className="text-purple-700">For S1-S4 CA marks (AOI), use the <Link href="/marks/aoi" className="underline font-semibold">AOI Marks Entry</Link> page</li>}
                   </ol>
                 </div>
 
@@ -722,14 +857,98 @@ export default function MarksEntryPage() {
                   )}
                 </div>
 
-                {file && classId && subjectId && (
+                {file && !showValidation && (
                   <button
-                    onClick={handleBulkUpload}
+                    onClick={handleValidate}
                     disabled={uploading}
-                    className="w-full px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold bg-purple-500 text-white hover:bg-purple-600 disabled:opacity-50 text-sm sm:text-base"
+                    className="w-full px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 text-sm sm:text-base"
                   >
-                    {uploading ? '⏳ Uploading...' : '🚀 Upload Marks'}
+                    {uploading ? '⏳ Validating...' : '🔍 Validate File'}
                   </button>
+                )}
+
+                {showValidation && validationResult && (
+                  <div className="space-y-4">
+                    <div className="bg-white border-2 border-gray-200 rounded-xl p-6">
+                      <h4 className="text-lg font-bold text-gray-800 mb-4">📊 Validation Summary</h4>
+                      <div className="grid grid-cols-3 gap-4 mb-4">
+                        <div className="bg-blue-50 p-4 rounded-lg text-center">
+                          <p className="text-2xl font-bold text-blue-600">{validationResult.total_rows}</p>
+                          <p className="text-sm text-gray-600">Total Rows</p>
+                        </div>
+                        <div className="bg-green-50 p-4 rounded-lg text-center">
+                          <p className="text-2xl font-bold text-green-600">{validationResult.valid_rows}</p>
+                          <p className="text-sm text-gray-600">Valid</p>
+                        </div>
+                        <div className="bg-red-50 p-4 rounded-lg text-center">
+                          <p className="text-2xl font-bold text-red-600">{validationResult.invalid_rows}</p>
+                          <p className="text-sm text-gray-600">Invalid</p>
+                        </div>
+                      </div>
+
+                      {validationResult.errors && validationResult.errors.length > 0 && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                          <h5 className="font-semibold text-red-800 mb-2">❌ Errors Found:</h5>
+                          <div className="max-h-40 overflow-y-auto space-y-1">
+                            {validationResult.errors.map((error: string, idx: number) => (
+                              <p key={idx} className="text-sm text-red-700">• {error}</p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {validationResult.valid_marks && validationResult.valid_marks.length > 0 && (
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-4">
+                          <h5 className="font-semibold text-green-800 mb-2">✅ Valid Marks Preview (First 5):</h5>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="border-b border-green-300">
+                                  <th className="text-left py-2 px-2">Admission No</th>
+                                  <th className="text-left py-2 px-2">Student</th>
+                                  <th className="text-center py-2 px-2">{importType === 'ca' ? 'CA' : 'Exam'}</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {validationResult.valid_marks.slice(0, 5).map((mark: any, idx: number) => (
+                                  <tr key={idx} className="border-b border-green-200">
+                                    <td className="py-2 px-2">{mark.admission_no}</td>
+                                    <td className="py-2 px-2">{mark.student_name}</td>
+                                    <td className="text-center py-2 px-2">{mark.ca || mark.exam}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                            {validationResult.valid_marks.length > 5 && (
+                              <p className="text-xs text-gray-600 mt-2 text-center">
+                                ... and {validationResult.valid_marks.length - 5} more
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => {
+                          setFile(null)
+                          setValidationResult(null)
+                          setShowValidation(false)
+                        }}
+                        className="flex-1 px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300 text-sm sm:text-base"
+                      >
+                        ← Change File
+                      </button>
+                      <button
+                        onClick={handleBulkUpload}
+                        disabled={uploading || validationResult.valid_rows === 0}
+                        className="flex-1 px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold bg-purple-500 text-white hover:bg-purple-600 disabled:opacity-50 text-sm sm:text-base"
+                      >
+                        {uploading ? '⏳ Uploading...' : `🚀 Import ${validationResult.valid_rows} Marks`}
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>

@@ -508,11 +508,31 @@ func main() {
 				c.Next()
 			})
 			{
+				// Legacy bulk marks import (deprecated - use exam marks import instead)
 				bulkMarksHandler := handlers.NewBulkMarksImportHandler(db)
 				teacherOrAdmin.POST("/marks/bulk-import", bulkMarksHandler.UploadMarksForApproval)
 				teacherOrAdmin.GET("/marks/imports", bulkMarksHandler.ListImports)
 				teacherOrAdmin.GET("/marks/imports/:id", bulkMarksHandler.GetImportDetails)
 				teacherOrAdmin.GET("/marks/import-template", bulkMarksHandler.DownloadTemplate)
+				
+				// New exam marks import (exam only, no AOI)
+				examMarksHandler := handlers.NewBulkExamMarksImportHandler(db)
+				teacherOrAdmin.POST("/marks/exam-validate", examMarksHandler.ValidateExamMarks)
+				teacherOrAdmin.POST("/marks/exam-import", examMarksHandler.UploadExamMarksForApproval)
+				teacherOrAdmin.GET("/marks/exam-template", examMarksHandler.DownloadExamMarksTemplate)
+				
+				// AOI marks import (S1-S4 only)
+				aoiMarksHandler := handlers.NewBulkAOIMarksImportHandler(db)
+				teacherOrAdmin.POST("/marks/aoi-validate", aoiMarksHandler.ValidateAOIMarks)
+				teacherOrAdmin.POST("/marks/aoi-import", aoiMarksHandler.UploadAOIMarks)
+				teacherOrAdmin.GET("/marks/aoi-template", aoiMarksHandler.DownloadAOIMarksTemplate)
+				
+				// CA marks import (Primary, Nursery - not S1-S4)
+				caMarksHandler := handlers.NewBulkCAMarksImportHandler(db)
+				teacherOrAdmin.POST("/marks/ca-validate", caMarksHandler.ValidateCAMarks)
+				teacherOrAdmin.POST("/marks/ca-import", caMarksHandler.UploadCAMarksForApproval)
+				teacherOrAdmin.GET("/marks/ca-template", caMarksHandler.DownloadCAMarksTemplate)
+				
 				teacherOrAdmin.GET("/export/marks", marksExportHandler.ExportClassMarks)
 			}
 

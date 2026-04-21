@@ -4,8 +4,8 @@ import (
 	"testing"
 )
 
-func TestPrimaryUpperGrader(t *testing.T) {
-	grader := &PrimaryUpperGrader{}
+func TestPrimaryGrader(t *testing.T) {
+	grader := &PrimaryGrader{}
 
 	tests := []struct {
 		name     string
@@ -15,17 +15,17 @@ func TestPrimaryUpperGrader(t *testing.T) {
 		examMax  float64
 		expected string
 	}{
-		{"Perfect Score", 20, 80, 20, 80, "D1"},
-		{"Grade D1", 18, 72, 20, 80, "D1"},
-		{"Grade D2", 16, 64, 20, 80, "D2"},
-		{"Grade C3", 14, 56, 20, 80, "C3"},
-		{"Grade C4", 12, 48, 20, 80, "C4"},
-		{"Grade C5", 11, 44, 20, 80, "C5"},
-		{"Grade C6", 10, 40, 20, 80, "C6"},
-		{"Grade P7", 9, 36, 20, 80, "P7"},
-		{"Grade P8", 8, 32, 20, 80, "P8"},
-		{"Grade F9", 6, 24, 20, 80, "F9"},
-		{"Zero Score", 0, 0, 20, 80, "F9"},
+		{"Perfect Score", 40, 60, 40, 60, "D1"},
+		{"Grade D1", 36, 54, 40, 60, "D1"},
+		{"Grade D2", 32, 48, 40, 60, "D2"},
+		{"Grade C3", 28, 42, 40, 60, "C3"},
+		{"Grade C4", 24, 36, 40, 60, "C4"},
+		{"Grade C5", 22, 33, 40, 60, "C5"},
+		{"Grade C6", 20, 30, 40, 60, "C6"},
+		{"Grade P7", 18, 27, 40, 60, "P7"},
+		{"Grade P8", 16, 24, 40, 60, "P8"},
+		{"Grade F9", 12, 18, 40, 60, "F9"},
+		{"Zero Score", 0, 0, 40, 60, "F9"},
 	};
 
 	for _, tt := range tests {

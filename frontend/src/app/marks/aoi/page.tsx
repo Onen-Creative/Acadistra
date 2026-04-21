@@ -7,7 +7,10 @@ import { DashboardLayout } from '@/components/DashboardLayout'
 import { PageHeader } from '@/components/ui/BeautifulComponents'
 import { FormSelect } from '@/components/ui/FormComponents'
 import { studentsApi, classesApi, subjectsApi, integrationActivitiesApi } from '@/services/api'
+import api from '@/services/api'
 import Link from 'next/link'
+import { Download, Upload } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 export default function AOIMarksEntryPage() {
   const [year, setYear] = useState('2026')
@@ -18,6 +21,11 @@ export default function AOIMarksEntryPage() {
   const [userRole, setUserRole] = useState('')
   const [hasExistingMarks, setHasExistingMarks] = useState(false)
   const [selectedActivity, setSelectedActivity] = useState(1)
+  const [showBulkImport, setShowBulkImport] = useState(false)
+  const [file, setFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [validationResult, setValidationResult] = useState<any>(null)
+  const [showValidation, setShowValidation] = useState(false)
 
   useEffect(() => {
     const userData = localStorage.getItem('user')
@@ -81,10 +89,124 @@ export default function AOIMarksEntryPage() {
     }
   }, [existingActivities])
 
+  const handleDownloadTemplate = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const params = new URLSearchParams();
+      if (classId) params.append('class_id', classId);
+      if (subjectId) {
+        const subject = subjectsData?.subjects?.find((s: any) => s.id === subjectId);
+        if (subject) params.append('subject_name', subject.name);
+      }
+      if (classLevel) params.append('level', classLevel);
+      if (year) params.append('year', year);
+      if (term) params.append('term', term);
+      
+      const url = `${process.env.NEXT_PUBLIC_API_URL || 'https://acadistra.com'}/api/v1/marks/aoi-template?${params.toString()}`;
+      
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = 'aoi_marks_template.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(downloadUrl);
+      document.body.removeChild(a);
+      
+      toast.success('Template downloaded');
+    } catch (error) {
+      toast.error('Failed to download template');
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
+      setValidationResult(null);
+      setShowValidation(false);
+    }
+  };
+
+  const handleValidate = async () => {
+    if (!file || !classId || !subjectId) {
+      toast.error('Please select class, subject, and file');
+      return;
+    }
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('class_id', classId);
+    formData.append('subject_id', subjectId);
+    formData.append('term', term);
+    formData.append('year', year);
+
+    try {
+      const res = await api.post('/api/v1/marks/aoi-validate', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      setValidationResult(res.data);
+      setShowValidation(true);
+      toast.success('Validation complete');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Validation failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleBulkUpload = async () => {
+    if (!file || !classId || !subjectId) {
+      toast.error('Please select class, subject, and file');
+      return;
+    }
+
+    if (!validationResult) {
+      toast.error('Please validate the file first');
+      return;
+    }
+
+    if (validationResult.valid_rows === 0) {
+      toast.error('No valid marks to import');
+      return;
+    }
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('class_id', classId);
+    formData.append('subject_id', subjectId);
+    formData.append('term', term);
+    formData.append('year', year);
+
+    try {
+      const res = await api.post('/api/v1/marks/aoi-import', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      toast.success(res.data.message);
+      setFile(null);
+      setValidationResult(null);
+      setShowValidation(false);
+      setShowBulkImport(false);
+      window.location.reload();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Import failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!subjectId || !classId) {
-      notifications.show({ title: 'Error', message: 'Please select class and subject', color: 'red' })
-      return
+      notifications.show({ title: 'Error', message: 'Please select class and subject', color: 'red' });
+      return;
     }
     try {
       const promises = Object.entries(aoiMarks).map(([studentId, marks]) =>
@@ -96,13 +218,13 @@ export default function AOIMarksEntryPage() {
           year: parseInt(year),
           marks
         })
-      )
-      await Promise.all(promises)
-      notifications.show({ title: 'Success', message: `Saved AOI marks for ${Object.keys(aoiMarks).length} students`, color: 'green' })
+      );
+      await Promise.all(promises);
+      notifications.show({ title: 'Success', message: `Saved AOI marks for ${Object.keys(aoiMarks).length} students`, color: 'green' });
     } catch (error: any) {
-      notifications.show({ title: 'Error', message: error.response?.data?.error || 'Failed to save', color: 'red' })
+      notifications.show({ title: 'Error', message: error.response?.data?.error || 'Failed to save', color: 'red' });
     }
-  }
+  };
 
   return (
     <DashboardLayout>
@@ -111,11 +233,19 @@ export default function AOIMarksEntryPage() {
           title="📝 Activities of Integration Entry"
           subtitle="Enter marks for Activities of Integration (S1-S4)"
           action={
-            <Link href="/marks/enter">
-              <button className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all text-sm sm:text-base">
-                ← Back
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+              <button
+                onClick={() => setShowBulkImport(!showBulkImport)}
+                className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold bg-blue-500 text-white hover:bg-blue-600 transition-all text-sm sm:text-base"
+              >
+                {showBulkImport ? '✏️ Manual' : '📤 Bulk'}
               </button>
-            </Link>
+              <Link href="/marks/enter">
+                <button className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all text-sm sm:text-base">
+                  ← Back
+                </button>
+              </Link>
+            </div>
           }
         />
 
@@ -173,7 +303,7 @@ export default function AOIMarksEntryPage() {
           </div>
         </div>
 
-        {classId && subjectId && ['S1', 'S2', 'S3', 'S4'].includes(classLevel) && (
+        {classId && subjectId && ['S1', 'S2', 'S3', 'S4'].includes(classLevel) && !showBulkImport && (
           <div className="bg-white rounded-2xl shadow-xl p-6">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
               <div>
@@ -190,7 +320,7 @@ export default function AOIMarksEntryPage() {
                 </Link>
                 <button
                   onClick={handleSave}
-                  disabled={Object.keys(aoiMarks).length === 0 || !subjectId || !classId || (hasExistingMarks && userRole !== 'school_admin')}
+                  disabled={Object.keys(aoiMarks).length === 0 || !subjectId || !classId}
                   className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold bg-gradient-to-r from-green-500 to-green-700 text-white hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                 >
                   💾 {hasExistingMarks ? 'Update' : 'Save'} {Object.keys(aoiMarks).length}
@@ -198,17 +328,10 @@ export default function AOIMarksEntryPage() {
               </div>
             </div>
 
-            {hasExistingMarks && userRole !== 'school_admin' && (
-              <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg mb-4">
-                <p className="text-sm text-yellow-900">
-                  <strong>⚠️ View Only:</strong> AOI marks have already been entered for this subject. Only School Admin can edit existing marks.
-                </p>
-              </div>
-            )}
-            {hasExistingMarks && userRole === 'school_admin' && (
+            {hasExistingMarks && (
               <div className="bg-green-50 border border-green-200 p-3 rounded-lg mb-4">
                 <p className="text-sm text-green-900">
-                  <strong>✏️ Edit Mode:</strong> You can edit existing AOI marks as School Admin.
+                  <strong>✏️ Edit Mode:</strong> You can edit existing AOI marks.
                 </p>
               </div>
             )}
@@ -250,7 +373,7 @@ export default function AOIMarksEntryPage() {
                     .filter((v): v is number => v !== undefined && v !== null && typeof v === 'number' && !isNaN(v))
                   const avg = activities.length > 0 ? activities.reduce((sum, v) => sum + v, 0) / activities.length : 0
                   const outOf20 = ((avg / 3) * 20).toFixed(2)
-                  const canEdit = !hasExistingMarks || userRole === 'school_admin'
+                  const canEdit = true
                   const currentActivityValue = studentMarks[`activity${selectedActivity}` as keyof typeof studentMarks]
                   
                   return (
@@ -319,7 +442,7 @@ export default function AOIMarksEntryPage() {
                       .filter((v): v is number => v !== undefined && v !== null && typeof v === 'number' && !isNaN(v))
                     const avg = activities.length > 0 ? activities.reduce((sum, v) => sum + v, 0) / activities.length : 0
                     const outOf20 = ((avg / 3) * 20).toFixed(2)
-                    const canEdit = !hasExistingMarks || userRole === 'school_admin'
+                    const canEdit = true
                     
                     return (
                       <tr key={student.id} className="border-b border-gray-200 hover:bg-gray-50">
@@ -358,6 +481,164 @@ export default function AOIMarksEntryPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* Bulk Import Section */}
+        {showBulkImport && classId && subjectId && ['S1', 'S2', 'S3', 'S4'].includes(classLevel) && (
+          <div className="bg-white rounded-2xl shadow-xl p-6">
+            <h3 className="text-lg font-bold text-gray-800 mb-4">📥 Bulk Import AOI Marks</h3>
+            
+            <div className="space-y-4">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <p className="text-sm text-blue-900 mb-2">
+                  <strong>Instructions:</strong>
+                </p>
+                <ol className="list-decimal list-inside text-sm text-blue-800 space-y-1">
+                  <li>Select filters above (Year, Term, Class, Subject)</li>
+                  <li>Download the Excel template</li>
+                  <li>Fill in AOI activity marks (5 activities, 0-3 each) for each student</li>
+                  <li>Upload the completed file</li>
+                </ol>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                <button
+                  onClick={handleDownloadTemplate}
+                  disabled={!classId}
+                  className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+                >
+                  <Download className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span className="hidden sm:inline">Download Template</span>
+                  <span className="sm:hidden">Template</span>
+                </button>
+              </div>
+
+              <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center">
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleFileChange}
+                  className="hidden"
+                  id="file-upload"
+                />
+                <label
+                  htmlFor="file-upload"
+                  className="cursor-pointer inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold bg-green-500 text-white hover:bg-green-600 text-sm sm:text-base"
+                >
+                  <Upload className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span className="hidden sm:inline">Select Excel File</span>
+                  <span className="sm:hidden">Select File</span>
+                </label>
+                {file && (
+                  <p className="mt-4 text-sm text-gray-600">
+                    Selected: <span className="font-semibold">{file.name}</span>
+                  </p>
+                )}
+              </div>
+
+              {file && !showValidation && (
+                <button
+                  onClick={handleValidate}
+                  disabled={uploading}
+                  className="w-full px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 text-sm sm:text-base"
+                >
+                  {uploading ? '⏳ Validating...' : '🔍 Validate File'}
+                </button>
+              )}
+
+              {showValidation && validationResult && (
+                <div className="space-y-4">
+                  <div className="bg-white border-2 border-gray-200 rounded-xl p-6">
+                    <h4 className="text-lg font-bold text-gray-800 mb-4">📊 Validation Summary</h4>
+                    <div className="grid grid-cols-3 gap-4 mb-4">
+                      <div className="bg-blue-50 p-4 rounded-lg text-center">
+                        <p className="text-2xl font-bold text-blue-600">{validationResult.total_rows}</p>
+                        <p className="text-sm text-gray-600">Total Rows</p>
+                      </div>
+                      <div className="bg-green-50 p-4 rounded-lg text-center">
+                        <p className="text-2xl font-bold text-green-600">{validationResult.valid_rows}</p>
+                        <p className="text-sm text-gray-600">Valid</p>
+                      </div>
+                      <div className="bg-red-50 p-4 rounded-lg text-center">
+                        <p className="text-2xl font-bold text-red-600">{validationResult.invalid_rows}</p>
+                        <p className="text-sm text-gray-600">Invalid</p>
+                      </div>
+                    </div>
+
+                    {validationResult.errors && validationResult.errors.length > 0 && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <h5 className="font-semibold text-red-800 mb-2">❌ Errors Found:</h5>
+                        <div className="max-h-40 overflow-y-auto space-y-1">
+                          {validationResult.errors.map((error: string, idx: number) => (
+                            <p key={idx} className="text-sm text-red-700">• {error}</p>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {validationResult.valid_marks && validationResult.valid_marks.length > 0 && (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-4">
+                        <h5 className="font-semibold text-green-800 mb-2">✅ Valid Marks Preview (First 5):</h5>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-green-300">
+                                <th className="text-left py-2 px-2">Admission No</th>
+                                <th className="text-left py-2 px-2">Student</th>
+                                <th className="text-center py-2 px-2">A1</th>
+                                <th className="text-center py-2 px-2">A2</th>
+                                <th className="text-center py-2 px-2">A3</th>
+                                <th className="text-center py-2 px-2">A4</th>
+                                <th className="text-center py-2 px-2">A5</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {validationResult.valid_marks.slice(0, 5).map((mark: any, idx: number) => (
+                                <tr key={idx} className="border-b border-green-200">
+                                  <td className="py-2 px-2">{mark.admission_no}</td>
+                                  <td className="py-2 px-2">{mark.student_name}</td>
+                                  <td className="text-center py-2 px-2">{mark.activities?.activity1 ?? '-'}</td>
+                                  <td className="text-center py-2 px-2">{mark.activities?.activity2 ?? '-'}</td>
+                                  <td className="text-center py-2 px-2">{mark.activities?.activity3 ?? '-'}</td>
+                                  <td className="text-center py-2 px-2">{mark.activities?.activity4 ?? '-'}</td>
+                                  <td className="text-center py-2 px-2">{mark.activities?.activity5 ?? '-'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          {validationResult.valid_marks.length > 5 && (
+                            <p className="text-xs text-gray-600 mt-2 text-center">
+                              ... and {validationResult.valid_marks.length - 5} more
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        setFile(null);
+                        setValidationResult(null);
+                        setShowValidation(false);
+                      }}
+                      className="flex-1 px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300 text-sm sm:text-base"
+                    >
+                      ← Change File
+                    </button>
+                    <button
+                      onClick={handleBulkUpload}
+                      disabled={uploading || validationResult.valid_rows === 0}
+                      className="flex-1 px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold bg-purple-500 text-white hover:bg-purple-600 disabled:opacity-50 text-sm sm:text-base"
+                    >
+                      {uploading ? '⏳ Uploading...' : `🚀 Import ${validationResult.valid_rows} Marks`}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

@@ -234,8 +234,6 @@ func (h *ResultHandler) GetByStudent(c *gin.Context) {
 }
 
 func (h *ResultHandler) CreateOrUpdate(c *gin.Context) {
-	userRole := c.GetString("user_role")
-	
 	var req struct {
 		StudentID   string                 `json:"student_id" binding:"required"`
 		SubjectID   string                 `json:"subject_id" binding:"required"`
@@ -302,14 +300,6 @@ func (h *ResultHandler) CreateOrUpdate(c *gin.Context) {
 	}
 	err = h.db.Where("student_id = ? AND subject_id = ? AND term = ? AND year = ? AND exam_type = ? AND paper = ?",
 		studentID, subjectID, req.Term, req.Year, req.ExamType, paperNum).First(&result).Error
-	
-	// Teachers can add marks for new exam types, but cannot edit existing exam type marks
-	// School admins can edit all marks
-	if userRole == "teacher" && err != gorm.ErrRecordNotFound {
-		// Teachers cannot edit existing marks at all
-		c.JSON(http.StatusForbidden, gin.H{"error": "Teachers cannot edit existing marks. Contact school admin."})
-		return
-	}
 	
 	// Get class level to determine grading system
 	var class models.Class

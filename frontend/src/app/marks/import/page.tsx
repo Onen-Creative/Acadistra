@@ -4,13 +4,15 @@ import { useState, useEffect } from 'react'
 import { DashboardLayout } from '@/components/DashboardLayout'
 import { PageHeader } from '@/components/ui/BeautifulComponents'
 import { FormSelect } from '@/components/ui/FormComponents'
-import api from '@/services/api'
-import { classesApi, subjectsApi } from '@/services/api'
+import { classesApi, subjectsApi, marksApi } from '@/services/api'
 import toast from 'react-hot-toast'
 import { Download, Upload, CheckCircle, XCircle, Clock } from 'lucide-react'
 
+const AOI_LEVELS = ['S1', 'S2', 'S3', 'S4']
+
 export default function BulkMarksImportPage() {
   const [userRole, setUserRole] = useState('')
+  const [importMode, setImportMode] = useState<'exam' | 'aoi'>('exam')
   const [classId, setClassId] = useState('')
   const [subjectId, setSubjectId] = useState('')
   const [term, setTerm] = useState('Term 1')
@@ -36,6 +38,10 @@ export default function BulkMarksImportPage() {
       setSelectedClass(cls)
       if (cls?.level) {
         fetchSubjects(cls.level)
+        // Switch to exam mode if class is not S1-S4
+        if (!AOI_LEVELS.includes(cls.level) && importMode === 'aoi') {
+          setImportMode('exam')
+        }
       }
     }
   }, [classId, classes])
@@ -60,8 +66,8 @@ export default function BulkMarksImportPage() {
 
   const fetchImports = async () => {
     try {
-      const res = await api.get('/api/v1/marks/imports')
-      setImports(res.data.imports || [])
+      const res = await marksApi.listImports()
+      setImports(res.imports || [])
     } catch (error) {
       console.error('Failed to fetch imports', error)
     }
@@ -69,25 +75,39 @@ export default function BulkMarksImportPage() {
 
   const handleDownloadTemplate = async () => {
     try {
-      const token = localStorage.getItem('access_token')
-      const url = classId 
-        ? `${process.env.NEXT_PUBLIC_API_URL || 'https://acadistra.com'}/api/v1/marks/import-template?class_id=${classId}`
-        : `${process.env.NEXT_PUBLIC_API_URL || 'https://acadistra.com'}/api/v1/marks/import-template`
-      
-      const response = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      
-      const blob = await response.blob()
+      const subject = subjects.find(s => s.id === subjectId)
+      let blob: Blob
+      let filename: string
+
+      if (importMode === 'aoi') {
+        blob = await marksApi.downloadAOITemplate({
+          class_id: classId || undefined,
+          subject_name: subject?.name,
+          level: selectedClass?.level,
+          year,
+          term,
+        })
+        filename = 'aoi_marks_template.xlsx'
+      } else {
+        blob = await marksApi.downloadExamTemplate({
+          class_id: classId || undefined,
+          subject_name: subject?.name,
+          level: selectedClass?.level,
+          year,
+          term,
+          exam_type: examType,
+        })
+        filename = 'exam_marks_template.xlsx'
+      }
+
       const downloadUrl = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = downloadUrl
-      a.download = 'marks_template.xlsx'
+      a.download = filename
       document.body.appendChild(a)
       a.click()
       window.URL.revokeObjectURL(downloadUrl)
       document.body.removeChild(a)
-      
       toast.success('Template downloaded')
     } catch (error) {
       toast.error('Failed to download template')
@@ -107,22 +127,25 @@ export default function BulkMarksImportPage() {
     }
 
     setUploading(true)
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('class_id', classId)
-    formData.append('subject_id', subjectId)
-    formData.append('term', term)
-    formData.append('year', year)
-    formData.append('exam_type', examType)
-
     try {
-      const res = await api.post('/api/v1/marks/bulk-import', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
-      
-      toast.success(res.data.message)
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('class_id', classId)
+      formData.append('subject_id', subjectId)
+      formData.append('term', term)
+      formData.append('year', year)
+
+      let res: any
+      if (importMode === 'aoi') {
+        res = await marksApi.bulkImportAOI(formData)
+      } else {
+        formData.append('exam_type', examType)
+        res = await marksApi.bulkImport(formData)
+      }
+
+      toast.success(res.message)
       setFile(null)
-      fetchImports()
+      if (importMode === 'exam') fetchImports()
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Import failed')
     } finally {
@@ -132,7 +155,7 @@ export default function BulkMarksImportPage() {
 
   const handleApprove = async (importId: string) => {
     try {
-      await api.post(`/marks/imports/${importId}/approve`)
+      await marksApi.approveImport(importId)
       toast.success('Import approved and processed')
       fetchImports()
     } catch (error: any) {
@@ -145,7 +168,7 @@ export default function BulkMarksImportPage() {
     if (!reason) return
 
     try {
-      await api.post(`/marks/imports/${importId}/reject`, { reason })
+      await marksApi.rejectImport(importId, reason)
       toast.success('Import rejected')
       fetchImports()
     } catch (error: any) {
@@ -154,6 +177,7 @@ export default function BulkMarksImportPage() {
   }
 
   const isAdmin = userRole === 'school_admin'
+  const isAOICapable = selectedClass ? AOI_LEVELS.includes(selectedClass.level) : true
 
   return (
     <DashboardLayout>
@@ -164,6 +188,36 @@ export default function BulkMarksImportPage() {
         />
 
         <div className="space-y-6">
+          {/* Mode Toggle */}
+          <div className="bg-white rounded-2xl shadow-xl p-4">
+            <div className="flex gap-3">
+              <button
+                onClick={() => setImportMode('exam')}
+                className={`px-5 py-2 rounded-xl font-semibold transition-colors ${
+                  importMode === 'exam'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                📝 Exam Marks
+              </button>
+              <button
+                onClick={() => setImportMode('aoi')}
+                disabled={!isAOICapable}
+                className={`px-5 py-2 rounded-xl font-semibold transition-colors ${
+                  importMode === 'aoi'
+                    ? 'bg-purple-500 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                } disabled:opacity-40 disabled:cursor-not-allowed`}
+              >
+                🔬 AOI Marks (S1–S4)
+              </button>
+            </div>
+            {importMode === 'aoi' && (
+              <p className="mt-2 text-sm text-purple-600">AOI marks are processed immediately — no approval required. Each activity is scored 0–3.</p>
+            )}
+          </div>
+
           {/* Upload Section */}
           <div className="bg-white rounded-2xl shadow-xl p-6">
             <h3 className="text-lg font-bold text-gray-800 mb-4">📋 Step 1: Select Filters</h3>
@@ -199,17 +253,19 @@ export default function BulkMarksImportPage() {
                   ...classes.map(c => ({ value: c.id, label: c.name }))
                 ]}
               />
-              <FormSelect
-                value={examType}
-                onChange={(e) => setExamType(e.target.value)}
-                label="Exam Type"
-                options={[
-                  { value: 'BOT', label: 'BOT' },
-                  { value: 'MOT', label: 'MOT' },
-                  { value: 'EOT', label: 'EOT' },
-                  { value: 'Mock', label: 'Mock' }
-                ]}
-              />
+              {importMode === 'exam' && (
+                <FormSelect
+                  value={examType}
+                  onChange={(e) => setExamType(e.target.value)}
+                  label="Exam Type"
+                  options={[
+                    { value: 'BOT', label: 'BOT' },
+                    { value: 'MOT', label: 'MOT' },
+                    { value: 'EOT', label: 'EOT' },
+                    { value: 'Mock', label: 'Mock' }
+                  ]}
+                />
+              )}
               <FormSelect
                 value={subjectId}
                 onChange={(e) => setSubjectId(e.target.value)}
@@ -270,8 +326,8 @@ export default function BulkMarksImportPage() {
             )}
           </div>
 
-          {/* Imports List */}
-          <div className="bg-white rounded-2xl shadow-xl p-6">
+          {/* Imports List — exam mode only */}
+          {importMode === 'exam' && <div className="bg-white rounded-2xl shadow-xl p-6">
             <h3 className="text-lg font-bold text-gray-800 mb-4">📊 Import History</h3>
             
             <div className="overflow-x-auto">
@@ -340,7 +396,7 @@ export default function BulkMarksImportPage() {
                 </tbody>
               </table>
             </div>
-          </div>
+          </div>}
         </div>
       </div>
     </DashboardLayout>
