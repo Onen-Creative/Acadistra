@@ -100,30 +100,22 @@ func (g *NCDCGrader) ComputeGrade(schoolBasedMarks, externalMarks, schoolBasedMa
 	extPercent := (externalMarks / externalMax) * 80
 	total := sbPercent + extPercent
 
-	grade, points := "", 0
+	grade := ""
 	switch {
 	case total >= 80:
-		grade, points = "D1", 1
-	case total >= 70:
-		grade, points = "D2", 2
+		grade = "A"
 	case total >= 65:
-		grade, points = "C3", 3
-	case total >= 60:
-		grade, points = "C4", 4
-	case total >= 55:
-		grade, points = "C5", 5
+		grade = "B"
 	case total >= 50:
-		grade, points = "C6", 6
-	case total >= 45:
-		grade, points = "P7", 7
+		grade = "C"
 	case total >= 35:
-		grade, points = "P8", 8
+		grade = "D"
 	default:
-		grade, points = "F9", 9
+		grade = "E"
 	}
 
-	reason := fmt.Sprintf("AOI: %.2f/%.0f (20%%) = %.2f, Exam: %.2f/%.0f (80%%) = %.2f, Total: %.2f → Grade %s (Points: %d)",
-		schoolBasedMarks, schoolBasedMax, sbPercent, externalMarks, externalMax, extPercent, total, grade, points)
+	reason := fmt.Sprintf("AOI: %.2f/%.0f (20%%) = %.2f, Exam: %.2f/%.0f (80%%) = %.2f, Total: %.2f → Grade %s",
+		schoolBasedMarks, schoolBasedMax, sbPercent, externalMarks, externalMax, extPercent, total, grade)
 
 	return GradeResult{
 		FinalGrade:        grade,

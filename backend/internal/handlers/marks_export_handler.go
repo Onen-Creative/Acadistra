@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -51,6 +52,14 @@ func (h *MarksExportHandler) ExportClassMarks(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "No students found in this class"})
 		return
 	}
+
+	// Sort enrollments by student first name, then last name
+	sort.Slice(enrollments, func(i, j int) bool {
+		if enrollments[i].Student.FirstName != enrollments[j].Student.FirstName {
+			return enrollments[i].Student.FirstName < enrollments[j].Student.FirstName
+		}
+		return enrollments[i].Student.LastName < enrollments[j].Student.LastName
+	})
 
 	// Get all subjects for this level
 	var subjects []models.StandardSubject

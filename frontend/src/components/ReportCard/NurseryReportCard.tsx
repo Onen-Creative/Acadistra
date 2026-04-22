@@ -59,7 +59,7 @@ export default function NurseryReportCard({
   const stats = calculateStats()
 
   return (
-    <div className={`report-card bg-white mx-auto ${pageBreak ? 'page-break' : ''}`} style={{ width: '210mm', height: '297mm', padding: '10mm', boxSizing: 'border-box', fontFamily: 'Arial, sans-serif' }}>
+    <div className={`report-card bg-white mx-auto`} style={{ width: '210mm', height: '297mm', padding: '10mm', boxSizing: 'border-box', fontFamily: 'Arial, sans-serif', pageBreakAfter: pageBreak ? 'always' : 'auto' }} data-print-item="true">
       <div style={{ display: 'flex', flexDirection: 'column', border: '3px solid #000', height: '100%', overflow: 'hidden' }}>
         
         {/* Header Section */}

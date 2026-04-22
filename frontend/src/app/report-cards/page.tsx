@@ -100,7 +100,7 @@ export default function ReportCardPage() {
         if (students.length === 0) return []
         const allExamTypes = new Set<string>()
         await Promise.all(
-          students.slice(0, 5).map(async (student: any) => {
+          students.map(async (student: any) => {
             const params: any = { year: selectedYear, term: selectedTerm }
             const res = await resultsApi.getByStudent(student.id, params)
             const results = res.results || []
@@ -303,7 +303,7 @@ export default function ReportCardPage() {
         </div>
 
         {selectedStudent && selectedExamType && mergedSubjects && mergedSubjects.length > 0 && !bulkPrintMode && (
-          <div className="mt-8">
+          <div className="mt-8 print-container">
             {['Baby', 'Middle', 'Top'].includes(selectedClassData?.level || '') ? (
               <NurseryReportCard
                 student={{ ...selectedStudentData, class_name: selectedClassData?.name, class_level: selectedClassData?.level }}
@@ -375,7 +375,7 @@ export default function ReportCardPage() {
         )}
 
         {bulkPrintMode && selectedStudents.length > 0 && selectedExamType && (
-          <div className="mt-8">
+          <div className="mt-8 print-container">
             {selectedStudents.map((studentId, index) => {
               const studentData = studentsData?.students?.find((s: any) => s.id === studentId)
               if (!studentData) return null
@@ -383,65 +383,77 @@ export default function ReportCardPage() {
               const studentResultData = Array.isArray(resultsData) ? resultsData?.find((r: any) => r.student_id === studentId) : null
               const studentResults = studentResultData?.results || []
               const studentOutstandingFees = studentResultData?.outstanding_fees || 0
-              const isLastStudent = index === selectedStudents.length - 1
               
-              return (
-                <div key={studentId} className={!isLastStudent ? 'print:break-after-page' : ''}>
-                  {['Baby', 'Middle', 'Top'].includes(selectedClassData?.level || '') ? (
-                    <NurseryReportCard
-                      student={{ ...studentData, class_name: selectedClassData?.name, class_level: selectedClassData?.level }}
-                      results={studentResults}
-                      subjects={allSubjectsData?.subjects || []}
-                      term={selectedTerm}
-                      year={selectedYear.toString()}
-                      examType={selectedExamType}
-                      school={schoolData}
-                      outstandingBalance={studentOutstandingFees}
-                      nextTermBegins={nextTermBegins}
-                      nextTermEnds={nextTermEnds}
-                    />
-                  ) : ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7'].includes(selectedClassData?.level || '') ? (
-                    <PrimaryReportCard
-                      student={{ ...studentData, class_name: selectedClassData?.name, class_level: selectedClassData?.level, class_id: selectedClass }}
-                      results={studentResults}
-                      subjects={allSubjectsData?.subjects || []}
-                      term={selectedTerm}
-                      year={selectedYear.toString()}
-                      examType={selectedExamType}
-                      school={schoolData}
-                      outstandingBalance={studentOutstandingFees}
-                      nextTermBegins={nextTermBegins}
-                      nextTermEnds={nextTermEnds}
-                    />
-                  ) : ['S1', 'S2', 'S3', 'S4'].includes(selectedClassData?.level || '') ? (
-                    <OrdinaryLevelReportCard
-                      student={{ ...studentData, class_name: selectedClassData?.name, class_level: selectedClassData?.level }}
-                      results={studentResults}
-                      subjects={allSubjectsData?.subjects || []}
-                      term={selectedTerm}
-                      year={selectedYear.toString()}
-                      examType={selectedExamType}
-                      school={schoolData}
-                      outstandingBalance={studentOutstandingFees}
-                      nextTermBegins={nextTermBegins}
-                      nextTermEnds={nextTermEnds}
-                    />
-                  ) : ['S5', 'S6'].includes(selectedClassData?.level || '') ? (
-                    <AdvancedLevelReportCard
-                      student={{ ...studentData, class_name: selectedClassData?.name, class_level: selectedClassData?.level }}
-                      results={studentResults}
-                      subjects={allSubjectsData?.subjects || []}
-                      term={selectedTerm}
-                      year={selectedYear.toString()}
-                      examType={selectedExamType}
-                      school={schoolData}
-                      outstandingBalance={studentOutstandingFees}
-                      nextTermBegins={nextTermBegins}
-                      nextTermEnds={nextTermEnds}
-                    />
-                  ) : null}
-                </div>
-              )
+              if (['Baby', 'Middle', 'Top'].includes(selectedClassData?.level || '')) {
+                return (
+                  <NurseryReportCard
+                    key={studentId}
+                    student={{ ...studentData, class_name: selectedClassData?.name, class_level: selectedClassData?.level }}
+                    results={studentResults}
+                    subjects={allSubjectsData?.subjects || []}
+                    term={selectedTerm}
+                    year={selectedYear.toString()}
+                    examType={selectedExamType}
+                    school={schoolData}
+                    outstandingBalance={studentOutstandingFees}
+                    nextTermBegins={nextTermBegins}
+                    nextTermEnds={nextTermEnds}
+                    pageBreak={index < selectedStudents.length - 1}
+                  />
+                )
+              } else if (['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7'].includes(selectedClassData?.level || '')) {
+                return (
+                  <PrimaryReportCard
+                    key={studentId}
+                    student={{ ...studentData, class_name: selectedClassData?.name, class_level: selectedClassData?.level, class_id: selectedClass }}
+                    results={studentResults}
+                    subjects={allSubjectsData?.subjects || []}
+                    term={selectedTerm}
+                    year={selectedYear.toString()}
+                    examType={selectedExamType}
+                    school={schoolData}
+                    outstandingBalance={studentOutstandingFees}
+                    nextTermBegins={nextTermBegins}
+                    nextTermEnds={nextTermEnds}
+                    pageBreak={index < selectedStudents.length - 1}
+                  />
+                )
+              } else if (['S1', 'S2', 'S3', 'S4'].includes(selectedClassData?.level || '')) {
+                return (
+                  <OrdinaryLevelReportCard
+                    key={studentId}
+                    student={{ ...studentData, class_name: selectedClassData?.name, class_level: selectedClassData?.level }}
+                    results={studentResults}
+                    subjects={allSubjectsData?.subjects || []}
+                    term={selectedTerm}
+                    year={selectedYear.toString()}
+                    examType={selectedExamType}
+                    school={schoolData}
+                    outstandingBalance={studentOutstandingFees}
+                    nextTermBegins={nextTermBegins}
+                    nextTermEnds={nextTermEnds}
+                    pageBreak={index < selectedStudents.length - 1}
+                  />
+                )
+              } else if (['S5', 'S6'].includes(selectedClassData?.level || '')) {
+                return (
+                  <AdvancedLevelReportCard
+                    key={studentId}
+                    student={{ ...studentData, class_name: selectedClassData?.name, class_level: selectedClassData?.level }}
+                    results={studentResults}
+                    subjects={allSubjectsData?.subjects || []}
+                    term={selectedTerm}
+                    year={selectedYear.toString()}
+                    examType={selectedExamType}
+                    school={schoolData}
+                    outstandingBalance={studentOutstandingFees}
+                    nextTermBegins={nextTermBegins}
+                    nextTermEnds={nextTermEnds}
+                    pageBreak={index < selectedStudents.length - 1}
+                  />
+                )
+              }
+              return null
             })}
           </div>
         )}

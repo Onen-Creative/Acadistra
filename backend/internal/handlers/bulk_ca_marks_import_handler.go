@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/school-system/backend/internal/grading"
 	"github.com/school-system/backend/internal/models"
 	"github.com/xuri/excelize/v2"
 	"gorm.io/gorm"
@@ -137,6 +138,21 @@ func (h *BulkCAMarksImportHandler) UploadCAMarksForApproval(c *gin.Context) {
 				result.RawMarks = make(models.JSONB)
 			}
 			result.RawMarks["ca"] = mark.CA
+			
+			// Recalculate grade if exam marks exist
+			exam := 0.0
+			if e, ok := result.RawMarks["exam"].(float64); ok {
+				exam = e
+			}
+			
+			if exam > 0 {
+				gradeResult, rawMarks := h.calculateGrade(class.Level, mark.CA, exam)
+				result.RawMarks = rawMarks
+				result.FinalGrade = gradeResult.FinalGrade
+				result.ComputationReason = gradeResult.ComputationReason
+				result.RuleVersionHash = gradeResult.RuleVersionHash
+			}
+			
 			if err := h.db.Save(&result).Error; err != nil {
 				errors = append(errors, fmt.Sprintf("Failed to update CA marks for %s: %v", mark.AdmissionNo, err))
 			}
@@ -328,7 +344,7 @@ func (h *BulkCAMarksImportHandler) DownloadCAMarksTemplate(c *gin.Context) {
 		var students []models.Student
 		h.db.Joins("JOIN enrollments ON enrollments.student_id = students.id").
 			Where("enrollments.class_id = ? AND students.school_id = ? AND enrollments.status = 'active'", classID, schoolID).
-			Order("students.first_name, students.last_name").
+			Order("students.first_name ASC, students.last_name ASC").
 			Find(&students)
 
 		for i, student := range students {
@@ -353,4 +369,28 @@ func (h *BulkCAMarksImportHandler) DownloadCAMarksTemplate(c *gin.Context) {
 	if err := f.Write(c.Writer); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate template"})
 	}
+}
+
+
+// calculateGrade computes grade based on level and marks
+func (h *BulkCAMarksImportHandler) calculateGrade(level string, ca, exam float64) (grading.GradeResult, models.JSONB) {
+	rawMarks := models.JSONB{"ca": ca, "exam": exam}
+	
+	switch level {
+	case "P1", "P2", "P3", "P4", "P5", "P6", "P7":
+		rawMarks["total"] = ca + exam
+		grader := &grading.PrimaryGrader{}
+		return grader.ComputeGrade(ca, exam, 40, 60), rawMarks
+		
+	case "Baby", "Middle", "Top", "Nursery":
+		avg := (ca + exam) / 2
+		rawMarks["mark"] = avg
+		grader := &grading.NurseryGrader{}
+		return grader.ComputeGrade(ca, exam, 100, 100), rawMarks
+	}
+	
+	return grading.GradeResult{
+		FinalGrade:        "",
+		ComputationReason: "Unknown level",
+	}, rawMarks
 }

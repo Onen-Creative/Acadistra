@@ -893,6 +893,7 @@ func (h *ResultHandler) GetPerformanceSummary(c *gin.Context) {
 			FROM students s
 			JOIN enrollments e ON s.id = e.student_id
 			WHERE e.class_id = ? AND e.status = 'active' AND s.school_id = ?
+			ORDER BY s.first_name ASC, s.last_name ASC
 		`, class.ID, schoolID).Scan(&students)
 		
 		var classPerformance []StudentPerformance

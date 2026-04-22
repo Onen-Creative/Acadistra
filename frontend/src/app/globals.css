@@ -311,32 +311,50 @@
   }
   
   body {
-    margin: 0;
-    padding: 0;
+    margin: 0 !important;
+    padding: 0 !important;
   }
   
-  body * {
-    visibility: hidden;
-  }
-  
-  .report-card, .report-card * {
-    visibility: visible;
-  }
-  
-  .report-card {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 210mm;
-    height: 297mm;
-  }
-  
+  /* Hide all non-print elements */
   .print\:hidden {
     display: none !important;
   }
   
-  .page-break {
-    page-break-after: always;
-    break-after: page;
+  /* Hide everything by default */
+  body * {
+    visibility: hidden !important;
+  }
+  
+  /* Show print container and all its descendants */
+  .print-container,
+  .print-container * {
+    visibility: visible !important;
+  }
+  
+  /* Position print container to fill the page */
+  .print-container {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  
+  /* Ensure report cards are properly formatted */
+  .report-card {
+    display: block !important;
+    position: relative !important;
+    margin: 0 auto !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Don't add page break after the last report card */
+  .report-card:last-child {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
   }
 }

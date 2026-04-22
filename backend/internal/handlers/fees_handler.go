@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -108,6 +109,17 @@ func (h *FeesHandler) ListStudentFees(c *gin.Context) {
 		// Store payments in a temporary field (we'll need to add this to response)
 		// For now, we can add it via a custom response structure if needed
 	}
+
+	// Sort fees by student first name, then last name
+	sort.Slice(fees, func(i, j int) bool {
+		if fees[i].Student == nil || fees[j].Student == nil {
+			return false
+		}
+		if fees[i].Student.FirstName != fees[j].Student.FirstName {
+			return fees[i].Student.FirstName < fees[j].Student.FirstName
+		}
+		return fees[i].Student.LastName < fees[j].Student.LastName
+	})
 
 	c.JSON(http.StatusOK, gin.H{
 		"fees":  fees,

@@ -284,6 +284,17 @@ func (h *ClinicHandler) GetVisits(c *gin.Context) {
 		}
 	}
 	
+	// Sort visits by student name alphabetically
+	sort.Slice(visits, func(i, j int) bool {
+		if visits[i].Student == nil || visits[j].Student == nil {
+			return false
+		}
+		if visits[i].Student.FirstName != visits[j].Student.FirstName {
+			return visits[i].Student.FirstName < visits[j].Student.FirstName
+		}
+		return visits[i].Student.LastName < visits[j].Student.LastName
+	})
+	
 	c.JSON(http.StatusOK, gin.H{"visits": visits, "total": total})
 }
 

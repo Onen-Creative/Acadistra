@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/school-system/backend/internal/grading"
 	"github.com/school-system/backend/internal/models"
 	"github.com/xuri/excelize/v2"
 	"gorm.io/gorm"
@@ -125,6 +126,13 @@ func (h *BulkAOIMarksImportHandler) UploadAOIMarks(c *gin.Context) {
 
 		if err := h.db.Create(&aoiRecord).Error; err != nil {
 			errors = append(errors, fmt.Sprintf("Failed to save AOI marks for %s: %v", mark.AdmissionNo, err))
+			continue
+		}
+
+		// Update all subject results with recalculated grade (AOI applies to all exam types)
+		if err := h.updateAllSubjectResultsWithAOI(uuid.MustParse(mark.StudentID), uuid.MustParse(subjectID), 
+			uuid.MustParse(classID), uuid.MustParse(schoolID), term, year, marksJSONB); err != nil {
+			errors = append(errors, fmt.Sprintf("Failed to update grade for %s: %v", mark.AdmissionNo, err))
 		}
 	}
 
@@ -179,31 +187,34 @@ func (h *BulkAOIMarksImportHandler) parseAOIFile(file interface{}, schoolID, _, 
 		return validMarks, errors, 0
 	}
 
-	// Count actual data rows (skip first 6: title, instructions, empty, headers, max labels, empty)
-	dataRows := rows[6:]
+	// Template structure (0-indexed):
+	// Row 0: Title
+	// Row 1: Instructions
+	// Row 2: Empty
+	// Row 3: Headers
+	// Row 4: Max labels
+	// Row 5+: Data
+	
+	dataRows := rows[5:]
 	nonEmptyCount := 0
 	for _, row := range dataRows {
-		if len(row) > 0 && row[0] != "" {
+		if len(row) > 0 && strings.TrimSpace(row[0]) != "" {
 			nonEmptyCount++
 		}
 	}
 	totalRows := nonEmptyCount
 
-	// Skip header rows (first 6 rows: title, instructions, empty, headers, max labels, empty)
-	for i, row := range rows[6:] {
-		// Skip empty rows
-		if len(row) == 0 || (len(row) > 0 && strings.TrimSpace(row[0]) == "") {
+	for i, row := range rows[5:] {
+		// Skip empty rows - check if admission_no column is empty
+		if len(row) == 0 {
 			continue
 		}
-
-		// Need at least admission_no and name (columns 0-1)
-		if len(row) < 2 {
-			errors = append(errors, fmt.Sprintf("Row %d: Insufficient columns (expected at least admission_no and name)", i+7))
-			continue
+		
+		admissionNo := ""
+		if len(row) > 0 {
+			admissionNo = strings.TrimSpace(row[0])
 		}
-
-		admissionNo := strings.TrimSpace(row[0])
-
+		
 		// Skip if admission number is empty
 		if admissionNo == "" {
 			continue
@@ -211,33 +222,36 @@ func (h *BulkAOIMarksImportHandler) parseAOIFile(file interface{}, schoolID, _, 
 
 		var student models.Student
 		if err := h.db.Where("admission_no = ? AND school_id = ?", admissionNo, schoolID).First(&student).Error; err != nil {
-			errors = append(errors, fmt.Sprintf("Row %d: Student %s not found", i+7, admissionNo))
+			errors = append(errors, fmt.Sprintf("Row %d: Student %s not found", i+6, admissionNo))
 			continue
 		}
 
 		activities := make(map[string]float64)
 		hasError := false
 
+		// Parse activities from columns 2-6 (activity1 to activity5)
 		for j := 1; j <= 5; j++ {
+			colIdx := j + 1 // Column index: 2 for activity1, 3 for activity2, etc.
+			
 			// Check if column exists in row
-			if j+1 >= len(row) {
+			if colIdx >= len(row) {
 				continue // Activity column doesn't exist, skip
 			}
 
-			activityStr := strings.TrimSpace(row[j+1])
+			activityStr := strings.TrimSpace(row[colIdx])
 			if activityStr == "" {
-				continue
+				continue // Empty activity, skip
 			}
 
 			mark, err := strconv.ParseFloat(activityStr, 64)
 			if err != nil {
-				errors = append(errors, fmt.Sprintf("Row %d: Invalid activity%d mark '%s'", i+7, j, activityStr))
+				errors = append(errors, fmt.Sprintf("Row %d: Invalid activity%d mark '%s'", i+6, j, activityStr))
 				hasError = true
 				break
 			}
 
 			if mark < 0 || mark > 3 {
-				errors = append(errors, fmt.Sprintf("Row %d: Activity%d mark %.1f out of range (0-3)", i+7, j, mark))
+				errors = append(errors, fmt.Sprintf("Row %d: Activity%d mark %.1f out of range (0-3)", i+6, j, mark))
 				hasError = true
 				break
 			}
@@ -341,7 +355,7 @@ func (h *BulkAOIMarksImportHandler) DownloadAOIMarksTemplate(c *gin.Context) {
 		var students []models.Student
 		h.db.Joins("JOIN enrollments ON enrollments.student_id = students.id").
 			Where("enrollments.class_id = ? AND students.school_id = ? AND enrollments.status = 'active'", classID, schoolID).
-			Order("students.first_name, students.last_name").
+			Order("students.first_name ASC, students.last_name ASC").
 			Find(&students)
 
 		for i, student := range students {
@@ -366,4 +380,63 @@ func (h *BulkAOIMarksImportHandler) DownloadAOIMarksTemplate(c *gin.Context) {
 	if err := f.Write(c.Writer); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate template"})
 	}
+}
+
+// updateAllSubjectResultsWithAOI updates all subject results (all exam types) with AOI-based grade calculation
+func (h *BulkAOIMarksImportHandler) updateAllSubjectResultsWithAOI(studentID, subjectID, _, _ uuid.UUID, 
+	term string, year int, aoiMarks models.JSONB) error {
+	
+	// Calculate AOI CA out of 20
+	activities := []float64{}
+	for i := 1; i <= 5; i++ {
+		key := fmt.Sprintf("activity%d", i)
+		if val, ok := aoiMarks[key].(float64); ok {
+			activities = append(activities, val)
+		}
+	}
+	
+	if len(activities) == 0 {
+		return nil // No activities to process
+	}
+	
+	avg := 0.0
+	for _, v := range activities {
+		avg += v
+	}
+	avg = avg / float64(len(activities))
+	aoiCA := (avg / 3.0) * 20.0
+	
+	// Find all subject results for this student, subject, term, and year
+	var results []models.SubjectResult
+	h.db.Where("student_id = ? AND subject_id = ? AND term = ? AND year = ?",
+		studentID, subjectID, term, year).Find(&results)
+	
+	// Update all existing results with new AOI CA
+	for _, result := range results {
+		exam := 0.0
+		if result.RawMarks != nil {
+			if e, ok := result.RawMarks["exam"].(float64); ok {
+				exam = e
+			}
+		}
+		
+		// Calculate grade using NCDC grader
+		grader := &grading.NCDCGrader{}
+		gradeResult := grader.ComputeGrade(aoiCA, exam, 20, 80)
+		
+		if result.RawMarks == nil {
+			result.RawMarks = make(models.JSONB)
+		}
+		result.RawMarks["ca"] = aoiCA
+		result.RawMarks["total"] = aoiCA + exam
+		result.FinalGrade = gradeResult.FinalGrade
+		result.ComputationReason = gradeResult.ComputationReason
+		result.RuleVersionHash = gradeResult.RuleVersionHash
+		
+		if err := h.db.Save(&result).Error; err != nil {
+			return err
+		}
+	}
+	
+	return nil
 }

@@ -262,10 +262,10 @@ func (h *StudentHandler) List(c *gin.Context) {
 	var err error
 	if limit == 0 {
 		// No pagination - return all students
-		err = query.Find(&students).Error
+		err = query.Order("students.first_name ASC, students.last_name ASC").Find(&students).Error
 	} else {
 		// With pagination
-		err = query.Offset(offset).Limit(limit).Find(&students).Error
+		err = query.Order("students.first_name ASC, students.last_name ASC").Offset(offset).Limit(limit).Find(&students).Error
 	}
 	
 	if err != nil {
@@ -392,7 +392,7 @@ func (h *StudentHandler) GetMyChildren(c *gin.Context) {
 
 	// Get students with their current class
 	var students []models.Student
-	if err := h.db.Where("id IN ? AND school_id = ?", studentIDs, schoolID).Find(&students).Error; err != nil {
+	if err := h.db.Where("id IN ? AND school_id = ?", studentIDs, schoolID).Order("first_name ASC, last_name ASC").Find(&students).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch students"})
 		return
 	}

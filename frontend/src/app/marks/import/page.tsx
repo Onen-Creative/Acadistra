@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { DashboardLayout } from '@/components/DashboardLayout'
 import { PageHeader } from '@/components/ui/BeautifulComponents'
 import { FormSelect } from '@/components/ui/FormComponents'
@@ -11,6 +12,7 @@ import { Download, Upload, CheckCircle, XCircle, Clock } from 'lucide-react'
 const AOI_LEVELS = ['S1', 'S2', 'S3', 'S4']
 
 export default function BulkMarksImportPage() {
+  const router = useRouter()
   const [userRole, setUserRole] = useState('')
   const [importMode, setImportMode] = useState<'exam' | 'aoi'>('exam')
   const [classId, setClassId] = useState('')
@@ -21,6 +23,7 @@ export default function BulkMarksImportPage() {
   const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const [imports, setImports] = useState<any[]>([])
+  const [loadingImports, setLoadingImports] = useState(false)
   const [classes, setClasses] = useState<any[]>([])
   const [subjects, setSubjects] = useState<any[]>([])
   const [selectedClass, setSelectedClass] = useState<any>(null)
@@ -65,11 +68,15 @@ export default function BulkMarksImportPage() {
   }
 
   const fetchImports = async () => {
+    if (loadingImports) return // Prevent concurrent fetches
+    setLoadingImports(true)
     try {
       const res = await marksApi.listImports()
       setImports(res.imports || [])
     } catch (error) {
       console.error('Failed to fetch imports', error)
+    } finally {
+      setLoadingImports(false)
     }
   }
 
@@ -126,6 +133,8 @@ export default function BulkMarksImportPage() {
       return
     }
 
+    if (uploading) return // Prevent double submission
+
     setUploading(true)
     try {
       const formData = new FormData()
@@ -138,14 +147,23 @@ export default function BulkMarksImportPage() {
       let res: any
       if (importMode === 'aoi') {
         res = await marksApi.bulkImportAOI(formData)
+        toast.success(res.message || 'AOI marks imported successfully')
+        // No redirect for AOI - stays on same page
       } else {
         formData.append('exam_type', examType)
         res = await marksApi.bulkImport(formData)
+        toast.success(res.message || 'Exam marks uploaded successfully')
+        // Redirect to result management page after successful exam import
+        setTimeout(() => {
+          router.push('/results')
+        }, 1000)
+        return // Exit early to prevent file reset before redirect
       }
 
-      toast.success(res.message)
       setFile(null)
-      if (importMode === 'exam') fetchImports()
+      // Reset file input
+      const fileInput = document.getElementById('file-upload') as HTMLInputElement
+      if (fileInput) fileInput.value = ''
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Import failed')
     } finally {
@@ -157,7 +175,8 @@ export default function BulkMarksImportPage() {
     try {
       await marksApi.approveImport(importId)
       toast.success('Import approved and processed')
-      fetchImports()
+      // Only refresh the imports list, not the entire page
+      await fetchImports()
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to approve')
     }
@@ -170,7 +189,8 @@ export default function BulkMarksImportPage() {
     try {
       await marksApi.rejectImport(importId, reason)
       toast.success('Import rejected')
-      fetchImports()
+      // Only refresh the imports list, not the entire page
+      await fetchImports()
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to reject')
     }
@@ -192,6 +212,7 @@ export default function BulkMarksImportPage() {
           <div className="bg-white rounded-2xl shadow-xl p-4">
             <div className="flex gap-3">
               <button
+                type="button"
                 onClick={() => setImportMode('exam')}
                 className={`px-5 py-2 rounded-xl font-semibold transition-colors ${
                   importMode === 'exam'
@@ -202,6 +223,7 @@ export default function BulkMarksImportPage() {
                 📝 Exam Marks
               </button>
               <button
+                type="button"
                 onClick={() => setImportMode('aoi')}
                 disabled={!isAOICapable}
                 className={`px-5 py-2 rounded-xl font-semibold transition-colors ${
@@ -280,6 +302,7 @@ export default function BulkMarksImportPage() {
 
             <div className="flex gap-4">
               <button
+                type="button"
                 onClick={handleDownloadTemplate}
                 className="flex items-center gap-2 px-6 py-3 rounded-xl font-semibold bg-blue-500 text-white hover:bg-blue-600"
               >
@@ -317,6 +340,7 @@ export default function BulkMarksImportPage() {
 
             {file && classId && subjectId && (
               <button
+                type="button"
                 onClick={handleUpload}
                 disabled={uploading}
                 className="mt-4 w-full px-6 py-3 rounded-xl font-semibold bg-purple-500 text-white hover:bg-purple-600 disabled:opacity-50"
@@ -377,12 +401,14 @@ export default function BulkMarksImportPage() {
                         {imp.status === 'pending' && isAdmin && (
                           <div className="flex gap-2 justify-center">
                             <button
+                              type="button"
                               onClick={() => handleApprove(imp.id)}
                               className="px-3 py-1 rounded bg-green-500 text-white text-sm hover:bg-green-600"
                             >
                               Approve
                             </button>
                             <button
+                              type="button"
                               onClick={() => handleReject(imp.id)}
                               className="px-3 py-1 rounded bg-red-500 text-white text-sm hover:bg-red-600"
                             >
