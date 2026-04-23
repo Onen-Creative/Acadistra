@@ -39,11 +39,24 @@ func (h *AnnouncementHandler) CreateAnnouncement(c *gin.Context) {
 
 	userID := c.GetString("user_id")
 	schoolID := c.GetString("school_id")
+	userRole := c.GetString("user_role")
 
 	var schoolUUID *uuid.UUID
-	if schoolID != "" {
+	// School admin can only create announcements for their school
+	switch userRole {
+	case "school_admin":
+		if schoolID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "School admin must have a school_id"})
+			return
+		}
 		parsed, _ := uuid.Parse(schoolID)
 		schoolUUID = &parsed
+	case "system_admin":
+		// System admin can create announcements for any school or system-wide (null school_id)
+		if schoolID != "" {
+			parsed, _ := uuid.Parse(schoolID)
+			schoolUUID = &parsed
+		}
 	}
 
 	announcement := models.SystemAnnouncement{
@@ -73,11 +86,21 @@ func (h *AnnouncementHandler) CreateAnnouncement(c *gin.Context) {
 
 func (h *AnnouncementHandler) SendAnnouncement(c *gin.Context) {
 	announcementID := c.Param("id")
+	userRole := c.GetString("user_role")
+	schoolID := c.GetString("school_id")
 
 	var announcement models.SystemAnnouncement
 	if err := h.db.First(&announcement, "id = ?", announcementID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Announcement not found"})
 		return
+	}
+
+	// School admin can only send announcements for their school
+	if userRole == "school_admin" {
+		if announcement.SchoolID == nil || announcement.SchoolID.String() != schoolID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You can only send announcements for your school"})
+			return
+		}
 	}
 
 	if announcement.Status == "sent" {
@@ -89,6 +112,7 @@ func (h *AnnouncementHandler) SendAnnouncement(c *gin.Context) {
 	var users []models.User
 	query := h.db.Where("is_active = ?", true)
 
+	// Filter by school - school_admin announcements are always school-specific
 	if announcement.SchoolID != nil {
 		query = query.Where("school_id = ?", announcement.SchoolID)
 	}
@@ -181,6 +205,8 @@ func (h *AnnouncementHandler) ListAnnouncements(c *gin.Context) {
 
 func (h *AnnouncementHandler) GetAnnouncement(c *gin.Context) {
 	announcementID := c.Param("id")
+	userRole := c.GetString("user_role")
+	schoolID := c.GetString("school_id")
 
 	var announcement models.SystemAnnouncement
 	if err := h.db.Preload("Creator").First(&announcement, "id = ?", announcementID).Error; err != nil {
@@ -188,16 +214,34 @@ func (h *AnnouncementHandler) GetAnnouncement(c *gin.Context) {
 		return
 	}
 
+	// School admin can only view announcements for their school
+	if userRole == "school_admin" {
+		if announcement.SchoolID == nil || announcement.SchoolID.String() != schoolID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You can only view announcements for your school"})
+			return
+		}
+	}
+
 	c.JSON(http.StatusOK, announcement)
 }
 
 func (h *AnnouncementHandler) DeleteAnnouncement(c *gin.Context) {
 	announcementID := c.Param("id")
+	userRole := c.GetString("user_role")
+	schoolID := c.GetString("school_id")
 
 	var announcement models.SystemAnnouncement
 	if err := h.db.First(&announcement, "id = ?", announcementID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Announcement not found"})
 		return
+	}
+
+	// School admin can only delete announcements for their school
+	if userRole == "school_admin" {
+		if announcement.SchoolID == nil || announcement.SchoolID.String() != schoolID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You can only delete announcements for your school"})
+			return
+		}
 	}
 
 	if announcement.Status == "sent" {

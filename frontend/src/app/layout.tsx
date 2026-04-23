@@ -33,6 +33,18 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  // Suppress browser extension errors in production
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+    const originalError = console.error
+    console.error = (...args) => {
+      if (args[0]?.toString().includes('proxy.js') || 
+          args[0]?.toString().includes('disconnected port')) {
+        return
+      }
+      originalError.apply(console, args)
+    }
+  }
+
   return (
     <html lang="en">
       <body className={inter.className}>

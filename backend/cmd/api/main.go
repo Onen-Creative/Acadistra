@@ -313,14 +313,6 @@ func main() {
 				sysAdmin.GET("/reports/system/activity", systemReportsHandler.GenerateActivityReport)
 				sysAdmin.GET("/reports/system/performance", systemReportsHandler.GeneratePerformanceReport)
 				
-				// System announcements
-				announcementHandler := handlers.NewAnnouncementHandler(db, emailService)
-				sysAdmin.POST("/announcements", announcementHandler.CreateAnnouncement)
-				sysAdmin.GET("/announcements", announcementHandler.ListAnnouncements)
-				sysAdmin.GET("/announcements/:id", announcementHandler.GetAnnouncement)
-				sysAdmin.POST("/announcements/:id/send", announcementHandler.SendAnnouncement)
-				sysAdmin.DELETE("/announcements/:id", announcementHandler.DeleteAnnouncement)
-				
 				// Grade recalculation
 				sysAdmin.POST("/recalculate-grades", resultHandler.RecalculateGrades)
 			}
@@ -393,6 +385,27 @@ func main() {
 			protected.PUT("/notifications/:id/read", notificationHandler.MarkAsRead)
 			protected.PUT("/notifications/mark-all-read", notificationHandler.MarkAllAsRead)
 			protected.DELETE("/notifications/:id", notificationHandler.DeleteNotification)
+			
+			// Announcements - System Admin and School Admin
+			announcementHandler := handlers.NewAnnouncementHandler(db, emailService)
+			announcements := protected.Group("/announcements")
+			announcements.Use(func(c *gin.Context) {
+				userRole := c.GetString("user_role")
+				if userRole != "system_admin" && userRole != "school_admin" {
+					c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+					c.Abort()
+					return
+				}
+				c.Next()
+			})
+			{
+				announcements.POST("", announcementHandler.CreateAnnouncement)
+				announcements.GET("", announcementHandler.ListAnnouncements)
+				announcements.GET("/:id", announcementHandler.GetAnnouncement)
+				announcements.POST("/:id/send", announcementHandler.SendAnnouncement)
+				announcements.DELETE("/:id", announcementHandler.DeleteAnnouncement)
+			}
+			
 			// School Admin routes
 			schoolAdmin := protected.Group("")
 			schoolAdmin.Use(middleware.RequireSchoolAdmin())
