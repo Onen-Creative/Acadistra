@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 export function useRequireAuth(allowedRoles?: string[]) {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const token = localStorage.getItem('access_token')
@@ -13,6 +14,7 @@ export function useRequireAuth(allowedRoles?: string[]) {
     
     if (!token) {
       router.replace('/login')
+      setLoading(false)
       return
     }
     
@@ -32,7 +34,8 @@ export function useRequireAuth(allowedRoles?: string[]) {
         router.replace(redirectPath)
       }
     }
+    setLoading(false)
   }, [router])
 
-  return { user }
+  return { user, loading }
 }

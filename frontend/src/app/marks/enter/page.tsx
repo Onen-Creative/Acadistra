@@ -21,7 +21,6 @@ export default function MarksEntryPage() {
   const [paperNumber, setPaperNumber] = useState('1')
   const [searchTerm, setSearchTerm] = useState('')
   const [marks, setMarks] = useState<Record<string, { ca?: number; exam?: number; mark?: number }>>({})
-  const [existingMarks, setExistingMarks] = useState<Record<string, any>>({})
   const [userRole, setUserRole] = useState('')
   const [showBulkImport, setShowBulkImport] = useState(false)
   const [importType, setImportType] = useState<'ca' | 'exam'>('exam') // 'ca' for AOI, 'exam' for exam marks
@@ -76,37 +75,43 @@ export default function MarksEntryPage() {
   useEffect(() => {
     if (classId && examType && subjectId && studentsData?.students && (!isAdvanced || paperNumber)) {
       const fetchExistingMarks = async () => {
-        const marksMap: Record<string, any> = {}
-        const marksData: Record<string, { ca: number; exam: number }> = {}
-        
-        for (const student of studentsData.students) {
-          try {
-            const res = await resultsApi.getByStudent(student.id, { year, term, exam_type: examType })
-            const result = res.results?.find((r: any) => {
-              if (isAdvanced) {
-                return r.subject_id === subjectId && r.raw_marks?.paper === parseInt(paperNumber)
-              }
-              return r.subject_id === subjectId
-            })
-            if (result && result.raw_marks) {
-              marksMap[student.id] = result
-              if (isAdvanced) {
-                marksData[student.id] = {
-                  mark: result.raw_marks.mark || result.raw_marks.total || 0
-                } as any
-              } else {
-                marksData[student.id] = {
-                  ca: result.raw_marks.ca || 0,
-                  exam: result.raw_marks.exam || 0
-                }
+        try {
+          // Use bulk endpoint to fetch all marks in one call
+          const params = new URLSearchParams({
+            class_id: classId,
+            subject_id: subjectId,
+            term,
+            year,
+            exam_type: examType
+          })
+          
+          if (isAdvanced && paperNumber) {
+            params.append('paper', paperNumber)
+          }
+          
+          const res = await api.get(`/api/v1/results/bulk-marks?${params.toString()}`)
+          const bulkMarks = res.data.marks || {}
+          
+          const marksData: Record<string, { ca?: number; exam?: number; mark?: number }> = {}
+          
+          for (const studentId in bulkMarks) {
+            const rawMarks = bulkMarks[studentId]
+            if (isAdvanced) {
+              marksData[studentId] = {
+                mark: rawMarks.mark || rawMarks.total || 0
+              } as any
+            } else {
+              marksData[studentId] = {
+                ca: rawMarks.ca || 0,
+                exam: rawMarks.exam || 0
               }
             }
-          } catch (error) {
-            // Student has no marks yet
           }
+          
+          setMarks(marksData)
+        } catch (error) {
+          console.error('Failed to fetch existing marks:', error)
         }
-        setExistingMarks(marksMap)
-        setMarks(marksData)
       }
       fetchExistingMarks()
     }
@@ -422,7 +427,6 @@ export default function MarksEntryPage() {
                 setClassId(e.target.value)
                 setSubjectId('')
                 setMarks({})
-                setExistingMarks({})
               }}
               label="Class"
               options={[
@@ -435,7 +439,6 @@ export default function MarksEntryPage() {
               onChange={(e) => {
                 setExamType(e.target.value)
                 setMarks({})
-                setExistingMarks({})
               }}
               label="Exam Type"
               disabled={!classId}
@@ -453,7 +456,6 @@ export default function MarksEntryPage() {
                 setSubjectId(e.target.value)
                 setPaperNumber('1')
                 setMarks({})
-                setExistingMarks({})
               }}
               label="Subject"
               disabled={!examType}
@@ -468,7 +470,6 @@ export default function MarksEntryPage() {
                 onChange={(e) => {
                   setPaperNumber(e.target.value)
                   setMarks({})
-                  setExistingMarks({})
                 }}
                 label="Paper"
                 options={[
@@ -529,7 +530,7 @@ export default function MarksEntryPage() {
               }).map((student: any, index: number) => {
                 const studentMarks = marks[student.id] || (isAdvanced ? { mark: 0 } : (['S1', 'S2', 'S3', 'S4'].includes(classLevel) ? { exam: 0 } : { ca: 0, exam: 0 }))
                 const total = isAdvanced ? (studentMarks.mark || 0) : (['S1', 'S2', 'S3', 'S4'].includes(classLevel) ? (studentMarks.exam || 0) : ((studentMarks.ca || 0) + (studentMarks.exam || 0)))
-                const hasExisting = !!existingMarks[student.id]
+                const hasExisting = marks[student.id] && (isAdvanced ? (marks[student.id].mark || 0) > 0 : (['S1', 'S2', 'S3', 'S4'].includes(classLevel) ? (marks[student.id].exam || 0) > 0 : ((marks[student.id].ca || 0) > 0 || (marks[student.id].exam || 0) > 0)))
                 const canEdit = true
                 
                 return (
@@ -671,7 +672,7 @@ export default function MarksEntryPage() {
                   }).map((student: any, index: number) => {
                     const studentMarks = marks[student.id] || (isAdvanced ? { mark: 0 } : (['S1', 'S2', 'S3', 'S4'].includes(classLevel) ? { exam: 0 } : { ca: 0, exam: 0 }))
                     const total = isAdvanced ? (studentMarks.mark || 0) : (['S1', 'S2', 'S3', 'S4'].includes(classLevel) ? (studentMarks.exam || 0) : ((studentMarks.ca || 0) + (studentMarks.exam || 0)))
-                    const hasExisting = !!existingMarks[student.id]
+                    const hasExisting = marks[student.id] && (isAdvanced ? (marks[student.id].mark || 0) > 0 : (['S1', 'S2', 'S3', 'S4'].includes(classLevel) ? (marks[student.id].exam || 0) > 0 : ((marks[student.id].ca || 0) > 0 || (marks[student.id].exam || 0) > 0)))
                     const canEdit = true
                     
                     return (

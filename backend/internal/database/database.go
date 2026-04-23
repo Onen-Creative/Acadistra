@@ -154,6 +154,8 @@ func Migrate(db *gorm.DB) error {
 		&models.InventoryCategory{},
 		&models.InventoryItem{},
 		&models.InventoryTransaction{},
+		// System Announcements
+		&models.SystemAnnouncement{},
 	)
 	if err != nil {
 		// Only ignore the uni_staff_email constraint error if it's about the constraint not existing

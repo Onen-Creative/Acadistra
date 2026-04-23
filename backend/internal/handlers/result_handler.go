@@ -5,6 +5,7 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -847,6 +848,57 @@ func (h *ResultHandler) RecalculateGrades(c *gin.Context) {
 }
 
 // GetPerformanceSummary returns comprehensive performance summary with all subjects per class
+// GetBulkMarks fetches all marks for a class/subject/term/year in one query
+func (h *ResultHandler) GetBulkMarks(c *gin.Context) {
+	schoolID := c.GetString("tenant_school_id")
+	classID := c.Query("class_id")
+	subjectID := c.Query("subject_id")
+	term := c.Query("term")
+	year := c.Query("year")
+	examType := c.Query("exam_type")
+	paperStr := c.Query("paper")
+	
+	if classID == "" || subjectID == "" || term == "" || year == "" || examType == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "class_id, subject_id, term, year, and exam_type are required"})
+		return
+	}
+	
+	paper := 0
+	if paperStr != "" {
+		if p, err := strconv.Atoi(paperStr); err == nil {
+			paper = p
+		}
+	}
+	
+	type StudentMark struct {
+		StudentID string      `json:"student_id"`
+		RawMarks  models.JSONB `json:"raw_marks"`
+	}
+	
+	var results []StudentMark
+	query := h.db.Table("subject_results").
+		Select("student_id, raw_marks").
+		Where("school_id = ? AND class_id = ? AND subject_id = ? AND term = ? AND year = ? AND exam_type = ?",
+			schoolID, classID, subjectID, term, year, examType)
+	
+	if paper > 0 {
+		query = query.Where("paper = ?", paper)
+	}
+	
+	if err := query.Scan(&results).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	
+	// Convert to map for easier frontend consumption
+	marksMap := make(map[string]models.JSONB)
+	for _, result := range results {
+		marksMap[result.StudentID] = result.RawMarks
+	}
+	
+	c.JSON(http.StatusOK, gin.H{"marks": marksMap})
+}
+
 func (h *ResultHandler) GetPerformanceSummary(c *gin.Context) {
 	schoolID := c.GetString("tenant_school_id")
 	term := c.Query("term")

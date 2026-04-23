@@ -152,6 +152,13 @@ export default function SystemAdminDashboard() {
                 link="/system/settings"
               />
               <QuickAction
+                title="System Announcements"
+                description="Send notifications to users about updates"
+                icon="📢"
+                color="bg-gradient-to-br from-pink-50 to-pink-100 text-pink-600"
+                link="/system/announcements"
+              />
+              <QuickAction
                 title="Audit Logs"
                 description="View system activity and audit trails"
                 icon="📋"

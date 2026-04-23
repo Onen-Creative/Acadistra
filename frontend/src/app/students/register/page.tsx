@@ -9,10 +9,9 @@ import { z } from 'zod'
 import { notifications } from '@mantine/notifications'
 import { studentsApi, classesApi, schoolsApi } from '@/services/api'
 import { DashboardLayout } from '@/components/DashboardLayout'
-import { PageHeader } from '@/components/ui/BeautifulComponents'
-import { FormInput, FormSelect, FormTextarea, FormSection, FormCard, FormActions, StepIndicator, FormGrid, FullWidthField } from '@/components/ui/FormComponents'
 import { FileInput } from '@mantine/core'
 import { uploadStudentPhoto } from '@/utils/upload'
+
 const studentSchema = z.object({
   first_name: z.string().min(1, 'Required'),
   middle_name: z.string().optional(),
@@ -46,6 +45,47 @@ const studentSchema = z.object({
 })
 
 type StudentForm = z.infer<typeof studentSchema>
+
+const FormInput = ({ label, error, required, ...props }: any) => (
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+      {label} {required && <span className="text-red-500">*</span>}
+    </label>
+    <input
+      {...props}
+      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+    />
+    {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+  </div>
+)
+
+const FormSelect = ({ label, options, error, required, ...props }: any) => (
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+      {label} {required && <span className="text-red-500">*</span>}
+    </label>
+    <select
+      {...props}
+      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+    >
+      {options.map((opt: any) => (
+        <option key={opt.value} value={opt.value}>{opt.label}</option>
+      ))}
+    </select>
+    {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+  </div>
+)
+
+const FormTextarea = ({ label, error, ...props }: any) => (
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
+    <textarea
+      {...props}
+      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+    />
+    {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+  </div>
+)
 
 export default function StudentRegistrationPage() {
   const router = useRouter()
@@ -163,349 +203,193 @@ export default function StudentRegistrationPage() {
 
   return (
     <DashboardLayout>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <PageHeader 
-          title="Student Registration" 
-          subtitle="Admission number will be auto-generated based on school and class"
-          action={
+      <div className="max-w-5xl mx-auto px-4 py-8">
+        <div className="mb-8">
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">New Student Registration</h1>
+              <p className="text-sm text-gray-500">Admission number will be auto-generated</p>
+            </div>
             <button
               onClick={() => router.push('/students')}
-              className="px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 hover:shadow-lg transition-all duration-300"
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
-              ⬅️ Back to Students
+              ← Back
             </button>
-          }
-        />
+          </div>
+        </div>
 
-        <FormCard>
-          <StepIndicator 
-            steps={['Basic Info', 'Guardian', 'Additional']} 
-            currentStep={step} 
-          />
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+          <div className="border-b border-gray-200 px-6 py-4">
+            <div className="flex items-center justify-between">
+              {['Basic Info', 'Guardian', 'Additional'].map((label, idx) => (
+                <div key={idx} className="flex items-center">
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold ${
+                    idx === step ? 'bg-blue-600 text-white' : 
+                    idx < step ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'
+                  }`}>
+                    {idx < step ? '✓' : idx + 1}
+                  </div>
+                  <span className={`ml-2 text-sm font-medium ${
+                    idx === step ? 'text-blue-600' : idx < step ? 'text-green-600' : 'text-gray-500'
+                  }`}>{label}</span>
+                  {idx < 2 && <div className="w-16 h-0.5 bg-gray-200 mx-4" />}
+                </div>
+              ))}
+            </div>
+          </div>
 
           {step === 0 && (
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-              <FormSection title="Personal Information" icon="👤">
-                <div className="md:col-span-2 flex flex-col items-center mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Student Photo (Optional)</label>
+            <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-8">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <span className="text-2xl">👤</span> Personal Information
+                </h2>
+                <div className="flex flex-col items-center mb-6 p-4 bg-gray-50 rounded-lg">
                   {photoPreview && (
-                    <div className="mb-3">
-                      <img src={photoPreview} alt="Preview" className="w-32 h-32 rounded-lg object-cover border-2 border-gray-300" />
-                    </div>
+                    <img src={photoPreview} alt="Preview" className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md mb-3" />
                   )}
                   <FileInput
-                    placeholder="Upload photo"
+                    placeholder="Upload student photo"
                     accept="image/*"
                     value={photoFile}
                     onChange={handlePhotoChange}
-                    className="w-full max-w-md"
+                    className="w-full max-w-sm"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Max 10MB. Will be optimized automatically.</p>
+                  <p className="text-xs text-gray-500 mt-2">Optional • Max 10MB • JPG, PNG</p>
                 </div>
-                <FormInput
-                  {...register('first_name')}
-                  label="First Name"
-                  icon="📝"
-                  required
-                  error={errors.first_name?.message}
-                  placeholder="Enter first name"
-                />
-                <FormInput
-                  {...register('middle_name')}
-                  label="Middle Name"
-                  icon="📝"
-                  placeholder="Enter middle name (optional)"
-                />
-                <FormInput
-                  {...register('last_name')}
-                  label="Last Name"
-                  icon="📝"
-                  required
-                  error={errors.last_name?.message}
-                  placeholder="Enter last name"
-                />
-                <FormInput
-                  {...register('date_of_birth')}
-                  type="date"
-                  label="Date of Birth"
-                  icon="📅"
-                  required
-                  error={errors.date_of_birth?.message}
-                />
-                <FormSelect
-                  {...register('gender')}
-                  label="Gender"
-                  icon="⚧"
-                  required
-                  options={[
-                    { value: 'Male', label: 'Male' },
-                    { value: 'Female', label: 'Female' }
-                  ]}
-                />
-                <FormInput
-                  {...register('nationality')}
-                  label="Nationality"
-                  icon="🌍"
-                  placeholder="e.g., Ugandan"
-                />
-                <FormSelect
-                  {...register('religion')}
-                  label="Religion"
-                  icon="🕊️"
-                  options={[
-                    { value: '', label: 'Select Religion' },
-                    { value: 'Catholic', label: 'Catholic' },
-                    { value: 'Protestant', label: 'Protestant' },
-                    { value: 'Anglican', label: 'Anglican' },
-                    { value: 'Pentecostal', label: 'Pentecostal' },
-                    { value: 'Seventh Day Adventist', label: 'Seventh Day Adventist' },
-                    { value: 'Muslim', label: 'Muslim' },
-                    { value: 'Orthodox', label: 'Orthodox' },
-                    { value: 'Born Again', label: 'Born Again' },
-                    { value: 'Other', label: 'Other' }
-                  ]}
-                />
-                <FormInput
-                  {...register('lin')}
-                  label="LIN (Learner Identification Number)"
-                  icon="🔢"
-                  placeholder="Enter LIN if available"
-                />
-              </FormSection>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <FormInput {...register('first_name')} label="First Name" required error={errors.first_name?.message} placeholder="John" />
+                  <FormInput {...register('middle_name')} label="Middle Name" placeholder="Optional" />
+                  <FormInput {...register('last_name')} label="Last Name" required error={errors.last_name?.message} placeholder="Doe" />
+                  <FormInput {...register('date_of_birth')} type="date" label="Date of Birth" required error={errors.date_of_birth?.message} />
+                  <FormSelect {...register('gender')} label="Gender" required options={[{ value: 'Male', label: 'Male' }, { value: 'Female', label: 'Female' }]} />
+                  <FormInput {...register('nationality')} label="Nationality" placeholder="Ugandan" />
+                  <FormSelect {...register('religion')} label="Religion" options={[
+                    { value: '', label: 'Select' }, { value: 'Catholic', label: 'Catholic' }, { value: 'Protestant', label: 'Protestant' },
+                    { value: 'Anglican', label: 'Anglican' }, { value: 'Muslim', label: 'Muslim' }, { value: 'Other', label: 'Other' }
+                  ]} />
+                  <FormInput {...register('lin')} label="LIN" placeholder="Optional" />
+                  <FormSelect {...register('residence_type')} label="Residence" options={[
+                    { value: 'Day', label: 'Day Scholar' }, { value: 'Boarding', label: 'Boarding' }
+                  ]} />
+                </div>
+              </div>
 
-              <FormSection title="Academic Information" icon="🎓">
-                <FormSelect
-                  {...register('class_level')}
-                  label="Class Level"
-                  icon="📚"
-                  required
-                  error={errors.class_level?.message}
-                  options={[
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <span className="text-2xl">🎓</span> Academic Information
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormSelect {...register('class_level')} label="Class Level" required error={errors.class_level?.message} options={[
                     { value: '', label: 'Select Level' },
-                    ...(levelsData?.levels?.map((level: string) => ({
-                      value: level,
-                      label: level
-                    })) || [])
-                  ]}
-                />
-                <FormSelect
-                  {...register('class_id')}
-                  label="Class"
-                  icon="🏫"
-                  required
-                  error={errors.class_id?.message}
-                  options={[
+                    ...(levelsData?.levels?.map((level: string) => ({ value: level, label: level })) || [])
+                  ]} />
+                  <FormSelect {...register('class_id')} label="Class" required error={errors.class_id?.message} options={[
                     { value: '', label: 'Select Class' },
-                    ...(classesData?.classes?.filter((c: any) => c.level === selectedLevel).map((c: any) => ({
-                      value: c.id,
-                      label: c.name
-                    })) || [])
-                  ]}
-                />
-                <FormInput
-                  {...register('year')}
-                  type="number"
-                  label="Academic Year"
-                  icon="📆"
-                  required
-                  placeholder="2026"
-                />
-                <FormSelect
-                  {...register('term')}
-                  label="Term"
-                  icon="📖"
-                  required
-                  options={[
-                    { value: 'Term 1', label: 'Term 1' },
-                    { value: 'Term 2', label: 'Term 2' },
-                    { value: 'Term 3', label: 'Term 3' }
-                  ]}
-                />
-              </FormSection>
+                    ...(classesData?.classes?.filter((c: any) => c.level === selectedLevel).map((c: any) => ({ value: c.id, label: c.name })) || [])
+                  ]} />
+                  <FormInput {...register('year')} type="number" label="Academic Year" required placeholder="2026" />
+                  <FormSelect {...register('term')} label="Term" required options={[
+                    { value: 'Term 1', label: 'Term 1' }, { value: 'Term 2', label: 'Term 2' }, { value: 'Term 3', label: 'Term 3' }
+                  ]} />
+                </div>
+              </div>
 
-              <FormSection title="Contact Information" icon="📞">
-                <FormInput
-                  {...register('email')}
-                  type="email"
-                  label="Email"
-                  icon="📧"
-                  placeholder="student@acadistra.com"
-                />
-                <FormInput
-                  {...register('phone')}
-                  label="Phone Number"
-                  icon="📱"
-                  placeholder="+256..."
-                />
-                <FormInput
-                  {...register('district')}
-                  label="District"
-                  icon="🗺️"
-                  placeholder="Enter district"
-                />
-                <FormInput
-                  {...register('village')}
-                  label="Village"
-                  icon="🏘️"
-                  placeholder="Enter village"
-                />
-                <FormSelect
-                  {...register('residence_type')}
-                  label="Residence Type"
-                  icon="🏠"
-                  options={[
-                    { value: 'Day', label: 'Day Scholar' },
-                    { value: 'Boarding', label: 'Boarding' }
-                  ]}
-                />
-                <FullWidthField>
-                  <FormTextarea
-                    {...register('address')}
-                    label="Full Address"
-                    icon="📍"
-                    rows={3}
-                    placeholder="Enter complete address"
-                  />
-                </FullWidthField>
-              </FormSection>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <span className="text-2xl">📞</span> Contact Information
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormInput {...register('email')} type="email" label="Email" placeholder="student@example.com" />
+                  <FormInput {...register('phone')} label="Phone" placeholder="+256..." />
+                  <FormInput {...register('district')} label="District" placeholder="Kampala" />
+                  <FormInput {...register('village')} label="Village" placeholder="Village name" />
+                  <div className="md:col-span-2">
+                    <FormTextarea {...register('address')} label="Full Address" rows={2} placeholder="Complete address" />
+                  </div>
+                </div>
+              </div>
             </form>
           )}
 
           {step === 1 && (
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-              <FormSection title="Guardian Information" icon="👨‍👩‍👧">
-                <FormInput
-                  {...register('guardian_full_name')}
-                  label="Guardian Full Name"
-                  icon="👤"
-                  required
-                  error={errors.guardian_full_name?.message}
-                  placeholder="Enter guardian's full name"
-                />
-                <FormSelect
-                  {...register('guardian_relationship')}
-                  label="Relationship"
-                  icon="👪"
-                  required
-                  error={errors.guardian_relationship?.message}
-                  options={[
-                    { value: '', label: 'Select Relationship' },
-                    { value: 'Father', label: 'Father' },
-                    { value: 'Mother', label: 'Mother' },
-                    { value: 'Legal Guardian', label: 'Legal Guardian' },
-                    { value: 'Sponsor', label: 'Sponsor' },
-                    { value: 'Other', label: 'Other' }
-                  ]}
-                />
-                <FormInput
-                  {...register('guardian_phone')}
-                  label="Primary Phone"
-                  icon="📱"
-                  required
-                  error={errors.guardian_phone?.message}
-                  placeholder="+256..."
-                />
-                <FormInput
-                  {...register('guardian_alternative_phone')}
-                  label="Alternative Phone"
-                  icon="📞"
-                  placeholder="+256... (optional)"
-                />
-                <FormInput
-                  {...register('guardian_email')}
-                  type="email"
-                  label="Email Address"
-                  icon="📧"
-                  placeholder="guardian@acadistra.com"
-                />
-                <FormInput
-                  {...register('guardian_occupation')}
-                  label="Occupation"
-                  icon="💼"
-                  placeholder="Enter occupation"
-                />
-                <FullWidthField>
-                  <FormTextarea
-                    {...register('guardian_address')}
-                    label="Guardian Address"
-                    icon="📍"
-                    rows={3}
-                    placeholder="Enter guardian's complete address"
-                  />
-                </FullWidthField>
-              </FormSection>
+            <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <span className="text-2xl">👨👩👧</span> Guardian / Parent Information
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormInput {...register('guardian_full_name')} label="Full Name" required error={errors.guardian_full_name?.message} placeholder="Guardian name" />
+                  <FormSelect {...register('guardian_relationship')} label="Relationship" required error={errors.guardian_relationship?.message} options={[
+                    { value: '', label: 'Select' }, { value: 'Father', label: 'Father' }, { value: 'Mother', label: 'Mother' },
+                    { value: 'Legal Guardian', label: 'Legal Guardian' }, { value: 'Sponsor', label: 'Sponsor' }, { value: 'Other', label: 'Other' }
+                  ]} />
+                  <FormInput {...register('guardian_phone')} label="Primary Phone" required error={errors.guardian_phone?.message} placeholder="+256..." />
+                  <FormInput {...register('guardian_alternative_phone')} label="Alternative Phone" placeholder="+256... (optional)" />
+                  <FormInput {...register('guardian_email')} type="email" label="Email" placeholder="guardian@example.com" />
+                  <FormInput {...register('guardian_occupation')} label="Occupation" placeholder="Teacher, Farmer, etc." />
+                  <div className="md:col-span-2">
+                    <FormTextarea {...register('guardian_address')} label="Address" rows={2} placeholder="Guardian's address" />
+                  </div>
+                </div>
+              </div>
             </form>
           )}
 
           {step === 2 && (
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-              <FormSection title="Previous Education" icon="🎒">
-                <FormInput
-                  {...register('previous_school')}
-                  label="Previous School"
-                  icon="🏫"
-                  placeholder="Enter previous school name"
-                />
-                <FormInput
-                  {...register('previous_class')}
-                  label="Previous Class"
-                  icon="📚"
-                  placeholder="e.g., P7, S3"
-                />
-              </FormSection>
+            <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <span className="text-2xl">🎒</span> Previous Education
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormInput {...register('previous_school')} label="Previous School" placeholder="School name" />
+                  <FormInput {...register('previous_class')} label="Previous Class" placeholder="P7, S3, etc." />
+                </div>
+              </div>
 
-              <FormSection title="Health & Special Needs" icon="🏥">
-                <FullWidthField>
-                  <FormTextarea
-                    {...register('special_needs')}
-                    label="Special Needs"
-                    icon="♿"
-                    rows={4}
-                    placeholder="Describe any special educational needs or accommodations required"
-                  />
-                </FullWidthField>
-                <FullWidthField>
-                  <FormTextarea
-                    {...register('disability_status')}
-                    label="Disability Status"
-                    icon="🩺"
-                    rows={4}
-                    placeholder="Describe any disabilities or medical conditions"
-                  />
-                </FullWidthField>
-              </FormSection>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <span className="text-2xl">🏥</span> Health & Special Needs
+                </h2>
+                <div className="space-y-4">
+                  <FormTextarea {...register('special_needs')} label="Special Educational Needs" rows={3} placeholder="Any special accommodations required (optional)" />
+                  <FormTextarea {...register('disability_status')} label="Medical Conditions" rows={3} placeholder="Any disabilities or medical conditions (optional)" />
+                </div>
+              </div>
             </form>
           )}
 
-          <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-4 mt-8">
+          <div className="flex justify-between items-center border-t border-gray-200 px-6 py-4 bg-gray-50">
             <button
               type="button"
               onClick={() => step > 0 && setStep(step - 1)}
               disabled={step === 0}
-              className="w-full sm:w-auto px-6 md:px-8 py-3 rounded-xl font-semibold bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 hover:from-gray-200 hover:to-gray-300 transition-all duration-300 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              ⬅️ Back
+              ← Previous
             </button>
             {step < 2 ? (
               <button
                 type="button"
                 onClick={() => setStep(step + 1)}
-                className="w-full sm:w-auto px-6 md:px-8 py-3 rounded-xl font-semibold bg-gradient-to-r from-blue-500 to-blue-700 text-white hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+                className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
               >
-                Next ➡️
+                Next →
               </button>
             ) : (
               <button
                 type="button"
                 onClick={handleSubmit(onSubmit)}
                 disabled={createMutation.isPending}
-                className="w-full sm:w-auto px-6 md:px-8 py-3 rounded-xl font-semibold bg-gradient-to-r from-green-500 to-green-700 text-white hover:shadow-xl transition-all duration-300 hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                className="px-6 py-2.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {createMutation.isPending ? '⏳ Registering...' : '✅ Register Student'}
+                {createMutation.isPending ? 'Registering...' : 'Register Student'}
               </button>
             )}
           </div>
-        </FormCard>
+        </div>
       </div>
     </DashboardLayout>
   )

@@ -31,6 +31,9 @@ import (
 // @in header
 // @name Authorization
 func main() {
+	// Set timezone to UTC for consistent timestamp handling
+	time.Local = time.UTC
+	
 	if len(os.Args) > 1 {
 		handleCommand(os.Args[1])
 		return
@@ -310,6 +313,14 @@ func main() {
 				sysAdmin.GET("/reports/system/activity", systemReportsHandler.GenerateActivityReport)
 				sysAdmin.GET("/reports/system/performance", systemReportsHandler.GeneratePerformanceReport)
 				
+				// System announcements
+				announcementHandler := handlers.NewAnnouncementHandler(db, emailService)
+				sysAdmin.POST("/announcements", announcementHandler.CreateAnnouncement)
+				sysAdmin.GET("/announcements", announcementHandler.ListAnnouncements)
+				sysAdmin.GET("/announcements/:id", announcementHandler.GetAnnouncement)
+				sysAdmin.POST("/announcements/:id/send", announcementHandler.SendAnnouncement)
+				sysAdmin.DELETE("/announcements/:id", announcementHandler.DeleteAnnouncement)
+				
 				// Grade recalculation
 				sysAdmin.POST("/recalculate-grades", resultHandler.RecalculateGrades)
 			}
@@ -370,6 +381,11 @@ func main() {
 			}
 
 			// Notifications endpoint - All authenticated users
+			userNotificationHandler := handlers.NewUserNotificationHandler(db)
+			protected.GET("/user-notifications", userNotificationHandler.GetUserNotifications)
+			protected.PUT("/user-notifications/:id/read", userNotificationHandler.MarkAsRead)
+			protected.GET("/user-notifications/unread-count", userNotificationHandler.GetUnreadCount)
+			
 			protected.GET("/notifications", notificationHandler.GetNotifications)
 			protected.GET("/notifications/unread-count", notificationHandler.GetUnreadCount)
 			protected.GET("/notifications/preferences", notificationHandler.GetPreferences)
@@ -406,13 +422,6 @@ func main() {
 				// School settings
 				schoolAdmin.GET("/school-settings", settingsHandler.GetSchoolSettings)
 				schoolAdmin.PUT("/school-settings", settingsHandler.UpdateSchoolSettings)
-				
-				// Guardian management
-				schoolAdmin.POST("/guardians", guardianHandler.Create)
-				schoolAdmin.GET("/guardians", guardianHandler.List)
-				schoolAdmin.GET("/guardians/:id", guardianHandler.Get)
-				schoolAdmin.PUT("/guardians/:id", guardianHandler.Update)
-				schoolAdmin.DELETE("/guardians/:id", guardianHandler.Delete)
 				
 				// Staff management (includes teachers)
 				schoolAdmin.POST("/staff", staffHandler.CreateStaff)
@@ -465,6 +474,13 @@ func main() {
 					schoolAdminOrDOS.PUT("/students/:id", studentHandler.Update)
 					schoolAdminOrDOS.DELETE("/students/:id", studentHandler.Delete)
 					schoolAdminOrDOS.POST("/students/:id/promote", studentHandler.PromoteOrDemote)
+					
+					// Guardian management - School Admin and DOS
+					schoolAdminOrDOS.POST("/guardians", guardianHandler.Create)
+					schoolAdminOrDOS.GET("/guardians", guardianHandler.List)
+					schoolAdminOrDOS.GET("/guardians/:id", guardianHandler.Get)
+					schoolAdminOrDOS.PUT("/guardians/:id", guardianHandler.Update)
+					schoolAdminOrDOS.DELETE("/guardians/:id", guardianHandler.Delete)
 					
 					// Student import - School Admin and DOS
 					schoolAdminOrDOS.POST("/import/students/upload", bulkImportXLSXHandler.UploadStudents)
@@ -772,6 +788,7 @@ func main() {
 			protected.GET("/classes/:id/students", classHandler.GetStudents)
 			protected.GET("/students/:id", studentHandler.Get)
 			protected.GET("/students/:id/results", resultHandler.GetByStudent)
+			protected.GET("/results/bulk-marks", resultHandler.GetBulkMarks)
 			protected.GET("/results/performance-summary", resultHandler.GetPerformanceSummary)
 			
 			// Analytics routes

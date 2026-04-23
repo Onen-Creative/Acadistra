@@ -14,22 +14,28 @@ import (
 )
 
 type EmailService struct {
-	host     string
-	port     int
-	username string
-	password string
-	from     string
-	db       *gorm.DB
+	host          string
+	port          int
+	username      string
+	password      string
+	from          string
+	db            *gorm.DB
+	dailySentCount int
+	dailyLimit     int
+	lastResetDate  string
 }
 
 func NewEmailService(host string, port int, username, password, from string, db *gorm.DB) *EmailService {
 	return &EmailService{
-		host:     host,
-		port:     port,
-		username: username,
-		password: password,
-		from:     from,
-		db:       db,
+		host:          host,
+		port:          port,
+		username:      username,
+		password:      password,
+		from:          from,
+		db:            db,
+		dailySentCount: 0,
+		dailyLimit:     450, // Set to 450 for Gmail (500 limit with buffer)
+		lastResetDate:  time.Now().Format("2006-01-02"),
 	}
 }
 
@@ -121,29 +127,66 @@ func (e *EmailService) SendQueuedEmail(queueItem *models.EmailQueue) error {
 	return err
 }
 
-// ProcessEmailQueue processes pending emails in queue
+// ProcessEmailQueue processes pending emails in queue with rate limiting
 func (e *EmailService) ProcessEmailQueue() {
 	if e.db == nil {
 		return
 	}
 	
 	for {
+		// Reset daily counter if new day
+		currentDate := time.Now().Format("2006-01-02")
+		if currentDate != e.lastResetDate {
+			e.dailySentCount = 0
+			e.lastResetDate = currentDate
+			log.Printf("Daily email counter reset for %s", currentDate)
+		}
+		
+		// Check if daily limit reached
+		if e.dailySentCount >= e.dailyLimit {
+			log.Printf("Daily email limit reached (%d/%d). Waiting until tomorrow...", e.dailySentCount, e.dailyLimit)
+			time.Sleep(1 * time.Hour)
+			continue
+		}
+		
 		var emails []models.EmailQueue
 		now := time.Now()
+		
+		// Calculate remaining emails we can send today
+		remainingQuota := e.dailyLimit - e.dailySentCount
+		batchSize := 10
+		if remainingQuota < batchSize {
+			batchSize = remainingQuota
+		}
+		
+		if batchSize == 0 {
+			time.Sleep(1 * time.Hour)
+			continue
+		}
 		
 		// Get pending emails ready for retry
 		e.db.Where("status = ? AND (next_retry IS NULL OR next_retry <= ?) AND attempts < max_attempts", "pending", now).
 			Order("priority ASC, created_at ASC").
-			Limit(10).
+			Limit(batchSize).
 			Find(&emails)
+		
+		if len(emails) == 0 {
+			time.Sleep(1 * time.Minute)
+			continue
+		}
 		
 		for _, email := range emails {
 			if err := e.SendQueuedEmail(&email); err != nil {
 				log.Printf("Failed to send queued email to %s (attempt %d/%d): %v", 
 					email.To, email.Attempts, email.MaxAttempts, err)
 			} else {
-				log.Printf("Successfully sent queued email to %s (type: %s)", email.To, email.EmailType)
+				e.dailySentCount++
+				log.Printf("Successfully sent queued email to %s (type: %s) [%d/%d today]", 
+					email.To, email.EmailType, e.dailySentCount, e.dailyLimit)
 			}
+			
+			// Add delay between emails to avoid rate limiting
+			time.Sleep(2 * time.Second)
 		}
 		
 		// Sleep for 1 minute before next batch
@@ -559,6 +602,57 @@ func (e *EmailService) SendRegistrationConfirmation(to, studentName, admissionNu
 	})
 
 	return e.QueueEmail(to, "Student Registration Confirmation - Acadistra", body.String(), "registration_confirmation", nil, 2)
+}
+
+// System Announcement Email
+func (e *EmailService) SendSystemAnnouncement(to, userName, title, message, priority string) error {
+	priorityColor := "#4F46E5"
+	priorityLabel := "Normal"
+	
+	switch priority {
+	case "urgent":
+		priorityColor = "#dc3545"
+		priorityLabel = "Urgent"
+	case "high":
+		priorityColor = "#ff6b6b"
+		priorityLabel = "High"
+	case "low":
+		priorityColor = "#6c757d"
+		priorityLabel = "Low"
+	}
+	
+	tmpl := `
+<!DOCTYPE html>
+<html>
+<head><style>body{font-family:Arial,sans-serif}.container{max-width:600px;margin:0 auto;padding:20px}.header{background:{{.PriorityColor}};color:white;padding:20px;text-align:center;border-radius:5px 5px 0 0}.priority-badge{display:inline-block;background:{{.PriorityColor}};color:white;padding:5px 15px;border-radius:20px;font-size:12px;font-weight:bold}.content{background:#f9f9f9;padding:20px;border:1px solid #ddd}.message-box{background:white;padding:20px;border-left:4px solid {{.PriorityColor}};margin:20px 0;white-space:pre-wrap}.footer{text-align:center;color:#666;font-size:12px;margin-top:20px}</style></head>
+<body>
+<div class="container">
+<div class="header"><h1>System Announcement</h1></div>
+<div class="content">
+<p>Hello {{.UserName}},</p>
+<div style="margin:10px 0"><span class="priority-badge">{{.PriorityLabel}}</span></div>
+<h2>{{.Title}}</h2>
+<div class="message-box">{{.Message}}</div>
+<p>This is an important update from the system administration. Please take note of the information above.</p>
+<p>Best regards,<br>Acadistra System</p>
+</div>
+<div class="footer"><p>&copy; {{.Year}} Acadistra. All rights reserved.</p></div>
+</div>
+</body>
+</html>`
+
+	t, _ := template.New("announcement").Parse(tmpl)
+	var body bytes.Buffer
+	t.Execute(&body, map[string]interface{}{
+		"UserName":      userName,
+		"Title":         title,
+		"Message":       message,
+		"PriorityColor": priorityColor,
+		"PriorityLabel": priorityLabel,
+		"Year":          time.Now().Year(),
+	})
+
+	return e.QueueEmail(to, fmt.Sprintf("[%s] %s", priorityLabel, title), body.String(), "system_announcement", nil, 1)
 }
 
 // Password Reset Request to Admin Email

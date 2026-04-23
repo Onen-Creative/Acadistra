@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useMantineColorScheme } from '@mantine/core'
 import api from '@/services/api'
+import NotificationsCenter from './NotificationsCenter'
 import { 
   LayoutDashboard, School, UserPlus, Users, Settings, FileText, BarChart3,
   GraduationCap, BookOpen, ClipboardList, DollarSign, Package,
@@ -24,6 +25,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [showSearchResults, setShowSearchResults] = useState(false)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
   const { colorScheme, toggleColorScheme } = useMantineColorScheme()
   
   const router = useRouter()
@@ -33,9 +36,19 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     const userData = localStorage.getItem('user')
     if (userData) {
       setUser(JSON.parse(userData))
+      fetchUnreadCount()
     }
     setLoading(false)
   }, [])
+
+  const fetchUnreadCount = async () => {
+    try {
+      const response = await api.get('/user-notifications/unread-count')
+      setUnreadCount(response.data.unread_count || 0)
+    } catch (error) {
+      console.error('Error fetching unread count:', error)
+    }
+  }
 
   const handleLogout = async () => {
     try {
@@ -183,6 +196,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           { href: '/dashboard/system-admin', label: 'Dashboard', icon: LayoutDashboard },
           { href: '/system/schools', label: 'Schools', icon: School },
           { href: '/system/users', label: 'Users', icon: Users },
+          { href: '/system/announcements', label: 'Announcements', icon: Bell },
           { href: '/system/settings', label: 'Settings', icon: Settings },
           { href: '/system/audit-logs', label: 'Audit Logs', icon: FileText },
           { href: '/system/reports', label: 'Reports', icon: BarChart3 },
@@ -204,6 +218,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           { href: '/finance', label: 'Finance', icon: DollarSign },
           { href: '/finance/budget', label: 'Budget', icon: DollarSign },
           { href: '/finance/requisitions', label: 'Requisitions', icon: ClipboardList },
+          { href: '/announcements', label: 'Announcements', icon: Bell },
           { href: '/settings', label: 'Settings', icon: Settings },
         ]
       case 'teacher':
@@ -427,10 +442,21 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 </button>
 
                 {/* Notifications */}
-                <button className="relative p-2.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all duration-300 hover:scale-105 group">
+                <button 
+                  onClick={() => {
+                    setNotificationsOpen(true)
+                    fetchUnreadCount()
+                  }}
+                  className="relative p-2.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all duration-300 hover:scale-105 group"
+                >
                   <Bell className="w-5 h-5" />
-                  <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                  <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-ping" />
+                  {unreadCount > 0 && (
+                    <>
+                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    </>
+                  )}
                 </button>
 
                 {/* Divider */}
@@ -477,6 +503,15 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           onClick={() => setSidebarOpen(false)}
         />
       )}
+
+      {/* Notifications Center */}
+      <NotificationsCenter 
+        opened={notificationsOpen} 
+        onClose={() => {
+          setNotificationsOpen(false)
+          fetchUnreadCount()
+        }} 
+      />
     </div>
   )
 }

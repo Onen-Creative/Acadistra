@@ -244,6 +244,11 @@ export default function ResultsPage() {
           subtitle="Manage student examination results and grades"
           action={
             <div className="flex gap-3">
+              <Link href="/results/aoi">
+                <button className="px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-purple-500 to-purple-700 text-white hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                  📊 AOI Results
+                </button>
+              </Link>
               <button
                 onClick={exportToExcel}
                 disabled={!resultsData || resultsData.length === 0}
