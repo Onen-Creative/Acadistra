@@ -624,26 +624,18 @@ func (h *ClassRankingHandler) getOrdinaryRankings(students []models.Student, ter
 
 		avgMarks := totalMarks / float64(count)
 		
-		// Determine grade
+		// Determine grade using NCDC grading system (A-E)
 		grade := ""
 		if avgMarks >= 80 {
-			grade = "D1"
-		} else if avgMarks >= 70 {
-			grade = "D2"
+			grade = "A"
 		} else if avgMarks >= 65 {
-			grade = "C3"
-		} else if avgMarks >= 60 {
-			grade = "C4"
-		} else if avgMarks >= 55 {
-			grade = "C5"
+			grade = "B"
 		} else if avgMarks >= 50 {
-			grade = "C6"
-		} else if avgMarks >= 45 {
-			grade = "P7"
+			grade = "C"
 		} else if avgMarks >= 35 {
-			grade = "P8"
+			grade = "D"
 		} else {
-			grade = "F9"
+			grade = "E"
 		}
 
 		rankings = append(rankings, StudentRanking{
@@ -786,6 +778,28 @@ func (h *ClassRankingHandler) getAdvancedRankings(students []models.Student, ter
 		}
 
 		avgMarks := totalMarks / float64(count)
+		
+		// Determine grade based on average marks using UACE grading
+		grade := ""
+		if avgMarks >= 85 {
+			grade = "D1"
+		} else if avgMarks >= 80 {
+			grade = "D2"
+		} else if avgMarks >= 75 {
+			grade = "C3"
+		} else if avgMarks >= 70 {
+			grade = "C4"
+		} else if avgMarks >= 65 {
+			grade = "C5"
+		} else if avgMarks >= 60 {
+			grade = "C6"
+		} else if avgMarks >= 50 {
+			grade = "P7"
+		} else if avgMarks >= 40 {
+			grade = "P8"
+		} else {
+			grade = "F9"
+		}
 
 		rankings = append(rankings, StudentRanking{
 			StudentID:     student.ID.String(),
@@ -795,6 +809,7 @@ func (h *ClassRankingHandler) getAdvancedRankings(students []models.Student, ter
 			TotalPoints:   &totalPoints,
 			AverageMarks:  avgMarks,
 			SubjectsCount: count,
+			Grade:         grade,
 		})
 	}
 
