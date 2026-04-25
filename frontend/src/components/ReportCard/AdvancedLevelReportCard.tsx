@@ -149,23 +149,23 @@ export default function AdvancedLevelReportCard({
         </div>
 
         {/* Main Content Area */}
-        <div style={{ padding: '15px 20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '12px 18px', flex: 1, display: 'flex', flexDirection: 'column' }}>
           
           {/* Academic Performance */}
-          <div style={{ marginBottom: '12px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <h2 style={{ fontSize: '15px', fontWeight: '700', margin: '0 0 10px 0', color: '#000', textTransform: 'uppercase', borderBottom: '2px solid #000', paddingBottom: '5px', textAlign: 'center' }}>
+          <div style={{ marginBottom: '8px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <h2 style={{ fontSize: '14px', fontWeight: '700', margin: '0 0 8px 0', color: '#000', textTransform: 'uppercase', borderBottom: '2px solid #000', paddingBottom: '4px', textAlign: 'center' }}>
               Academic Performance
             </h2>
             
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', marginBottom: '10px', flex: 1 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px', marginBottom: '8px', flex: 1 }}>
               <thead>
                 <tr style={{ background: 'white', color: '#000' }}>
-                  <th style={{ border: '1px solid #000', padding: '7px 6px', textAlign: 'left', fontWeight: '600' }}>SUBJECT</th>
-                  <th style={{ border: '1px solid #000', padding: '7px 6px', textAlign: 'center', fontWeight: '600', width: '60px' }}>P1</th>
-                  <th style={{ border: '1px solid #000', padding: '7px 6px', textAlign: 'center', fontWeight: '600', width: '60px' }}>P2</th>
-                  <th style={{ border: '1px solid #000', padding: '7px 6px', textAlign: 'center', fontWeight: '600', width: '60px' }}>P3</th>
-                  <th style={{ border: '1px solid #000', padding: '7px 6px', textAlign: 'center', fontWeight: '600', width: '55px' }}>GRADE</th>
-                  <th style={{ border: '1px solid #000', padding: '7px 6px', textAlign: 'center', fontWeight: '600', width: '90px' }}>REMARK</th>
+                  <th style={{ border: '1px solid #000', padding: '5px 4px', textAlign: 'left', fontWeight: '600' }}>SUBJECT</th>
+                  <th style={{ border: '1px solid #000', padding: '5px 4px', textAlign: 'center', fontWeight: '600', width: '50px' }}>P1</th>
+                  <th style={{ border: '1px solid #000', padding: '5px 4px', textAlign: 'center', fontWeight: '600', width: '50px' }}>P2</th>
+                  <th style={{ border: '1px solid #000', padding: '5px 4px', textAlign: 'center', fontWeight: '600', width: '50px' }}>P3</th>
+                  <th style={{ border: '1px solid #000', padding: '5px 4px', textAlign: 'center', fontWeight: '600', width: '50px' }}>GRADE</th>
+                  <th style={{ border: '1px solid #000', padding: '5px 4px', textAlign: 'center', fontWeight: '600', width: '85px' }}>REMARK</th>
                 </tr>
               </thead>
               <tbody>
@@ -207,12 +207,12 @@ export default function AdvancedLevelReportCard({
                   
                   return (
                     <tr key={subject.id} style={{ background: index % 2 === 0 ? 'white' : '#f8fafc' }}>
-                      <td style={{ border: '1px solid #000', padding: '6px', fontWeight: '600', color: '#000' }}>{subject.name}</td>
-                      <td style={{ border: '1px solid #000', padding: '6px', textAlign: 'center' }}>{p1 > 0 ? p1 : ''}</td>
-                      <td style={{ border: '1px solid #000', padding: '6px', textAlign: 'center' }}>{!isSubsidiary && p2 > 0 ? p2 : ''}</td>
-                      <td style={{ border: '1px solid #000', padding: '6px', textAlign: 'center' }}>{!isSubsidiary && p3 > 0 ? p3 : ''}</td>
-                      <td style={{ border: '1px solid #000', padding: '6px', textAlign: 'center', fontWeight: '700' }}>{grade}</td>
-                      <td style={{ border: '1px solid #000', padding: '6px', textAlign: 'center', fontSize: '10px', fontStyle: 'italic', color: '#000' }}>{remark}</td>
+                      <td style={{ border: '1px solid #000', padding: '4px', fontWeight: '600', color: '#000' }}>{subject.name}</td>
+                      <td style={{ border: '1px solid #000', padding: '4px', textAlign: 'center' }}>{p1 > 0 ? p1 : ''}</td>
+                      <td style={{ border: '1px solid #000', padding: '4px', textAlign: 'center' }}>{!isSubsidiary && p2 > 0 ? p2 : ''}</td>
+                      <td style={{ border: '1px solid #000', padding: '4px', textAlign: 'center' }}>{!isSubsidiary && p3 > 0 ? p3 : ''}</td>
+                      <td style={{ border: '1px solid #000', padding: '4px', textAlign: 'center', fontWeight: '700' }}>{grade}</td>
+                      <td style={{ border: '1px solid #000', padding: '4px', textAlign: 'center', fontSize: '9px', fontStyle: 'italic', color: '#000' }}>{remark}</td>
                     </tr>
                   )
                 })}
@@ -220,77 +220,77 @@ export default function AdvancedLevelReportCard({
             </table>
 
             {/* Grading Scale */}
-            <div style={{ background: '#f8fafc', padding: '10px', borderRadius: '3px', border: '1px solid #000' }}>
-              <p style={{ fontSize: '11px', fontWeight: '700', margin: '0 0 6px 0', textTransform: 'uppercase', color: '#000', textAlign: 'center' }}>UACE Grading Scale</p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px', fontSize: '9px', marginBottom: '4px' }}>
-                <span style={{ background: 'white', padding: '3px', textAlign: 'center', border: '1px solid #000', borderRadius: '2px' }}><strong>D1:</strong> 85-100</span>
-                <span style={{ background: 'white', padding: '3px', textAlign: 'center', border: '1px solid #000', borderRadius: '2px' }}><strong>D2:</strong> 80-84</span>
-                <span style={{ background: 'white', padding: '3px', textAlign: 'center', border: '1px solid #000', borderRadius: '2px' }}><strong>C3:</strong> 75-79</span>
-                <span style={{ background: 'white', padding: '3px', textAlign: 'center', border: '1px solid #000', borderRadius: '2px' }}><strong>C4:</strong> 70-74</span>
-                <span style={{ background: 'white', padding: '3px', textAlign: 'center', border: '1px solid #000', borderRadius: '2px' }}><strong>C5:</strong> 65-69</span>
+            <div style={{ background: '#f8fafc', padding: '6px', borderRadius: '3px', border: '1px solid #000' }}>
+              <p style={{ fontSize: '9px', fontWeight: '700', margin: '0 0 4px 0', textTransform: 'uppercase', color: '#000', textAlign: 'center' }}>UACE Grading Scale</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '3px', fontSize: '8px', marginBottom: '3px' }}>
+                <span style={{ background: 'white', padding: '2px', textAlign: 'center', border: '1px solid #000', borderRadius: '2px' }}><strong>D1:</strong> 85-100</span>
+                <span style={{ background: 'white', padding: '2px', textAlign: 'center', border: '1px solid #000', borderRadius: '2px' }}><strong>D2:</strong> 80-84</span>
+                <span style={{ background: 'white', padding: '2px', textAlign: 'center', border: '1px solid #000', borderRadius: '2px' }}><strong>C3:</strong> 75-79</span>
+                <span style={{ background: 'white', padding: '2px', textAlign: 'center', border: '1px solid #000', borderRadius: '2px' }}><strong>C4:</strong> 70-74</span>
+                <span style={{ background: 'white', padding: '2px', textAlign: 'center', border: '1px solid #000', borderRadius: '2px' }}><strong>C5:</strong> 65-69</span>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px', fontSize: '9px' }}>
-                <span style={{ background: 'white', padding: '3px', textAlign: 'center', border: '1px solid #000', borderRadius: '2px' }}><strong>C6:</strong> 60-64</span>
-                <span style={{ background: 'white', padding: '3px', textAlign: 'center', border: '1px solid #000', borderRadius: '2px' }}><strong>P7:</strong> 50-59</span>
-                <span style={{ background: 'white', padding: '3px', textAlign: 'center', border: '1px solid #000', borderRadius: '2px' }}><strong>P8:</strong> 40-49</span>
-                <span style={{ background: 'white', padding: '3px', textAlign: 'center', border: '1px solid #000', borderRadius: '2px' }}><strong>F9:</strong> 0-39</span>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '3px', fontSize: '8px' }}>
+                <span style={{ background: 'white', padding: '2px', textAlign: 'center', border: '1px solid #000', borderRadius: '2px' }}><strong>C6:</strong> 60-64</span>
+                <span style={{ background: 'white', padding: '2px', textAlign: 'center', border: '1px solid #000', borderRadius: '2px' }}><strong>P7:</strong> 50-59</span>
+                <span style={{ background: 'white', padding: '2px', textAlign: 'center', border: '1px solid #000', borderRadius: '2px' }}><strong>P8:</strong> 40-49</span>
+                <span style={{ background: 'white', padding: '2px', textAlign: 'center', border: '1px solid #000', borderRadius: '2px' }}><strong>F9:</strong> 0-39</span>
               </div>
             </div>
           </div>
 
           {/* Summary and Comments Section */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px', marginBottom: '6px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '6px', marginBottom: '5px' }}>
             
             {/* Left: Performance Summary */}
             <div>
-              <h3 style={{ fontSize: '9px', fontWeight: '700', margin: '0 0 6px 0', color: '#000', textTransform: 'uppercase', borderBottom: '2px solid #000', paddingBottom: '3px' }}>
+              <h3 style={{ fontSize: '8px', fontWeight: '700', margin: '0 0 4px 0', color: '#000', textTransform: 'uppercase', borderBottom: '2px solid #000', paddingBottom: '2px' }}>
                 Performance Summary
               </h3>
               
-              <div style={{ background: '#f8fafc', padding: '8px', textAlign: 'center', border: '2px solid #000', borderRadius: '3px', marginBottom: '6px' }}>
-                <p style={{ margin: '0 0 3px 0', fontSize: '7px', color: '#000', textTransform: 'uppercase', fontWeight: '600' }}>Total Points</p>
-                <p style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#000' }}>{totalPoints} / 20</p>
+              <div style={{ background: '#f8fafc', padding: '6px', textAlign: 'center', border: '2px solid #000', borderRadius: '3px', marginBottom: '4px' }}>
+                <p style={{ margin: '0 0 2px 0', fontSize: '7px', color: '#000', textTransform: 'uppercase', fontWeight: '600' }}>Total Points</p>
+                <p style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#000' }}>{totalPoints} / 20</p>
               </div>
             </div>
 
             {/* Right: Comments and Fees */}
             <div>
-              <h3 style={{ fontSize: '9px', fontWeight: '700', margin: '0 0 6px 0', color: '#000', textTransform: 'uppercase', borderBottom: '2px solid #000', paddingBottom: '3px' }}>
+              <h3 style={{ fontSize: '8px', fontWeight: '700', margin: '0 0 4px 0', color: '#000', textTransform: 'uppercase', borderBottom: '2px solid #000', paddingBottom: '2px' }}>
                 Teacher Comments
               </h3>
               
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '6px' }}>
-                <div style={{ background: '#f8fafc', padding: '6px', border: '1px solid #000', borderRadius: '3px' }}>
-                  <p style={{ fontSize: '7px', fontWeight: '700', margin: '0 0 3px 0', textTransform: 'uppercase', color: '#000' }}>Class Teacher</p>
-                  <p style={{ fontSize: '7px', margin: '0 0 6px 0', lineHeight: '1.3', color: '#000' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px', marginBottom: '5px' }}>
+                <div style={{ background: '#f8fafc', padding: '5px', border: '1px solid #000', borderRadius: '3px' }}>
+                  <p style={{ fontSize: '7px', fontWeight: '700', margin: '0 0 2px 0', textTransform: 'uppercase', color: '#000' }}>Class Teacher</p>
+                  <p style={{ fontSize: '7px', margin: '0 0 4px 0', lineHeight: '1.2', color: '#000' }}>
                     {totalPoints >= 18 ? 'Outstanding performance! Excellent work.' : totalPoints >= 14 ? 'Very good performance. Keep it up.' : totalPoints >= 10 ? 'Good effort. Continue working hard.' : totalPoints >= 6 ? 'Fair performance. More effort needed.' : 'Needs significant improvement.'}
                   </p>
-                  <div style={{ borderTop: '1px solid #000', paddingTop: '3px' }}>
-                    <p style={{ fontSize: '6px', margin: '0 0 2px 0', color: '#000' }}>Sign: __________</p>
+                  <div style={{ borderTop: '1px solid #000', paddingTop: '2px' }}>
+                    <p style={{ fontSize: '6px', margin: 0, color: '#000' }}>Sign: __________</p>
                   </div>
                 </div>
-                <div style={{ background: '#f8fafc', padding: '6px', border: '1px solid #000', borderRadius: '3px' }}>
-                  <p style={{ fontSize: '7px', fontWeight: '700', margin: '0 0 3px 0', textTransform: 'uppercase', color: '#000' }}>Headteacher</p>
-                  <p style={{ fontSize: '7px', margin: '0 0 6px 0', lineHeight: '1.3', color: '#000' }}>
+                <div style={{ background: '#f8fafc', padding: '5px', border: '1px solid #000', borderRadius: '3px' }}>
+                  <p style={{ fontSize: '7px', fontWeight: '700', margin: '0 0 2px 0', textTransform: 'uppercase', color: '#000' }}>Headteacher</p>
+                  <p style={{ fontSize: '7px', margin: '0 0 4px 0', lineHeight: '1.2', color: '#000' }}>
                     {totalPoints >= 18 ? 'Exemplary achievement! Well done.' : totalPoints >= 14 ? 'Commendable performance.' : totalPoints >= 10 ? 'Satisfactory progress.' : totalPoints >= 6 ? 'Requires more dedication.' : 'Immediate intervention required.'}
                   </p>
-                  <div style={{ borderTop: '1px solid #000', paddingTop: '3px' }}>
-                    <p style={{ fontSize: '6px', margin: '0 0 2px 0', color: '#000' }}>Sign & Stamp: __________</p>
+                  <div style={{ borderTop: '1px solid #000', paddingTop: '2px' }}>
+                    <p style={{ fontSize: '6px', margin: 0, color: '#000' }}>Sign & Stamp: __________</p>
                   </div>
                 </div>
               </div>
 
               {/* Fees */}
-              <div style={{ background: '#f8fafc', padding: '6px', border: '2px solid #000', borderRadius: '3px' }}>
-                <p style={{ fontSize: '7px', fontWeight: '700', margin: '0 0 3px 0', textTransform: 'uppercase', color: '#000' }}>Fees Status</p>
+              <div style={{ background: '#f8fafc', padding: '5px', border: '2px solid #000', borderRadius: '3px' }}>
+                <p style={{ fontSize: '7px', fontWeight: '700', margin: '0 0 2px 0', textTransform: 'uppercase', color: '#000' }}>Fees Status</p>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '7px', color: '#000' }}>Outstanding:</span>
-                  <span style={{ fontSize: '10px', fontWeight: '700', color: '#000' }}>
+                  <span style={{ fontSize: '9px', fontWeight: '700', color: '#000' }}>
                     UGX {outstandingBalance?.toLocaleString() || '0'}
                   </span>
                 </div>
                 {outstandingBalance > 0 && (
-                  <p style={{ fontSize: '6px', margin: '3px 0 0 0', color: '#000', fontStyle: 'italic' }}>
+                  <p style={{ fontSize: '6px', margin: '2px 0 0 0', color: '#000', fontStyle: 'italic' }}>
                     Please clear outstanding fees.
                   </p>
                 )}
@@ -299,7 +299,7 @@ export default function AdvancedLevelReportCard({
           </div>
 
           {/* Footer Information */}
-          <div style={{ background: '#f8fafc', padding: '6px', border: '1px solid #000', borderRadius: '3px' }}>
+          <div style={{ background: '#f8fafc', padding: '5px 8px', border: '1px solid #000', borderRadius: '3px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '7px' }}>
               <div>
                 <p style={{ margin: '0 0 1px 0', fontWeight: '700', color: '#000' }}>Next Term Dates</p>

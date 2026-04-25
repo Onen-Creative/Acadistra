@@ -129,31 +129,30 @@ func (h *AnnouncementHandler) SendAnnouncement(c *gin.Context) {
 		return
 	}
 
-	// Send emails
+	// Send emails and create notifications
 	totalSent := 0
 	totalFailed := 0
 
-	if announcement.SendEmail && h.emailService != nil {
-		for _, user := range users {
-			if user.Email != "" {
-				err := h.emailService.SendSystemAnnouncement(user.Email, user.FullName, announcement.Title, announcement.Message, announcement.Priority)
-				if err != nil {
-					totalFailed++
-				} else {
-					totalSent++
-				}
+	for _, user := range users {
+		// Create notification for user (always create, regardless of email)
+		notification := models.UserNotification{
+			UserID:         user.ID,
+			AnnouncementID: &announcement.ID,
+			Title:          announcement.Title,
+			Message:        announcement.Message,
+			Priority:       announcement.Priority,
+			IsRead:         false,
+		}
+		h.db.Create(&notification)
+
+		// Send email if requested, service is available, and user has email
+		if announcement.SendEmail && h.emailService != nil && user.Email != "" {
+			err := h.emailService.SendSystemAnnouncement(user.Email, user.FullName, announcement.Title, announcement.Message, announcement.Priority)
+			if err != nil {
+				totalFailed++
+			} else {
+				totalSent++
 			}
-			
-			// Create notification for user
-			notification := models.UserNotification{
-				UserID:         user.ID,
-				AnnouncementID: &announcement.ID,
-				Title:          announcement.Title,
-				Message:        announcement.Message,
-				Priority:       announcement.Priority,
-				IsRead:         false,
-			}
-			h.db.Create(&notification)
 		}
 	}
 
