@@ -17,8 +17,8 @@ type SystemAnnouncement struct {
 	SendEmail    bool       `gorm:"default:true" json:"send_email"`
 	SendSMS      bool       `gorm:"default:false" json:"send_sms"`
 	Status       string     `gorm:"type:varchar(20);default:'draft'" json:"status"` // draft, scheduled, sending, sent
-	ScheduledFor *time.Time `json:"scheduled_for,omitempty"`
-	SentAt       *time.Time `json:"sent_at,omitempty"`
+	ScheduledFor *time.Time `gorm:"type:timestamptz" json:"scheduled_for,omitempty"`
+	SentAt       *time.Time `gorm:"type:timestamptz" json:"sent_at,omitempty"`
 	CreatedBy    uuid.UUID  `gorm:"type:char(36);not null" json:"created_by"`
 	TotalSent    int        `gorm:"default:0" json:"total_sent"`
 	TotalFailed  int        `gorm:"default:0" json:"total_failed"`

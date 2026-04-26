@@ -74,35 +74,48 @@ export default function NotificationsCenter({ opened, onClose }: NotificationsCe
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return 'Unknown';
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Unknown';
     
-    if (!dateString || isNaN(date.getTime())) {
-      return 'Unknown';
-    }
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Africa/Kampala', // Uganda timezone
+    });
+  };
+
+  const formatRelativeTime = (dateString: string | undefined) => {
+    if (!dateString) return 'Unknown';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Unknown';
     
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     
-    // Handle future dates (clock skew)
-    if (diffMs < 0) {
-      return 'Just now';
+    // If date is in the future by more than 5 minutes (clock skew tolerance)
+    if (diffMs < -300000) {
+      return formatDate(dateString);
     }
     
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+    // Treat small negative differences as "Just now" (clock skew)
+    const absDiffMs = Math.abs(diffMs);
+    const diffSecs = Math.floor(absDiffMs / 1000);
+    const diffMins = Math.floor(absDiffMs / 60000);
+    const diffHours = Math.floor(absDiffMs / 3600000);
+    const diffDays = Math.floor(absDiffMs / 86400000);
 
-    if (diffMins < 1) return 'Just now';
+    if (diffSecs < 60) return 'Just now';
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays < 7) return `${diffDays}d ago`;
     
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
-    });
+    return formatDate(dateString);
   };
 
   return (
@@ -153,9 +166,11 @@ export default function NotificationsCenter({ opened, onClose }: NotificationsCe
                     )}
                   </Group>
                   <Group gap="xs">
-                    <Text size="xs" c="dimmed">
-                      {formatDate(notification.created_at)}
-                    </Text>
+                    <Tooltip label={formatDate(notification.created_at)}>
+                      <Text size="xs" c="dimmed">
+                        {formatRelativeTime(notification.created_at)}
+                      </Text>
+                    </Tooltip>
                     {!notification.is_read && (
                       <Tooltip label="Mark as read">
                         <ActionIcon

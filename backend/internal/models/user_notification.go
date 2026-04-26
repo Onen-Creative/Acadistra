@@ -16,8 +16,8 @@ type UserNotification struct {
 	Message        string     `gorm:"type:text;not null" json:"message"`
 	Priority       string     `gorm:"type:varchar(20);default:'normal'" json:"priority"`
 	IsRead         bool       `gorm:"default:false;index" json:"is_read"`
-	CreatedAt      time.Time  `gorm:"default:CURRENT_TIMESTAMP" json:"created_at"`
-	ReadAt         *time.Time `json:"read_at,omitempty"`
+	CreatedAt      time.Time  `gorm:"type:timestamptz;default:CURRENT_TIMESTAMP" json:"created_at"`
+	ReadAt         *time.Time `gorm:"type:timestamptz" json:"read_at,omitempty"`
 }
 
 func (UserNotification) TableName() string {

@@ -765,7 +765,20 @@ func (h *ResultHandler) RecalculateGrades(c *gin.Context) {
 			result.RawMarks["total"] = total
 
 		case "S5", "S6":
-			// A-Level: Paper-based grading
+			// A-Level: Check if subsidiary subject first
+			var standardSubject models.StandardSubject
+			if err := h.db.First(&standardSubject, result.SubjectID).Error; err != nil {
+				skipped++
+				continue
+			}
+			
+			// Check if this is a subsidiary subject
+			isSubsidiary := standardSubject.Name == "ICT" || 
+				standardSubject.Name == "General Paper" ||
+				strings.Contains(strings.ToLower(standardSubject.Name), "ict") ||
+				strings.Contains(strings.ToLower(standardSubject.Name), "general paper") ||
+				strings.Contains(strings.ToLower(standardSubject.Name), "subsidiary")
+			
 			mark := 0.0
 			if m, ok := result.RawMarks["mark"].(float64); ok {
 				mark = m
@@ -782,29 +795,21 @@ func (h *ResultHandler) RecalculateGrades(c *gin.Context) {
 				skipped++
 				continue
 			}
-			grader := &grading.UACEGrader{}
-			code := grader.MapMarkToCode(mark)
-			switch code {
-			case 1:
-				newGrade = "D1"
-			case 2:
-				newGrade = "D2"
-			case 3:
-				newGrade = "C3"
-			case 4:
-				newGrade = "C4"
-			case 5:
-				newGrade = "C5"
-			case 6:
-				newGrade = "C6"
-			case 7:
-				newGrade = "P7"
-			case 8:
-				newGrade = "P8"
-			default:
-				newGrade = "F9"
+			
+			if isSubsidiary {
+				// Subsidiary subjects: O or F only
+				if mark >= 50 {
+					newGrade = "O"
+				} else {
+					newGrade = "F"
+				}
+				gradeResult.FinalGrade = newGrade
+				gradeResult.ComputationReason = fmt.Sprintf("Subsidiary: %.2f/100 -> %s", mark, newGrade)
+			} else {
+				// Principal subjects: Keep existing grade (computed from all papers)
+				skipped++
+				continue
 			}
-			gradeResult.FinalGrade = newGrade
 			gradeResult.ComputationReason = fmt.Sprintf("Recalculated: %.2f/100 → %s", mark, newGrade)
 
 		default:
