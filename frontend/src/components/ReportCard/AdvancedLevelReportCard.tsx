@@ -47,23 +47,22 @@ export default function AdvancedLevelReportCard({
       const result = results?.find((r: any) => r.subject_id === subject.id)
       const grade = result?.final_grade?.trim()
       
-      // Check if subsidiary subject (ICT or General Paper)
-      const isSubsidiary = subject.name?.toLowerCase().includes('ict') || 
-                          subject.name?.toLowerCase().includes('general paper') ||
-                          subject.name?.toLowerCase().includes('subsidiary')
+      // Check if subsidiary subject (1 paper only)
+      const isSubsidiary = subject.papers === 1
       
       if (grade) {
         if (isSubsidiary) {
           // Subsidiary subjects: O=1, F=0
           if (grade === 'O') totalPoints += 1
         } else {
-          // Main subjects: A=6, B=5, C=4, D=3, E=2, F=0
+          // Principal subjects: A=6, B=5, C=4, D=3, E=2, O=1, F=0
           if (grade === 'A') totalPoints += 6
           else if (grade === 'B') totalPoints += 5
           else if (grade === 'C') totalPoints += 4
           else if (grade === 'D') totalPoints += 3
           else if (grade === 'E') totalPoints += 2
-          // F = 0 points (no addition needed)
+          else if (grade === 'O') totalPoints += 1
+          // F = 0 points
         }
       }
     })
