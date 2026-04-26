@@ -122,7 +122,7 @@ func (h *ResultHandler) GetByStudent(c *gin.Context) {
 		}
 	}
 	
-	// Fix grades for subsidiary subjects and convert UACE codes to letter grades
+	// Fix grades for subsidiary subjects only
 	for i := range results {
 		// Check if this is a subsidiary subject
 		isSubsidiary := results[i].SubjectName == "ICT" || results[i].SubjectName == "General Paper" ||
@@ -156,31 +156,6 @@ func (h *ResultHandler) GetByStudent(c *gin.Context) {
 					results[i].FinalGrade = "O"
 				} else if mark > 0 {
 					results[i].FinalGrade = "F"
-				}
-			}
-		} else if classLevel == "S5" || classLevel == "S6" {
-			// Convert UACE numeric codes to letter grades for Advanced Level (principal subjects only)
-			// Check if grade is a numeric code (1-9) and convert to letter grade
-			if len(results[i].FinalGrade) == 1 {
-				switch results[i].FinalGrade {
-				case "1":
-					results[i].FinalGrade = "D1"
-				case "2":
-					results[i].FinalGrade = "D2"
-				case "3":
-					results[i].FinalGrade = "C3"
-				case "4":
-					results[i].FinalGrade = "C4"
-				case "5":
-					results[i].FinalGrade = "C5"
-				case "6":
-					results[i].FinalGrade = "C6"
-				case "7":
-					results[i].FinalGrade = "P7"
-				case "8":
-					results[i].FinalGrade = "P8"
-				case "9":
-					results[i].FinalGrade = "F9"
 				}
 			}
 		}
