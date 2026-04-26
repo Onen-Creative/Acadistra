@@ -124,32 +124,42 @@ func (h *ResultHandler) GetByStudent(c *gin.Context) {
 	
 	// Fix grades for subsidiary subjects and convert UACE codes to letter grades
 	for i := range results {
-		// Handle subsidiary subjects
-		if results[i].SubjectName == "ICT" || results[i].SubjectName == "General Paper" ||
+		// Check if this is a subsidiary subject
+		isSubsidiary := results[i].SubjectName == "ICT" || results[i].SubjectName == "General Paper" ||
 			strings.Contains(strings.ToLower(results[i].SubjectName), "ict") ||
 			strings.Contains(strings.ToLower(results[i].SubjectName), "general paper") ||
-			strings.Contains(strings.ToLower(results[i].SubjectName), "subsidiary") {
-			// Recalculate grade for subsidiary subjects
+			strings.Contains(strings.ToLower(results[i].SubjectName), "subsidiary")
+		
+		if isSubsidiary {
+			// Recalculate grade for subsidiary subjects - O or F only
 			if results[i].RawMarks != nil {
-				ca := 0.0
-				exam := 0.0
-				if c, ok := results[i].RawMarks["ca"].(float64); ok {
-					ca = c
+				mark := 0.0
+				// Try different fields for the mark
+				if m, ok := results[i].RawMarks["mark"].(float64); ok {
+					mark = m
+				} else if t, ok := results[i].RawMarks["total"].(float64); ok {
+					mark = t
+				} else {
+					// Fallback to ca + exam
+					ca := 0.0
+					exam := 0.0
+					if c, ok := results[i].RawMarks["ca"].(float64); ok {
+						ca = c
+					}
+					if e, ok := results[i].RawMarks["exam"].(float64); ok {
+						exam = e
+					}
+					mark = ca + exam
 				}
-				if e, ok := results[i].RawMarks["exam"].(float64); ok {
-					exam = e
-				}
-				total := ca + exam
-				if total >= 50 {
+				
+				if mark >= 50 {
 					results[i].FinalGrade = "O"
-				} else if total > 0 {
+				} else if mark > 0 {
 					results[i].FinalGrade = "F"
 				}
 			}
-		}
-		
-		// Convert UACE numeric codes to letter grades for Advanced Level
-		if classLevel == "S5" || classLevel == "S6" {
+		} else if classLevel == "S5" || classLevel == "S6" {
+			// Convert UACE numeric codes to letter grades for Advanced Level (principal subjects only)
 			// Check if grade is a numeric code (1-9) and convert to letter grade
 			if len(results[i].FinalGrade) == 1 {
 				switch results[i].FinalGrade {
