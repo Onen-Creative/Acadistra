@@ -122,40 +122,43 @@ func (h *ResultHandler) GetByStudent(c *gin.Context) {
 		}
 	}
 	
-	// Fix grades for subsidiary subjects only
+	// Fix grades for subsidiary subjects only (S5/S6 Advanced Level)
 	for i := range results {
-		// Check if this is a subsidiary subject
-		isSubsidiary := results[i].SubjectName == "ICT" || results[i].SubjectName == "General Paper" ||
-			strings.Contains(strings.ToLower(results[i].SubjectName), "ict") ||
-			strings.Contains(strings.ToLower(results[i].SubjectName), "general paper") ||
-			strings.Contains(strings.ToLower(results[i].SubjectName), "subsidiary")
-		
-		if isSubsidiary {
-			// Recalculate grade for subsidiary subjects - O or F only
-			if results[i].RawMarks != nil {
-				mark := 0.0
-				// Try different fields for the mark
-				if m, ok := results[i].RawMarks["mark"].(float64); ok {
-					mark = m
-				} else if t, ok := results[i].RawMarks["total"].(float64); ok {
-					mark = t
-				} else {
-					// Fallback to ca + exam
-					ca := 0.0
-					exam := 0.0
-					if c, ok := results[i].RawMarks["ca"].(float64); ok {
-						ca = c
+		// Only apply subsidiary grading for S5/S6 levels
+		if classLevel == "S5" || classLevel == "S6" {
+			// Check if this is a subsidiary subject
+			isSubsidiary := results[i].SubjectName == "ICT" || results[i].SubjectName == "General Paper" ||
+				strings.Contains(strings.ToLower(results[i].SubjectName), "ict") ||
+				strings.Contains(strings.ToLower(results[i].SubjectName), "general paper") ||
+				strings.Contains(strings.ToLower(results[i].SubjectName), "subsidiary")
+			
+			if isSubsidiary {
+				// Recalculate grade for subsidiary subjects - O or F only
+				if results[i].RawMarks != nil {
+					mark := 0.0
+					// Try different fields for the mark
+					if m, ok := results[i].RawMarks["mark"].(float64); ok {
+						mark = m
+					} else if t, ok := results[i].RawMarks["total"].(float64); ok {
+						mark = t
+					} else {
+						// Fallback to ca + exam
+						ca := 0.0
+						exam := 0.0
+						if c, ok := results[i].RawMarks["ca"].(float64); ok {
+							ca = c
+						}
+						if e, ok := results[i].RawMarks["exam"].(float64); ok {
+							exam = e
+						}
+						mark = ca + exam
 					}
-					if e, ok := results[i].RawMarks["exam"].(float64); ok {
-						exam = e
+					
+					if mark >= 50 {
+						results[i].FinalGrade = "O"
+					} else if mark > 0 {
+						results[i].FinalGrade = "F"
 					}
-					mark = ca + exam
-				}
-				
-				if mark >= 50 {
-					results[i].FinalGrade = "O"
-				} else if mark > 0 {
-					results[i].FinalGrade = "F"
 				}
 			}
 		}
