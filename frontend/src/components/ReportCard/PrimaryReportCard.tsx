@@ -173,12 +173,12 @@ export default function PrimaryReportCard({
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', marginBottom: '8px', flex: 1 }}>
               <thead>
                 <tr style={{ background: 'white', color: '#000' }}>
-                  <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'left', fontWeight: '700', fontSize: '11px' }}>SUBJECT</th>
-                  <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'center', fontWeight: '700', width: '60px', fontSize: '11px' }}>CA (40)</th>
-                  <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'center', fontWeight: '700', width: '60px', fontSize: '11px' }}>EXAM (60)</th>
-                  <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'center', fontWeight: '700', width: '60px', fontSize: '11px' }}>TOTAL (100)</th>
-                  <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'center', fontWeight: '700', width: '50px', fontSize: '11px' }}>GRADE</th>
-                  <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'center', fontWeight: '700', width: '80px', fontSize: '11px' }}>REMARK</th>
+                  <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'left', fontWeight: '700', fontSize: '11px', width: '180px' }}>SUBJECT</th>
+                  <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'center', fontWeight: '700', width: '50px', fontSize: '11px' }}>CA (40)</th>
+                  <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'center', fontWeight: '700', width: '55px', fontSize: '11px' }}>EXAM (60)</th>
+                  <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'center', fontWeight: '700', width: '55px', fontSize: '11px' }}>TOTAL (100)</th>
+                  <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'center', fontWeight: '700', width: '45px', fontSize: '11px' }}>GRADE</th>
+                  <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'center', fontWeight: '700', width: '100px', fontSize: '11px' }}>REMARK</th>
                 </tr>
               </thead>
               <tbody>

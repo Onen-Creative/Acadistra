@@ -159,11 +159,11 @@ export default function SystemAdminDashboard() {
                 link="/system/announcements"
               />
               <QuickAction
-                title="Audit Logs"
-                description="View system activity and audit trails"
+                title="System Monitoring"
+                description="View system activity, audit logs, and metrics"
                 icon="📋"
                 color="bg-gradient-to-br from-red-50 to-red-100 text-red-600"
-                link="/system/audit-logs"
+                link="/system/monitoring"
               />
               <QuickAction
                 title="Reports & Analytics"

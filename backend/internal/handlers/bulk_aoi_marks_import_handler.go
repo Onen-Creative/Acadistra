@@ -9,18 +9,22 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/school-system/backend/internal/grading"
 	"github.com/school-system/backend/internal/models"
+	"github.com/school-system/backend/internal/services"
 	"github.com/xuri/excelize/v2"
 	"gorm.io/gorm"
 )
 
 type BulkAOIMarksImportHandler struct {
-	db *gorm.DB
+	db                      *gorm.DB
+	gradeCalculationService *services.GradeCalculationService
 }
 
 func NewBulkAOIMarksImportHandler(db *gorm.DB) *BulkAOIMarksImportHandler {
-	return &BulkAOIMarksImportHandler{db: db}
+	return &BulkAOIMarksImportHandler{
+		db:                      db,
+		gradeCalculationService: services.NewGradeCalculationService(db),
+	}
 }
 
 type AOIMarkRow struct {
@@ -129,9 +133,14 @@ func (h *BulkAOIMarksImportHandler) UploadAOIMarks(c *gin.Context) {
 			continue
 		}
 
-		// Update all subject results with recalculated grade (AOI applies to all exam types)
-		if err := h.updateAllSubjectResultsWithAOI(uuid.MustParse(mark.StudentID), uuid.MustParse(subjectID), 
-			uuid.MustParse(classID), uuid.MustParse(schoolID), term, year, marksJSONB); err != nil {
+		// Update all subject results with recalculated grade using centralized service
+		if err := h.gradeCalculationService.UpdateAllResultsWithAOI(
+			uuid.MustParse(mark.StudentID),
+			uuid.MustParse(subjectID),
+			term,
+			year,
+			marksJSONB,
+		); err != nil {
 			errors = append(errors, fmt.Sprintf("Failed to update grade for %s: %v", mark.AdmissionNo, err))
 		}
 	}
@@ -382,61 +391,4 @@ func (h *BulkAOIMarksImportHandler) DownloadAOIMarksTemplate(c *gin.Context) {
 	}
 }
 
-// updateAllSubjectResultsWithAOI updates all subject results (all exam types) with AOI-based grade calculation
-func (h *BulkAOIMarksImportHandler) updateAllSubjectResultsWithAOI(studentID, subjectID, _, _ uuid.UUID, 
-	term string, year int, aoiMarks models.JSONB) error {
-	
-	// Calculate AOI CA out of 20
-	activities := []float64{}
-	for i := 1; i <= 5; i++ {
-		key := fmt.Sprintf("activity%d", i)
-		if val, ok := aoiMarks[key].(float64); ok {
-			activities = append(activities, val)
-		}
-	}
-	
-	if len(activities) == 0 {
-		return nil // No activities to process
-	}
-	
-	avg := 0.0
-	for _, v := range activities {
-		avg += v
-	}
-	avg = avg / float64(len(activities))
-	aoiCA := (avg / 3.0) * 20.0
-	
-	// Find all subject results for this student, subject, term, and year
-	var results []models.SubjectResult
-	h.db.Where("student_id = ? AND subject_id = ? AND term = ? AND year = ?",
-		studentID, subjectID, term, year).Find(&results)
-	
-	// Update all existing results with new AOI CA
-	for _, result := range results {
-		exam := 0.0
-		if result.RawMarks != nil {
-			if e, ok := result.RawMarks["exam"].(float64); ok {
-				exam = e
-			}
-		}
-		
-		// Calculate grade using NCDC grader
-		grader := &grading.NCDCGrader{}
-		gradeResult := grader.ComputeGrade(aoiCA, exam, 20, 80)
-		
-		if result.RawMarks == nil {
-			result.RawMarks = make(models.JSONB)
-		}
-		result.RawMarks["ca"] = aoiCA
-		result.RawMarks["total"] = aoiCA + exam
-		result.FinalGrade = gradeResult.FinalGrade
-		result.ComputationReason = gradeResult.ComputationReason
-		result.RuleVersionHash = gradeResult.RuleVersionHash
-		
-		if err := h.db.Save(&result).Error; err != nil {
-			return err
-		}
-	}
-	
-	return nil
-}
+

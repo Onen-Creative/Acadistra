@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/school-system/backend/internal/models"
 	"gorm.io/gorm"
 )
 
@@ -29,16 +31,29 @@ type SystemSettings struct {
 }
 
 func (h *SettingsHandler) GetSettings(c *gin.Context) {
-	var settings []struct {
-		Key   string `gorm:"column:key"`
-		Value string
+	var settings []models.SystemSetting
+	if err := h.db.Find(&settings).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch settings"})
+		return
 	}
-
-	h.db.Table("system_settings").Find(&settings)
 
 	settingsMap := make(map[string]string)
 	for _, s := range settings {
 		settingsMap[s.Key] = s.Value
+	}
+
+	sessionTimeout := 30
+	if val := getOrDefault(settingsMap, "session_timeout", "30"); val != "" {
+		if parsed, err := strconv.Atoi(val); err == nil {
+			sessionTimeout = parsed
+		}
+	}
+
+	smtpPort := 587
+	if val := getOrDefault(settingsMap, "smtp_port", "587"); val != "" {
+		if parsed, err := strconv.Atoi(val); err == nil {
+			smtpPort = parsed
+		}
 	}
 
 	result := SystemSettings{
@@ -46,9 +61,9 @@ func (h *SettingsHandler) GetSettings(c *gin.Context) {
 		SupportEmail:     getOrDefault(settingsMap, "support_email", "support@acadistra.com"),
 		DefaultCountry:   getOrDefault(settingsMap, "default_country", "Uganda"),
 		TwoFactorEnabled: getOrDefault(settingsMap, "two_factor_enabled", "false") == "true",
-		SessionTimeout:   30,
-		SMTPHost:         getOrDefault(settingsMap, "smtp_host", ""),
-		SMTPPort:         587,
+		SessionTimeout:   sessionTimeout,
+		SMTPHost:         getOrDefault(settingsMap, "smtp_host", "smtp.gmail.com"),
+		SMTPPort:         smtpPort,
 		SMTPUsername:     getOrDefault(settingsMap, "smtp_username", ""),
 		AutoBackup:       getOrDefault(settingsMap, "auto_backup", "true") == "true",
 		BackupTime:       getOrDefault(settingsMap, "backup_time", "02:00"),
@@ -64,29 +79,37 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 		return
 	}
 
-	h.db.Exec(`CREATE TABLE IF NOT EXISTS system_settings (
-		"key" VARCHAR(255) PRIMARY KEY,
-		value TEXT
-	)`)
-
 	updates := map[string]string{
 		"system_name":        input.SystemName,
 		"support_email":      input.SupportEmail,
 		"default_country":    input.DefaultCountry,
 		"two_factor_enabled": boolToString(input.TwoFactorEnabled),
+		"session_timeout":    strconv.Itoa(input.SessionTimeout),
 		"smtp_host":          input.SMTPHost,
+		"smtp_port":          strconv.Itoa(input.SMTPPort),
 		"smtp_username":      input.SMTPUsername,
 		"auto_backup":        boolToString(input.AutoBackup),
 		"backup_time":        input.BackupTime,
 	}
 
 	for key, value := range updates {
-		var count int64
-		h.db.Table("system_settings").Where(`"key" = ?`, key).Count(&count)
-		if count > 0 {
-			h.db.Table("system_settings").Where(`"key" = ?`, key).Update("value", value)
+		var setting models.SystemSetting
+		err := h.db.Where("key = ?", key).First(&setting).Error
+		if err == gorm.ErrRecordNotFound {
+			setting = models.SystemSetting{Key: key, Value: value}
+			if err := h.db.Create(&setting).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create setting"})
+				return
+			}
+		} else if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+			return
 		} else {
-			h.db.Exec(`INSERT INTO system_settings ("key", value) VALUES (?, ?)`, key, value)
+			setting.Value = value
+			if err := h.db.Save(&setting).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update setting"})
+				return
+			}
 		}
 	}
 

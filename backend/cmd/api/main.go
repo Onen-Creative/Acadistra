@@ -63,9 +63,53 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
+	// Services
+	authService := services.NewAuthService(db, cfg)
+	monitoringService := services.NewSystemMonitoringService(db)
+	emailService := services.NewEmailService(
+		os.Getenv("SMTP_HOST"),
+		587,
+		os.Getenv("SMTP_USER"),
+		os.Getenv("SMTP_PASSWORD"),
+		os.Getenv("SMTP_FROM"),
+		db,
+	)
+	
+	// Start email queue processor in background
+	go emailService.ProcessEmailQueue()
+	
+	// Start system metrics collection (every 5 minutes)
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			monitoringService.RecordSystemMetric()
+		}
+	}()
+	
+	// Start daily report generation (at 1 AM)
+	go func() {
+		for {
+			now := time.Now()
+			next := time.Date(now.Year(), now.Month(), now.Day()+1, 1, 0, 0, 0, now.Location())
+			time.Sleep(time.Until(next))
+			monitoringService.GenerateDailyReport(now)
+		}
+	}()
+	
+	// Cleanup old logs daily (keep 90 days)
+	go func() {
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			monitoringService.CleanupOldLogs(90)
+		}
+	}()
+
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(middleware.Logger())
+	r.Use(middleware.RequestLogger(monitoringService))
 
 	// CORS
 	r.Use(func(c *gin.Context) {
@@ -120,20 +164,6 @@ func main() {
 		c.JSON(200, gin.H{"message": "Standard fee types seeded successfully"})
 	})
 
-	// Services
-	authService := services.NewAuthService(db, cfg)
-	emailService := services.NewEmailService(
-		os.Getenv("SMTP_HOST"),
-		587,
-		os.Getenv("SMTP_USER"),
-		os.Getenv("SMTP_PASSWORD"),
-		os.Getenv("SMTP_FROM"),
-		db,
-	)
-	
-	// Start email queue processor in background
-	go emailService.ProcessEmailQueue()
-
 	// Password reset endpoints (public)
 	passwordResetHandler := handlers.NewPasswordResetHandler(db, emailService, authService)
 	r.POST("/api/v1/auth/password-reset/request", passwordResetHandler.RequestPasswordReset)
@@ -152,7 +182,7 @@ func main() {
 	r.POST("/socket.io/*any", gin.WrapH(socketServer))
 
 	// Handlers
-	authHandler := handlers.NewAuthHandler(authService)
+	authHandler := handlers.NewAuthHandler(authService, monitoringService)
 	userHandler := handlers.NewUserHandlerWithEmail(db, authService, emailService)
 	schoolHandler := handlers.NewSchoolHandler(db)
 	classHandler := handlers.NewClassHandler(db)
@@ -176,6 +206,7 @@ func main() {
 	payrollHandler := handlers.NewPayrollHandler(payrollService, emailService)
 	marksExportHandler := handlers.NewMarksExportHandler(db)
 	systemReportsHandler := handlers.NewSystemReportsHandler(db)
+	reportsHandler := handlers.NewReportsHandler(db)
 	settingsHandler := handlers.NewSettingsHandler(db)
 	notificationHandler := handlers.NewNotificationHandler(db)
 	integrationActivityHandler := handlers.NewIntegrationActivityHandler(db)
@@ -243,6 +274,18 @@ func main() {
 
 				// Audit logs
 				sysAdmin.GET("/audit/recent", auditHandler.GetRecentActivity)
+				
+				// System monitoring
+				monitoringHandler := handlers.NewSystemMonitoringHandler(db, monitoringService)
+				sysAdmin.GET("/monitoring/active-users", monitoringHandler.GetActiveUsers)
+				sysAdmin.GET("/monitoring/audit-logs", monitoringHandler.GetEnhancedAuditLogs)
+				sysAdmin.GET("/monitoring/system-stats", monitoringHandler.GetSystemStats)
+				sysAdmin.GET("/monitoring/daily-reports", monitoringHandler.GetDailyReports)
+				sysAdmin.GET("/monitoring/performance-metrics", monitoringHandler.GetPerformanceMetrics)
+				sysAdmin.GET("/monitoring/slowest-endpoints", monitoringHandler.GetSlowestEndpoints)
+				sysAdmin.GET("/monitoring/error-analysis", monitoringHandler.GetErrorAnalysis)
+				sysAdmin.POST("/monitoring/generate-daily-report", monitoringHandler.GenerateDailyReport)
+				
 				sysAdmin.GET("/audit-logs", func(c *gin.Context) {
 					_ = c.DefaultQuery("page", "1")
 					actionFilter := c.Query("action")
@@ -312,6 +355,12 @@ func main() {
 				sysAdmin.GET("/reports/system/students", systemReportsHandler.GenerateStudentsReport)
 				sysAdmin.GET("/reports/system/activity", systemReportsHandler.GenerateActivityReport)
 				sysAdmin.GET("/reports/system/performance", systemReportsHandler.GeneratePerformanceReport)
+				
+				// School reports (accessible by school admins and system admins)
+				protected.GET("/reports/students", reportsHandler.GenerateStudentsReport)
+				protected.GET("/reports/staff", reportsHandler.GenerateStaffReport)
+				protected.GET("/reports/attendance", reportsHandler.GenerateAttendanceReport)
+				protected.GET("/reports/performance", reportsHandler.GeneratePerformanceReport)
 				
 				// Grade recalculation
 				sysAdmin.POST("/recalculate-grades", resultHandler.RecalculateGrades)

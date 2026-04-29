@@ -9,18 +9,22 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/school-system/backend/internal/grading"
 	"github.com/school-system/backend/internal/models"
+	"github.com/school-system/backend/internal/services"
 	"github.com/xuri/excelize/v2"
 	"gorm.io/gorm"
 )
 
 type BulkCAMarksImportHandler struct {
-	db *gorm.DB
+	db                      *gorm.DB
+	gradeCalculationService *services.GradeCalculationService
 }
 
 func NewBulkCAMarksImportHandler(db *gorm.DB) *BulkCAMarksImportHandler {
-	return &BulkCAMarksImportHandler{db: db}
+	return &BulkCAMarksImportHandler{
+		db:                      db,
+		gradeCalculationService: services.NewGradeCalculationService(db),
+	}
 }
 
 type CAMarkRow struct {
@@ -146,7 +150,12 @@ func (h *BulkCAMarksImportHandler) UploadCAMarksForApproval(c *gin.Context) {
 			}
 			
 			if exam > 0 {
-				gradeResult, rawMarks := h.calculateGrade(class.Level, mark.CA, exam)
+				// Recalculate grade using centralized service
+				gradeResult, rawMarks := h.gradeCalculationService.RecalculateGradeWithCA(
+					class.Level,
+					mark.CA,
+					exam,
+				)
 				result.RawMarks = rawMarks
 				result.FinalGrade = gradeResult.FinalGrade
 				result.ComputationReason = gradeResult.ComputationReason
@@ -372,25 +381,3 @@ func (h *BulkCAMarksImportHandler) DownloadCAMarksTemplate(c *gin.Context) {
 }
 
 
-// calculateGrade computes grade based on level and marks
-func (h *BulkCAMarksImportHandler) calculateGrade(level string, ca, exam float64) (grading.GradeResult, models.JSONB) {
-	rawMarks := models.JSONB{"ca": ca, "exam": exam}
-	
-	switch level {
-	case "P1", "P2", "P3", "P4", "P5", "P6", "P7":
-		rawMarks["total"] = ca + exam
-		grader := &grading.PrimaryGrader{}
-		return grader.ComputeGrade(ca, exam, 40, 60), rawMarks
-		
-	case "Baby", "Middle", "Top", "Nursery":
-		avg := (ca + exam) / 2
-		rawMarks["mark"] = avg
-		grader := &grading.NurseryGrader{}
-		return grader.ComputeGrade(ca, exam, 100, 100), rawMarks
-	}
-	
-	return grading.GradeResult{
-		FinalGrade:        "",
-		ComputationReason: "Unknown level",
-	}, rawMarks
-}

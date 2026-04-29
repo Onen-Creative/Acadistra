@@ -5,66 +5,57 @@ import { useQuery } from '@tanstack/react-query'
 import { DashboardLayout } from '@/components/DashboardLayout'
 import toast from 'react-hot-toast'
 import { api } from '@/services/api'
-import * as XLSX from 'xlsx'
 
-export default function SchoolReportsPage() {
+export default function ReportsPage() {
   const [generating, setGenerating] = useState<string | null>(null)
-  const [dateRange, setDateRange] = useState({ start: '', end: '' })
-  const [selectedTerm, setSelectedTerm] = useState('Term 1')
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [filters, setFilters] = useState({
+    year: new Date().getFullYear(),
+    term: 'Term 1',
+    startDate: '',
+    endDate: '',
+    classId: '',
+    role: ''
+  })
 
-  const { data: stats } = useQuery({
-    queryKey: ['school-stats'],
+  const { data: classes } = useQuery({
+    queryKey: ['classes'],
     queryFn: async () => {
-      const [studentsRes, classRes, staffRes] = await Promise.all([
-        api.get('/api/v1/students', { params: { limit: 1 } }),
-        api.get('/api/v1/classes'),
-        api.get('/api/v1/staff')
-      ])
-      return {
-        students: studentsRes.data.total || studentsRes.data.students?.length || 0,
-        classes: Array.isArray(classRes.data) ? classRes.data.length : classRes.data.classes?.length || 0,
-        staff: Array.isArray(staffRes.data) ? staffRes.data.length : staffRes.data.staff?.length || 0
-      }
+      const res = await api.get('/api/v1/classes')
+      return Array.isArray(res.data) ? res.data : res.data.classes || []
     }
   })
+
+  const downloadReport = async (endpoint: string, filename: string, params: any = {}) => {
+    try {
+      const res = await api.get(endpoint, {
+        params,
+        responseType: 'blob'
+      })
+      const url = window.URL.createObjectURL(new Blob([res.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', filename)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      toast.success('Report downloaded successfully')
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to generate report')
+    }
+  }
 
   const generateStudentsReport = async () => {
     setGenerating('students')
     try {
-      const classesRes = await api.get('/api/v1/classes')
-      const classes = Array.isArray(classesRes.data) ? classesRes.data : classesRes.data.classes || []
-      
-      const allStudents: any[] = []
-      for (const cls of classes) {
-        try {
-          const res = await api.get('/api/v1/students', { params: { class_id: cls.id, year: selectedYear, term: selectedTerm } })
-          const students = res.data.students || []
-          students.forEach((s: any) => {
-            allStudents.push({ ...s, className: cls.name })
-          })
-        } catch (e) {}
-      }
-      
-      const data = allStudents.map((s: any, i: number) => ({
-        '#': i + 1,
-        'Admission No': s.admission_no,
-        'First Name': s.first_name,
-        'Middle Name': s.middle_name || '',
-        'Last Name': s.last_name,
-        'Gender': s.gender,
-        'Date of Birth': s.date_of_birth,
-        'Class': s.className || '',
-        'Status': s.status,
-        'Enrolled Date': s.created_at?.split('T')[0] || ''
-      }))
-      const ws = XLSX.utils.json_to_sheet(data)
-      const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, ws, 'Students')
-      XLSX.writeFile(wb, `students-report-${new Date().toISOString().split('T')[0]}.xlsx`)
-      toast.success('Students report downloaded')
-    } catch (error) {
-      toast.error('Failed to generate report')
+      await downloadReport(
+        '/api/v1/reports/students',
+        `students-report-${new Date().toISOString().split('T')[0]}.xlsx`,
+        {
+          class_id: filters.classId,
+          year: filters.year,
+          term: filters.term
+        }
+      )
     } finally {
       setGenerating(null)
     }
@@ -73,146 +64,32 @@ export default function SchoolReportsPage() {
   const generateStaffReport = async () => {
     setGenerating('staff')
     try {
-      const res = await api.get('/api/v1/staff', { params: { limit: 10000 } })
-      const staff = Array.isArray(res.data) ? res.data : res.data.staff || []
-      const data = staff.map((s: any, i: number) => ({
-        '#': i + 1,
-        'Staff ID': s.staff_id || s.id,
-        'First Name': s.first_name,
-        'Last Name': s.last_name,
-        'Position': s.position,
-        'Department': s.department || '',
-        'Email': s.email || '',
-        'Phone': s.phone || '',
-        'Status': s.status,
-        'Hire Date': s.hire_date || s.date_hired || s.created_at?.split('T')[0] || ''
-      }))
-      const ws = XLSX.utils.json_to_sheet(data)
-      const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, ws, 'Staff')
-      XLSX.writeFile(wb, `staff-report-${new Date().toISOString().split('T')[0]}.xlsx`)
-      toast.success('Staff report downloaded')
-    } catch (error) {
-      toast.error('Failed to generate report')
-    } finally {
-      setGenerating(null)
-    }
-  }
-
-  const generateClassesReport = async () => {
-    setGenerating('classes')
-    try {
-      const res = await api.get('/api/v1/classes', { params: { year: selectedYear } })
-      const classes = Array.isArray(res.data) ? res.data : res.data.classes || []
-      const data = classes.map((c: any, i: number) => ({
-        '#': i + 1,
-        'Class Name': c.name,
-        'Level': c.level,
-        'Stream': c.stream || '',
-        'Year': c.year,
-        'Term': c.term,
-        'Capacity': c.capacity || '',
-        'Teacher': c.class_teacher_name || '',
-        'Students': c.student_count || 0
-      }))
-      const ws = XLSX.utils.json_to_sheet(data)
-      const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, ws, 'Classes')
-      XLSX.writeFile(wb, `classes-report-${new Date().toISOString().split('T')[0]}.xlsx`)
-      toast.success('Classes report downloaded')
-    } catch (error) {
-      toast.error('Failed to generate report')
+      await downloadReport(
+        '/api/v1/reports/staff',
+        `staff-report-${new Date().toISOString().split('T')[0]}.xlsx`,
+        { role: filters.role }
+      )
     } finally {
       setGenerating(null)
     }
   }
 
   const generateAttendanceReport = async () => {
+    if (!filters.startDate || !filters.endDate) {
+      toast.error('Please select start and end dates')
+      return
+    }
     setGenerating('attendance')
     try {
-      if (!dateRange.start || !dateRange.end) {
-        toast.error('Please select date range')
-        setGenerating(null)
-        return
-      }
-      
-      const classesRes = await api.get('/api/v1/classes')
-      const classes = Array.isArray(classesRes.data) ? classesRes.data : classesRes.data.classes || []
-      
-      const allSummary: any[] = []
-      for (const cls of classes) {
-        try {
-          const res = await api.get('/api/v1/attendance/class-summary', {
-            params: { class_id: cls.id, start_date: dateRange.start, end_date: dateRange.end }
-          })
-          const summary = res.data.summary || []
-          summary.forEach((s: any) => {
-            allSummary.push({ ...s, class_name: cls.name })
-          })
-        } catch (e) {}
-      }
-      
-      if (allSummary.length === 0) {
-        toast.error('No attendance data found for selected period')
-        setGenerating(null)
-        return
-      }
-      
-      const data = allSummary.map((s: any, i: number) => ({
-        '#': i + 1,
-        'Class': s.class_name,
-        'Student': s.student_name,
-        'Total Days': s.total_days,
-        'Present': s.present,
-        'Absent': s.absent,
-        'Late': s.late,
-        'Sick': s.sick || 0,
-        'Excused': s.excused || 0,
-        'Attendance %': s.percentage.toFixed(2) + '%'
-      }))
-      const ws = XLSX.utils.json_to_sheet(data)
-      const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, ws, 'Attendance')
-      XLSX.writeFile(wb, `attendance-report-${new Date().toISOString().split('T')[0]}.xlsx`)
-      toast.success(`Attendance report downloaded (${allSummary.length} students)`)
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to generate report')
-    } finally {
-      setGenerating(null)
-    }
-  }
-
-  const generateFinanceReport = async () => {
-    setGenerating('finance')
-    try {
-      const res = await api.get('/api/v1/finance/summary')
-      const summary = res.data
-      
-      const data = [
-        { 'Metric': 'Total Income', 'Amount': summary.total_income || 0 },
-        { 'Metric': 'Total Expenditure', 'Amount': summary.total_expenditure || 0 },
-        { 'Metric': 'Net Balance', 'Amount': summary.net_balance || 0 }
-      ]
-      
-      if (summary.income_by_category) {
-        Object.entries(summary.income_by_category).forEach(([cat, amt]) => {
-          data.push({ 'Metric': `Income - ${cat}`, 'Amount': amt as number })
-        })
-      }
-      
-      if (summary.expense_by_category) {
-        Object.entries(summary.expense_by_category).forEach(([cat, amt]) => {
-          data.push({ 'Metric': `Expense - ${cat}`, 'Amount': amt as number })
-        })
-      }
-      
-      const ws = XLSX.utils.json_to_sheet(data)
-      const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, ws, 'Finance Summary')
-      XLSX.writeFile(wb, `finance-report-${new Date().toISOString().split('T')[0]}.xlsx`)
-      toast.success('Finance report downloaded')
-    } catch (error) {
-      toast.error('Failed to generate report')
+      await downloadReport(
+        '/api/v1/reports/attendance',
+        `attendance-report-${new Date().toISOString().split('T')[0]}.xlsx`,
+        {
+          start_date: filters.startDate,
+          end_date: filters.endDate,
+          class_id: filters.classId
+        }
+      )
     } finally {
       setGenerating(null)
     }
@@ -221,62 +98,15 @@ export default function SchoolReportsPage() {
   const generatePerformanceReport = async () => {
     setGenerating('performance')
     try {
-      const res = await api.get('/api/v1/results/performance-summary', {
-        params: { year: selectedYear, term: selectedTerm }
-      })
-      const results = res.data.results || []
-      
-      if (results.length === 0) {
-        toast.error('No results found for selected year and term')
-        setGenerating(null)
-        return
-      }
-      
-      const wb = XLSX.utils.book_new()
-      
-      // Group by class
-      const byClass = results.reduce((acc: any, r: any) => {
-        if (!acc[r.class_name]) acc[r.class_name] = []
-        acc[r.class_name].push(r)
-        return acc
-      }, {})
-      
-      // Create a sheet for each class
-      Object.entries(byClass).forEach(([className, students]: [string, any]) => {
-        const data: any[] = []
-        
-        students.forEach((s: any, i: number) => {
-          const row: any = {
-            '#': i + 1,
-            'Student': s.student_name,
-            'Admission No': s.admission_no,
-          }
-          
-          // Add each subject's marks
-          s.subjects.forEach((subj: any) => {
-            row[`${subj.subject_name} - CA`] = subj.ca
-            row[`${subj.subject_name} - Exam`] = subj.exam
-            row[`${subj.subject_name} - Total`] = subj.total
-            row[`${subj.subject_name} - Grade`] = subj.grade
-          })
-          
-          row['Total Marks'] = s.total_marks.toFixed(2)
-          row['Average'] = s.average.toFixed(2)
-          row['Overall Grade'] = s.grade
-          row['Position'] = s.position
-          row['Division'] = s.division
-          
-          data.push(row)
-        })
-        
-        const ws = XLSX.utils.json_to_sheet(data)
-        XLSX.utils.book_append_sheet(wb, ws, className.substring(0, 31))
-      })
-      
-      XLSX.writeFile(wb, `performance-report-${selectedYear}-${selectedTerm}-${new Date().toISOString().split('T')[0]}.xlsx`)
-      toast.success(`Performance report downloaded (${results.length} students across ${Object.keys(byClass).length} classes)`)
-    } catch (error) {
-      toast.error('Failed to generate report')
+      await downloadReport(
+        '/api/v1/reports/performance',
+        `performance-report-${filters.year}-${filters.term}-${new Date().toISOString().split('T')[0]}.xlsx`,
+        {
+          year: filters.year,
+          term: filters.term,
+          class_id: filters.classId
+        }
+      )
     } finally {
       setGenerating(null)
     }
@@ -286,62 +116,38 @@ export default function SchoolReportsPage() {
     {
       id: 'students',
       title: 'Students Report',
-      description: 'Complete list of all enrolled students',
+      description: 'Complete list of enrolled students with class information',
       icon: '🎓',
       color: 'from-blue-500 to-blue-600',
-      count: stats?.students || 0,
       action: generateStudentsReport,
-      needsDate: false
+      filters: ['year', 'term', 'class']
     },
     {
       id: 'staff',
       title: 'Staff Report',
-      description: 'All staff members with positions and details',
+      description: 'All staff members with positions and employment details',
       icon: '👥',
       color: 'from-green-500 to-green-600',
-      count: stats?.staff || 0,
       action: generateStaffReport,
-      needsDate: false
-    },
-    {
-      id: 'classes',
-      title: 'Classes Report',
-      description: 'All classes with enrollment and teacher info',
-      icon: '📚',
-      color: 'from-purple-500 to-purple-600',
-      count: stats?.classes || 0,
-      action: generateClassesReport,
-      needsDate: false
+      filters: ['role']
     },
     {
       id: 'attendance',
       title: 'Attendance Report',
-      description: 'Student attendance records for date range',
+      description: 'Student attendance records for selected date range',
       icon: '📅',
       color: 'from-orange-500 to-orange-600',
-      count: null,
       action: generateAttendanceReport,
-      needsDate: true
-    },
-    {
-      id: 'finance',
-      title: 'Finance Report',
-      description: 'Income, expenses and financial summary',
-      icon: '💰',
-      color: 'from-emerald-500 to-emerald-600',
-      count: null,
-      action: generateFinanceReport,
-      needsDate: true
+      filters: ['dateRange', 'class']
     },
     {
       id: 'performance',
       title: 'Performance Report',
-      description: 'Academic results and student performance',
+      description: 'Academic results and student performance by term',
       icon: '📊',
-      color: 'from-red-500 to-red-600',
-      count: null,
+      color: 'from-purple-500 to-purple-600',
       action: generatePerformanceReport,
-      needsDate: false
+      filters: ['year', 'term', 'class']
     }
   ]
 
@@ -350,7 +156,7 @@ export default function SchoolReportsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">📊 School Reports</h1>
-          <p className="text-gray-600 mt-1">Generate comprehensive reports for your school</p>
+          <p className="text-gray-600 mt-1">Generate comprehensive Excel reports for your school</p>
         </div>
 
         {/* Filters */}
@@ -360,8 +166,8 @@ export default function SchoolReportsPage() {
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Academic Year</label>
               <select
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                value={filters.year}
+                onChange={(e) => setFilters({ ...filters, year: Number(e.target.value) })}
                 className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
               >
                 {[2024, 2025, 2026, 2027].map(year => (
@@ -372,8 +178,8 @@ export default function SchoolReportsPage() {
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Term</label>
               <select
-                value={selectedTerm}
-                onChange={(e) => setSelectedTerm(e.target.value)}
+                value={filters.term}
+                onChange={(e) => setFilters({ ...filters, term: e.target.value })}
                 className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
               >
                 <option value="Term 1">Term 1</option>
@@ -382,20 +188,50 @@ export default function SchoolReportsPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Start Date</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Class (Optional)</label>
+              <select
+                value={filters.classId}
+                onChange={(e) => setFilters({ ...filters, classId: e.target.value })}
+                className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+              >
+                <option value="">All Classes</option>
+                {classes?.map((cls: any) => (
+                  <option key={cls.id} value={cls.id}>{cls.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Staff Role (Optional)</label>
+              <select
+                value={filters.role}
+                onChange={(e) => setFilters({ ...filters, role: e.target.value })}
+                className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+              >
+                <option value="">All Roles</option>
+                <option value="Teacher">Teacher</option>
+                <option value="Admin">Admin</option>
+                <option value="Bursar">Bursar</option>
+                <option value="Librarian">Librarian</option>
+                <option value="Nurse">Nurse</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Start Date (for Attendance)</label>
               <input
                 type="date"
-                value={dateRange.start}
-                onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                value={filters.startDate}
+                onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
                 className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">End Date</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">End Date (for Attendance)</label>
               <input
                 type="date"
-                value={dateRange.end}
-                onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                value={filters.endDate}
+                onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
                 className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
               />
             </div>
@@ -403,20 +239,14 @@ export default function SchoolReportsPage() {
         </div>
 
         {/* Report Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {reports.map((report) => (
             <div key={report.id} className={`bg-gradient-to-br ${report.color} rounded-2xl shadow-lg p-6 text-white transform transition-all hover:scale-105 hover:shadow-2xl`}>
               <div className="flex items-center justify-between mb-4">
                 <div className="text-5xl">{report.icon}</div>
-                {report.count !== null && (
-                  <div className="text-3xl font-bold">{report.count}</div>
-                )}
               </div>
               <h3 className="text-xl font-bold mb-2">{report.title}</h3>
               <p className="text-sm opacity-90 mb-4">{report.description}</p>
-              {report.needsDate && (!dateRange.start || !dateRange.end) && (
-                <p className="text-xs bg-white/20 rounded-lg p-2 mb-3">⚠️ Select date range above</p>
-              )}
               <button
                 onClick={report.action}
                 disabled={generating === report.id}
@@ -445,8 +275,8 @@ export default function SchoolReportsPage() {
               <p>• Data is current as of generation time</p>
             </div>
             <div className="space-y-2">
-              <p>• Date range required for attendance & finance</p>
-              <p>• Year/term filters apply to performance reports</p>
+              <p>• Use filters to narrow down report scope</p>
+              <p>• Date range required for attendance reports</p>
               <p>• Open with Excel, Google Sheets, or LibreOffice</p>
             </div>
           </div>

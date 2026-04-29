@@ -1,32 +1,19 @@
 'use client'
 
 import { DashboardLayout } from '@/components/DashboardLayout'
-
 import { PageHeader, LoadingSpinner } from '@/components/ui/BeautifulComponents'
 import { useState, useEffect } from 'react'
 import { notifications } from '@mantine/notifications'
-
-interface Settings {
-  system_name: string
-  support_email: string
-  default_country: string
-  two_factor_enabled: boolean
-  session_timeout: number
-  smtp_host: string
-  smtp_port: number
-  smtp_username: string
-  auto_backup: boolean
-  backup_time: string
-}
+import { settingsService, SystemSettings } from '@/services/settings'
 
 export default function SystemSettingsPage() {
-  const [settings, setSettings] = useState<Settings>({
+  const [settings, setSettings] = useState<SystemSettings>({
     system_name: 'Acadistra',
     support_email: 'support@acadistra.com',
     default_country: 'Uganda',
     two_factor_enabled: false,
     session_timeout: 30,
-    smtp_host: '',
+    smtp_host: 'smtp.gmail.com',
     smtp_port: 587,
     smtp_username: '',
     auto_backup: true,
@@ -34,6 +21,7 @@ export default function SystemSettingsPage() {
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [backingUp, setBackingUp] = useState(false)
 
   useEffect(() => {
     fetchSettings()
@@ -41,24 +29,24 @@ export default function SystemSettingsPage() {
 
   const fetchSettings = async () => {
     try {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        setLoading(false)
-        return
-      }
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://acadistra.com'}/api/v1/settings`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setSettings(data)
-      } else if (res.status === 401) {
-        notifications.show({ title: 'Error', message: 'Session expired. Please login again.', color: 'red' })
+      const data = await settingsService.getSettings()
+      setSettings(data)
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        notifications.show({ 
+          title: 'Error', 
+          message: 'Session expired. Please login again.', 
+          color: 'red' 
+        })
         localStorage.removeItem('token')
         window.location.href = '/login'
+      } else {
+        notifications.show({ 
+          title: 'Error', 
+          message: 'Failed to load settings', 
+          color: 'red' 
+        })
       }
-    } catch (error) {
-      console.error('Failed to fetch settings:', error)
     } finally {
       setLoading(false)
     }
@@ -67,39 +55,50 @@ export default function SystemSettingsPage() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        notifications.show({ title: 'Error', message: 'Please login first', color: 'red' })
-        setSaving(false)
-        return
-      }
-      
-      
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://acadistra.com'}/api/v1/settings`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(settings)
+      await settingsService.updateSettings(settings)
+      notifications.show({ 
+        title: 'Success', 
+        message: 'Settings saved successfully', 
+        color: 'green' 
       })
-      
-      const data = await res.json()
-      
-      if (res.ok) {
-        notifications.show({ title: 'Success', message: 'Settings saved successfully', color: 'green' })
-      } else if (res.status === 401) {
-        notifications.show({ title: 'Error', message: 'Session expired. Please login again.', color: 'red' })
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        notifications.show({ 
+          title: 'Error', 
+          message: 'Session expired. Please login again.', 
+          color: 'red' 
+        })
         localStorage.removeItem('token')
         window.location.href = '/login'
       } else {
-        notifications.show({ title: 'Error', message: data.error || 'Failed to save settings', color: 'red' })
+        notifications.show({ 
+          title: 'Error', 
+          message: error.response?.data?.error || 'Failed to save settings', 
+          color: 'red' 
+        })
       }
-    } catch (error) {
-      console.error('Save error:', error)
-      notifications.show({ title: 'Error', message: 'Failed to save settings', color: 'red' })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleRunBackup = async () => {
+    setBackingUp(true)
+    try {
+      await settingsService.runBackup()
+      notifications.show({ 
+        title: 'Success', 
+        message: 'Backup started successfully', 
+        color: 'blue' 
+      })
+    } catch (error) {
+      notifications.show({ 
+        title: 'Info', 
+        message: 'Backup feature will be available soon', 
+        color: 'blue' 
+      })
+    } finally {
+      setBackingUp(false)
     }
   }
 
@@ -248,7 +247,13 @@ export default function SystemSettingsPage() {
                     onChange={(e) => setSettings({...settings, backup_time: e.target.value})}
                   />
                 </div>
-                <button className="btn-primary w-full" onClick={() => notifications.show({ title: 'Success', message: 'Backup started', color: 'blue' })}>Run Backup Now</button>
+                <button 
+                  className="btn-primary w-full" 
+                  onClick={handleRunBackup}
+                  disabled={backingUp}
+                >
+                  {backingUp ? '⏳ Running...' : '💾 Run Backup Now'}
+                </button>
               </div>
             </div>
           </div>

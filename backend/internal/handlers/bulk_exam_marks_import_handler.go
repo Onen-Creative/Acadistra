@@ -9,18 +9,22 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/school-system/backend/internal/grading"
 	"github.com/school-system/backend/internal/models"
+	"github.com/school-system/backend/internal/services"
 	"github.com/xuri/excelize/v2"
 	"gorm.io/gorm"
 )
 
 type BulkExamMarksImportHandler struct {
-	db *gorm.DB
+	db                      *gorm.DB
+	gradeCalculationService *services.GradeCalculationService
 }
 
 func NewBulkExamMarksImportHandler(db *gorm.DB) *BulkExamMarksImportHandler {
-	return &BulkExamMarksImportHandler{db: db}
+	return &BulkExamMarksImportHandler{
+		db:                      db,
+		gradeCalculationService: services.NewGradeCalculationService(db),
+	}
 }
 
 type ExamMarkRow struct {
@@ -104,8 +108,28 @@ func (h *BulkExamMarksImportHandler) UploadExamMarksForApproval(c *gin.Context) 
 		err := h.db.Where("student_id = ? AND subject_id = ? AND term = ? AND year = ? AND exam_type = ? AND paper = ?",
 			mark.StudentID, subjectID, term, year, examType, paper).First(&result).Error
 
-		// Calculate grade based on level
-		gradeResult, rawMarks := h.calculateGrade(class.Level, 0, mark.Exam, uuid.MustParse(mark.StudentID), uuid.MustParse(subjectID), term, year)
+		// Get existing CA if available
+		var existingCA *float64
+		if result.RawMarks != nil {
+			if ca, ok := result.RawMarks["ca"].(float64); ok {
+				existingCA = &ca
+			}
+		}
+
+		// Calculate grade using centralized service
+		gradeResult, rawMarks, calcErr := h.gradeCalculationService.CalculateGradeForResult(
+			class.Level,
+			uuid.MustParse(mark.StudentID),
+			uuid.MustParse(subjectID),
+			term,
+			year,
+			mark.Exam,
+			existingCA,
+		)
+		if calcErr != nil {
+			errors = append(errors, fmt.Sprintf("Failed to calculate grade for %s: %v", mark.AdmissionNo, calcErr))
+			continue
+		}
 
 		if err == gorm.ErrRecordNotFound {
 			// Create new result
@@ -341,92 +365,4 @@ func (h *BulkExamMarksImportHandler) DownloadExamMarksTemplate(c *gin.Context) {
 	}
 }
 
-// calculateGrade computes grade based on level and marks
-func (h *BulkExamMarksImportHandler) calculateGrade(level string, ca, exam float64, studentID, subjectID uuid.UUID, term string, year int) (grading.GradeResult, models.JSONB) {
-	rawMarks := models.JSONB{"exam": exam}
-	
-	switch level {
-	case "S1", "S2", "S3", "S4":
-		// NCDC: Get AOI marks for CA
-		var aoiActivity models.IntegrationActivity
-		aoiCA := 0.0
-		if err := h.db.Where("student_id = ? AND subject_id = ? AND term = ? AND year = ?",
-			studentID, subjectID, term, year).First(&aoiActivity).Error; err == nil {
-			if aoiActivity.Marks != nil {
-				activities := []float64{}
-				for i := 1; i <= 5; i++ {
-					key := fmt.Sprintf("activity%d", i)
-					if val, ok := aoiActivity.Marks[key].(float64); ok {
-						activities = append(activities, val)
-					}
-				}
-				if len(activities) > 0 {
-					avg := 0.0
-					for _, v := range activities {
-						avg += v
-					}
-					avg = avg / float64(len(activities))
-					aoiCA = (avg / 3.0) * 20.0
-				}
-			}
-		}
-		rawMarks["ca"] = aoiCA
-		rawMarks["total"] = aoiCA + exam
-		
-		grader := &grading.NCDCGrader{}
-		return grader.ComputeGrade(aoiCA, exam, 20, 80), rawMarks
-		
-	case "P1", "P2", "P3", "P4", "P5", "P6", "P7":
-		// Primary: exam only, CA should be entered separately
-		rawMarks["ca"] = ca
-		rawMarks["total"] = ca + exam
-		grader := &grading.PrimaryGrader{}
-		return grader.ComputeGrade(ca, exam, 40, 60), rawMarks
-		
-	case "Baby", "Middle", "Top", "Nursery":
-		// Nursery: exam only, CA should be entered separately
-		rawMarks["ca"] = ca
-		avg := (ca + exam) / 2
-		rawMarks["mark"] = avg
-		grader := &grading.NurseryGrader{}
-		return grader.ComputeGrade(ca, exam, 100, 100), rawMarks
-		
-	case "S5", "S6":
-		// UACE: Paper-based
-		rawMarks["mark"] = exam
-		grader := &grading.UACEGrader{}
-		code := grader.MapMarkToCode(exam)
-		var letterGrade string
-		switch code {
-		case 1:
-			letterGrade = "D1"
-		case 2:
-			letterGrade = "D2"
-		case 3:
-			letterGrade = "C3"
-		case 4:
-			letterGrade = "C4"
-		case 5:
-			letterGrade = "C5"
-		case 6:
-			letterGrade = "C6"
-		case 7:
-			letterGrade = "P7"
-		case 8:
-			letterGrade = "P8"
-		default:
-			letterGrade = "F9"
-		}
-		return grading.GradeResult{
-			FinalGrade:        letterGrade,
-			ComputationReason: fmt.Sprintf("Paper mark %.2f/100 → Grade %s", exam, letterGrade),
-			RuleVersionHash:   "UACE_SINGLE_PAPER_V1",
-		}, rawMarks
-	}
-	
-	// Fallback
-	return grading.GradeResult{
-		FinalGrade:        "",
-		ComputationReason: "Unknown level",
-	}, rawMarks
-}
+

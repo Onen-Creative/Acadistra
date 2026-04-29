@@ -10,11 +10,15 @@ import (
 )
 
 type AuthHandler struct {
-	authService *services.AuthService
+	authService       *services.AuthService
+	monitoringService *services.SystemMonitoringService
 }
 
-func NewAuthHandler(authService *services.AuthService) *AuthHandler {
-	return &AuthHandler{authService: authService}
+func NewAuthHandler(authService *services.AuthService, monitoringService *services.SystemMonitoringService) *AuthHandler {
+	return &AuthHandler{
+		authService:       authService,
+		monitoringService: monitoringService,
+	}
 }
 
 type LoginRequest struct {
@@ -56,6 +60,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
+
+	// Create user session
+	go h.monitoringService.CreateSession(user.ID, user.SchoolID, tokens.AccessToken, c.ClientIP(), c.Request.UserAgent())
 
 	// Log login action
 	h.authService.LogAudit(user.ID, "login", "auth", user.ID, nil, models.JSONB{"email": user.Email}, c.ClientIP())
@@ -133,6 +140,11 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 				h.authService.LogAudit(parsedID, "logout", "auth", parsedID, nil, nil, c.ClientIP())
 			}
 		}
+	}
+
+	// End user session
+	if authHeader := c.GetHeader("Authorization"); authHeader != "" {
+		go h.monitoringService.EndSession(authHeader)
 	}
 
 	if err := h.authService.RevokeToken(req.RefreshToken); err != nil {

@@ -66,13 +66,34 @@ func AuditLogger(db *gorm.DB) gin.HandlerFunc {
 			}
 		}
 
+		// Get school ID and role from context
+		var schoolID *uuid.UUID
+		if schoolIDStr := c.GetString("school_id"); schoolIDStr != "" {
+			if parsed, err := uuid.Parse(schoolIDStr); err == nil {
+				schoolID = &parsed
+			}
+		}
+		userRole := c.GetString("user_role")
+
+		// Extract class_id from request body if present
+		var classID *uuid.UUID
+		if classIDStr, ok := details["class_id"].(string); ok {
+			if parsed, err := uuid.Parse(classIDStr); err == nil {
+				classID = &parsed
+			}
+		}
+
 		log := models.AuditLog{
 			ActorUserID:  userUUID,
+			SchoolID:     schoolID,
+			UserRole:     userRole,
 			Action:       action,
 			ResourceType: entity,
 			ResourceID:   resourceID,
+			ClassID:      classID,
 			After:        models.JSONB(details),
 			IP:           c.ClientIP(),
+			UserAgent:    c.Request.UserAgent(),
 		}
 
 		db.Create(&log)

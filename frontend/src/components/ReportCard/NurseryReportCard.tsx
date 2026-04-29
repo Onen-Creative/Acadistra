@@ -145,11 +145,11 @@ export default function NurseryReportCard({
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', marginBottom: '8px' }}>
               <thead>
                 <tr style={{ background: '#f8fafc' }}>
-                  <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'left', fontWeight: '700', fontSize: '11px' }}>LEARNING AREA</th>
-                  <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'center', fontWeight: '700', width: '60px', fontSize: '11px' }}>CA</th>
-                  <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'center', fontWeight: '700', width: '60px', fontSize: '11px' }}>EXAM</th>
-                  <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'center', fontWeight: '700', width: '50px', fontSize: '11px' }}>AVG</th>
-                  <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'center', fontWeight: '700', width: '80px', fontSize: '11px' }}>REMARK</th>
+                  <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'left', fontWeight: '700', fontSize: '11px', width: '180px' }}>LEARNING AREA</th>
+                  <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'center', fontWeight: '700', width: '40px', fontSize: '11px' }}>CA</th>
+                  <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'center', fontWeight: '700', width: '45px', fontSize: '11px' }}>EXAM</th>
+                  <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'center', fontWeight: '700', width: '45px', fontSize: '11px' }}>AVG</th>
+                  <th style={{ border: '2px solid #000', padding: '6px 4px', textAlign: 'center', fontWeight: '700', width: '100px', fontSize: '11px' }}>REMARK</th>
                 </tr>
               </thead>
               <tbody>

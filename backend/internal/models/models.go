@@ -247,15 +247,22 @@ type ReportCard struct {
 
 // AuditLog tracks all data changes
 type AuditLog struct {
-	ID           uuid.UUID `gorm:"type:char(36);primaryKey" json:"id"`
-	ActorUserID  uuid.UUID `gorm:"type:char(36);index" json:"actor_user_id"`
-	Action       string    `gorm:"type:varchar(50);not null" json:"action"`
-	ResourceType string    `gorm:"type:varchar(50);not null;index" json:"resource_type"`
-	ResourceID   uuid.UUID `gorm:"type:char(36);index" json:"resource_id"`
-	Before       JSONB     `gorm:"type:json" json:"before"`
-	After        JSONB     `gorm:"type:json" json:"after"`
-	Timestamp    time.Time `gorm:"autoCreateTime;index" json:"timestamp"`
-	IP           string    `gorm:"type:varchar(45)" json:"ip"`
+	ID           uuid.UUID  `gorm:"type:char(36);primaryKey" json:"id"`
+	ActorUserID  uuid.UUID  `gorm:"type:char(36);index" json:"actor_user_id"`
+	SchoolID     *uuid.UUID `gorm:"type:char(36);index" json:"school_id,omitempty"`
+	UserRole     string     `gorm:"type:varchar(50);index" json:"user_role"`
+	Action       string     `gorm:"type:varchar(50);not null;index" json:"action"`
+	ResourceType string     `gorm:"type:varchar(50);not null;index" json:"resource_type"`
+	ResourceID   uuid.UUID  `gorm:"type:char(36);index" json:"resource_id"`
+	ClassID      *uuid.UUID `gorm:"type:char(36);index" json:"class_id,omitempty"`
+	Before       JSONB      `gorm:"type:json" json:"before"`
+	After        JSONB      `gorm:"type:json" json:"after"`
+	Timestamp    time.Time  `gorm:"autoCreateTime;index" json:"timestamp"`
+	IP           string     `gorm:"type:varchar(45)" json:"ip"`
+	UserAgent    string     `gorm:"type:text" json:"user_agent"`
+	User         *User      `gorm:"foreignKey:ActorUserID" json:"user,omitempty"`
+	School       *School    `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
+	Class        *Class     `gorm:"foreignKey:ClassID" json:"class,omitempty"`
 }
 
 func (a *AuditLog) BeforeCreate(tx *gorm.DB) error {

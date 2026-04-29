@@ -196,9 +196,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           { href: '/dashboard/system-admin', label: 'Dashboard', icon: LayoutDashboard },
           { href: '/system/schools', label: 'Schools', icon: School },
           { href: '/system/users', label: 'Users', icon: Users },
+          { href: '/system/monitoring', label: 'System Monitoring', icon: BarChart3 },
           { href: '/system/announcements', label: 'Announcements', icon: Bell },
           { href: '/system/settings', label: 'Settings', icon: Settings },
-          { href: '/system/audit-logs', label: 'Audit Logs', icon: FileText },
           { href: '/system/reports', label: 'Reports', icon: BarChart3 },
         ]
       case 'school_admin':

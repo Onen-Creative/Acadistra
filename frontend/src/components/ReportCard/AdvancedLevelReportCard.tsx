@@ -159,12 +159,12 @@ export default function AdvancedLevelReportCard({
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px', marginBottom: '8px', flex: 1 }}>
               <thead>
                 <tr style={{ background: 'white', color: '#000' }}>
-                  <th style={{ border: '1px solid #000', padding: '5px 4px', textAlign: 'left', fontWeight: '600' }}>SUBJECT</th>
-                  <th style={{ border: '1px solid #000', padding: '5px 4px', textAlign: 'center', fontWeight: '600', width: '50px' }}>P1</th>
-                  <th style={{ border: '1px solid #000', padding: '5px 4px', textAlign: 'center', fontWeight: '600', width: '50px' }}>P2</th>
-                  <th style={{ border: '1px solid #000', padding: '5px 4px', textAlign: 'center', fontWeight: '600', width: '50px' }}>P3</th>
-                  <th style={{ border: '1px solid #000', padding: '5px 4px', textAlign: 'center', fontWeight: '600', width: '50px' }}>GRADE</th>
-                  <th style={{ border: '1px solid #000', padding: '5px 4px', textAlign: 'center', fontWeight: '600', width: '85px' }}>REMARK</th>
+                  <th style={{ border: '1px solid #000', padding: '5px 4px', textAlign: 'left', fontWeight: '600', width: '180px' }}>SUBJECT</th>
+                  <th style={{ border: '1px solid #000', padding: '5px 4px', textAlign: 'center', fontWeight: '600', width: '40px' }}>P1</th>
+                  <th style={{ border: '1px solid #000', padding: '5px 4px', textAlign: 'center', fontWeight: '600', width: '40px' }}>P2</th>
+                  <th style={{ border: '1px solid #000', padding: '5px 4px', textAlign: 'center', fontWeight: '600', width: '40px' }}>P3</th>
+                  <th style={{ border: '1px solid #000', padding: '5px 4px', textAlign: 'center', fontWeight: '600', width: '45px' }}>GRADE</th>
+                  <th style={{ border: '1px solid #000', padding: '5px 4px', textAlign: 'center', fontWeight: '600', width: '100px' }}>REMARK</th>
                 </tr>
               </thead>
               <tbody>
