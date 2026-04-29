@@ -30,14 +30,23 @@ export default function AdvancedLevelReportCard({
   pageBreak = false
 }: AdvancedLevelReportCardProps) {
 
-  const getGradeComment = (grade: string) => {
+  const getGradeComment = (grade: string, isSubsidiary: boolean = false, mark: number = 0) => {
+    // For subsidiary subjects, use mark-based comments
+    if (isSubsidiary && grade === 'O') {
+      if (mark >= 80) return 'Excellent'
+      if (mark >= 70) return 'Very Good'
+      if (mark >= 60) return 'Good'
+      return 'Aim Higher'
+    }
+    
+    // For principal subjects
     if (grade === 'A') return 'Excellent'
     if (grade === 'B') return 'Very Good'
     if (grade === 'C') return 'Good'
     if (grade === 'D') return 'Satisfactory'
     if (grade === 'E') return 'Fair'
-    if (grade === 'O') return 'Pass'
-    return 'Fail'
+    if (grade === 'O') return 'Aim Higher'
+    return 'Needs Improvement'
   }
 
   const calculateTotalPoints = () => {
@@ -202,7 +211,7 @@ export default function AdvancedLevelReportCard({
                   }
                   
                   const hasMarks = p1 > 0 || p2 > 0 || p3 > 0
-                  const remark = grade ? getGradeComment(grade) : ''
+                  const remark = grade ? getGradeComment(grade, isSubsidiary, p1) : ''
                   
                   return (
                     <tr key={subject.id} style={{ background: index % 2 === 0 ? 'white' : '#f8fafc' }}>
