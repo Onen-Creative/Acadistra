@@ -127,10 +127,16 @@ func (h *ResultHandler) GetByStudent(c *gin.Context) {
 		// Only apply subsidiary grading for S5/S6 levels
 		if classLevel == "S5" || classLevel == "S6" {
 			// Check if this is a subsidiary subject
-			isSubsidiary := results[i].SubjectName == "ICT" || results[i].SubjectName == "General Paper" ||
+			isSubsidiary := results[i].SubjectName == "ICT" || 
+				results[i].SubjectName == "Information Communication Technology" ||
+				results[i].SubjectName == "General Paper" ||
+				results[i].SubjectName == "Subsidiary Mathematics" ||
 				strings.Contains(strings.ToLower(results[i].SubjectName), "ict") ||
+				strings.Contains(strings.ToLower(results[i].SubjectName), "information") ||
+				strings.Contains(strings.ToLower(results[i].SubjectName), "communication") ||
+				strings.Contains(strings.ToLower(results[i].SubjectName), "technology") ||
 				strings.Contains(strings.ToLower(results[i].SubjectName), "general paper") ||
-				strings.Contains(strings.ToLower(results[i].SubjectName), "subsidiary")
+				strings.HasPrefix(strings.ToLower(results[i].SubjectName), "subsidiary")
 			
 			if isSubsidiary {
 				// Recalculate grade for subsidiary subjects - O or F only
@@ -405,10 +411,15 @@ func (h *ResultHandler) CreateOrUpdate(c *gin.Context) {
 				} else if len(paperMarks) == 1 {
 					// Check if this is a subsidiary subject
 					isSubsidiary := standardSubject.Name == "ICT" || 
+						standardSubject.Name == "Information Communication Technology" ||
 						standardSubject.Name == "General Paper" ||
+						standardSubject.Name == "Subsidiary Mathematics" ||
 						strings.Contains(strings.ToLower(standardSubject.Name), "ict") ||
+						strings.Contains(strings.ToLower(standardSubject.Name), "information") ||
+						strings.Contains(strings.ToLower(standardSubject.Name), "communication") ||
+						strings.Contains(strings.ToLower(standardSubject.Name), "technology") ||
 						strings.Contains(strings.ToLower(standardSubject.Name), "general paper") ||
-						strings.Contains(strings.ToLower(standardSubject.Name), "subsidiary")
+						strings.HasPrefix(strings.ToLower(standardSubject.Name), "subsidiary")
 					
 					if isSubsidiary {
 						// Subsidiary subjects use O/F grading
@@ -774,10 +785,15 @@ func (h *ResultHandler) RecalculateGrades(c *gin.Context) {
 			
 			// Check if this is a subsidiary subject
 			isSubsidiary := standardSubject.Name == "ICT" || 
+				standardSubject.Name == "Information Communication Technology" ||
 				standardSubject.Name == "General Paper" ||
+				standardSubject.Name == "Subsidiary Mathematics" ||
 				strings.Contains(strings.ToLower(standardSubject.Name), "ict") ||
+				strings.Contains(strings.ToLower(standardSubject.Name), "information") ||
+				strings.Contains(strings.ToLower(standardSubject.Name), "communication") ||
+				strings.Contains(strings.ToLower(standardSubject.Name), "technology") ||
 				strings.Contains(strings.ToLower(standardSubject.Name), "general paper") ||
-				strings.Contains(strings.ToLower(standardSubject.Name), "subsidiary")
+				strings.HasPrefix(strings.ToLower(standardSubject.Name), "subsidiary")
 			
 			mark := 0.0
 			if m, ok := result.RawMarks["mark"].(float64); ok {
