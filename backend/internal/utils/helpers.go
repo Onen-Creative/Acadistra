@@ -6,11 +6,25 @@ import (
 )
 
 func Atoi(s string) int {
+	if s == "" {
+		return 0
+	}
+	
+	negative := false
+	if s[0] == '-' {
+		negative = true
+		s = s[1:]
+	}
+	
 	var i int
 	for _, c := range s {
 		if c >= '0' && c <= '9' {
 			i = i*10 + int(c-'0')
 		}
+	}
+	
+	if negative {
+		return -i
 	}
 	return i
 }

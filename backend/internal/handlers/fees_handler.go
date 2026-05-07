@@ -34,6 +34,12 @@ func (h *FeesHandler) ListStudentFees(c *gin.Context) {
 		return
 	}
 
+	// If limit is -1, fetch all records (no pagination)
+	if limit == -1 {
+		limit = 999999 // Set to a very high number
+		page = 1
+	}
+
 	fees, total, err := h.feesService.ListStudentFees(schoolID, term, yearStr, classID, search, page, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -249,4 +255,27 @@ func (h *FeesHandler) GetReportData(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, reportData)
+}
+
+func (h *FeesHandler) BulkCreateFees(c *gin.Context) {
+	schoolID := c.GetString("tenant_school_id")
+	
+	var req struct {
+		ClassID      string             `json:"class_id" binding:"required"`
+		Term         string             `json:"term" binding:"required"`
+		Year         int                `json:"year" binding:"required"`
+		FeeStructure map[string]float64 `json:"fee_structure" binding:"required"`
+	}
+	
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	
+	if err := h.feesService.BulkCreateFees(schoolID, req.ClassID, req.Term, req.Year, req.FeeStructure); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	
+	c.JSON(http.StatusOK, gin.H{"message": "Fees created successfully for all students in the class"})
 }

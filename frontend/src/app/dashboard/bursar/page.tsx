@@ -19,9 +19,10 @@ export default function BursarDashboard() {
   const loadDashboardData = async () => {
     setLoading(true)
     try {
+      // Fetch ALL fees without pagination for accurate totals
       const [feesRes, financeRes] = await Promise.all([
-        api.get('/api/v1/fees', { params: { term, year } }),
-        api.get('/api/v1/finance/summary', { params: { term, year } })
+        api.get('/api/v1/fees', { params: { term, year: year.toString(), limit: -1 } }), // -1 means no limit
+        api.get('/api/v1/finance/summary', { params: { term, year: year.toString() } })
       ])
 
       const feesData = feesRes.data?.fees || []

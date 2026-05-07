@@ -20,6 +20,7 @@ export default function FeesPage() {
   const [year, setYear] = useState(new Date().getFullYear())
   const [loading, setLoading] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showBulkModal, setShowBulkModal] = useState(false)
   const [showEditFeeModal, setShowEditFeeModal] = useState(false)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [selectedFee, setSelectedFee] = useState<any>(null)
@@ -187,6 +188,39 @@ export default function FeesPage() {
     }
   }
 
+  const handleBulkCreateFees = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    
+    const feeStructure: {[key: string]: number} = {}
+    let totalFees = 0
+    feeItems.forEach(item => {
+      if (item.category && item.amount > 0) {
+        feeStructure[item.category] = item.amount
+        totalFees += item.amount
+      }
+    })
+    
+    if (totalFees === 0) {
+      toast.error('Please add at least one fee type with amount')
+      return
+    }
+    
+    try {
+      const response = await api.post('/api/v1/fees/bulk', {
+        class_id: selectedClass,
+        term,
+        year,
+        fee_structure: feeStructure
+      })
+      toast.success(response.data.message || 'Fees created successfully for all students')
+      setShowBulkModal(false)
+      setFeeItems([{category: '', amount: 0}])
+      loadFees()
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to create bulk fees')
+    }
+  }
+
   const handleEditFee = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const feeBreakdown: {[key: string]: number} = {}
@@ -343,64 +377,65 @@ export default function FeesPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Fees Management</h1>
+      <div className="space-y-4 md:space-y-6 p-2 md:p-0">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+          <h1 className="text-xl md:text-2xl font-bold">Fees Management</h1>
           {totalFees > 0 && (
-            <div className="text-sm text-gray-600">
+            <div className="text-xs md:text-sm text-gray-600">
               Total: {totalFees} students • Showing {startFee}-{endFee}
             </div>
           )}
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
-            <select value={term} onChange={(e) => setTerm(e.target.value)} className="px-3 py-2 border rounded-lg">
+        <div className="bg-white rounded-lg shadow p-3 md:p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-2 md:gap-4">
+            <select value={term} onChange={(e) => setTerm(e.target.value)} className="px-3 py-2 border rounded-lg text-sm">
               <option value="Term 1">Term 1</option>
               <option value="Term 2">Term 2</option>
               <option value="Term 3">Term 3</option>
             </select>
-            <input type="number" value={year} onChange={(e) => setYear(Number(e.target.value))} className="px-3 py-2 border rounded-lg" />
-            <select value={selectedLevel} onChange={(e) => { setSelectedLevel(e.target.value); setSelectedClass(''); setCurrentPage(1) }} className="px-3 py-2 border rounded-lg">
+            <input type="number" value={year} onChange={(e) => setYear(Number(e.target.value))} className="px-3 py-2 border rounded-lg text-sm" />
+            <select value={selectedLevel} onChange={(e) => { setSelectedLevel(e.target.value); setSelectedClass(''); setCurrentPage(1) }} className="px-3 py-2 border rounded-lg text-sm">
               <option value="">Select Level</option>
               {levels.map(l => <option key={l} value={l}>{l}</option>)}
             </select>
-            <select value={selectedClass} onChange={(e) => { setSelectedClass(e.target.value); setCurrentPage(1) }} disabled={!selectedLevel} className="px-3 py-2 border rounded-lg disabled:opacity-50">
+            <select value={selectedClass} onChange={(e) => { setSelectedClass(e.target.value); setCurrentPage(1) }} disabled={!selectedLevel} className="px-3 py-2 border rounded-lg disabled:opacity-50 text-sm">
               <option value="">Select Class</option>
               {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-            <select value={feeTypeFilter} onChange={(e) => { setFeeTypeFilter(e.target.value); setCurrentPage(1) }} className="px-3 py-2 border rounded-lg">
+            <select value={feeTypeFilter} onChange={(e) => { setFeeTypeFilter(e.target.value); setCurrentPage(1) }} className="px-3 py-2 border rounded-lg text-sm">
               <option value="">All Fee Types</option>
               {allFeeTypes.map(type => <option key={type} value={type}>{type}</option>)}
             </select>
-            <select value={paymentStatusFilter} onChange={(e) => { setPaymentStatusFilter(e.target.value); setCurrentPage(1) }} className="px-3 py-2 border rounded-lg">
+            <select value={paymentStatusFilter} onChange={(e) => { setPaymentStatusFilter(e.target.value); setCurrentPage(1) }} className="px-3 py-2 border rounded-lg text-sm">
               <option value="">All Status</option>
               <option value="paid">Fully Paid</option>
               <option value="partial">Partially Paid</option>
               <option value="unpaid">Not Paid</option>
             </select>
-            <div className="flex gap-2">
-              <button onClick={() => setShowAddModal(true)} disabled={!selectedClass} className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg disabled:opacity-50">Add</button>
-              <button onClick={exportToExcel} disabled={!filteredFees.length} className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg disabled:opacity-50">Export</button>
+            <div className="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-1">
+              <button onClick={() => setShowAddModal(true)} disabled={!selectedClass} className="flex-1 min-w-[70px] bg-blue-600 text-white px-3 py-2 rounded-lg disabled:opacity-50 text-sm">Add</button>
+              <button onClick={() => { setShowBulkModal(true); setFeeItems([{category: '', amount: 0}]) }} disabled={!selectedClass} className="flex-1 min-w-[70px] bg-purple-600 text-white px-3 py-2 rounded-lg disabled:opacity-50 text-sm whitespace-nowrap">Bulk</button>
+              <button onClick={exportToExcel} disabled={!filteredFees.length} className="flex-1 min-w-[70px] bg-green-600 text-white px-3 py-2 rounded-lg disabled:opacity-50 text-sm">Export</button>
             </div>
           </div>
         </div>
 
         {/* Totals */}
         {selectedClass && (
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-600">{feeTypeFilter ? `${feeTypeFilter} - Expected` : 'Expected'}</p>
-              <p className="text-2xl font-bold text-blue-700">UGX {totals.expected.toLocaleString()}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 md:p-4">
+              <p className="text-xs md:text-sm text-blue-600">{feeTypeFilter ? `${feeTypeFilter} - Expected` : 'Expected'}</p>
+              <p className="text-xl md:text-2xl font-bold text-blue-700">UGX {totals.expected.toLocaleString()}</p>
             </div>
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <p className="text-sm text-green-600">{feeTypeFilter ? `${feeTypeFilter} - Collected` : 'Collected'}</p>
-              <p className="text-2xl font-bold text-green-700">UGX {totals.paid.toLocaleString()}</p>
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 md:p-4">
+              <p className="text-xs md:text-sm text-green-600">{feeTypeFilter ? `${feeTypeFilter} - Collected` : 'Collected'}</p>
+              <p className="text-xl md:text-2xl font-bold text-green-700">UGX {totals.paid.toLocaleString()}</p>
             </div>
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-sm text-red-600">{feeTypeFilter ? `${feeTypeFilter} - Outstanding` : 'Outstanding'}</p>
-              <p className="text-2xl font-bold text-red-700">UGX {totals.outstanding.toLocaleString()}</p>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 md:p-4">
+              <p className="text-xs md:text-sm text-red-600">{feeTypeFilter ? `${feeTypeFilter} - Outstanding` : 'Outstanding'}</p>
+              <p className="text-xl md:text-2xl font-bold text-red-700">UGX {totals.outstanding.toLocaleString()}</p>
             </div>
           </div>
         )}
@@ -409,163 +444,244 @@ export default function FeesPage() {
         {loading ? (
           <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>
         ) : selectedClass && filteredFees.length > 0 ? (
-          <div className="bg-white rounded-lg shadow overflow-x-auto">
-            <table className="min-w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase sticky left-0 bg-gray-50">Student</th>
-                  {/* Dynamic fee type columns - show only selected fee type or all */}
-                  {feeTypeFilter ? (
-                    <>
-                      <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                        <div>{feeTypeFilter}</div>
-                        <div className="text-[10px] font-normal text-gray-400">(Paid/Total)</div>
-                      </th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Total</th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Paid</th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Outstanding</th>
-                    </>
-                  ) : (
-                    filteredFees.length > 0 && filteredFees[0].fee_breakdown && Object.keys(filteredFees[0].fee_breakdown).map((feeType: string) => (
-                      <th key={feeType} className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                        <div>{feeType}</div>
-                        <div className="text-[10px] font-normal text-gray-400">(Paid/Total)</div>
-                      </th>
-                    ))
-                  )}
-                  {!feeTypeFilter && (
-                    <>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Total Fees</th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Total Paid</th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Outstanding</th>
-                    </>
-                  )}
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase sticky right-0 bg-gray-50">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredFees.map((fee: any) => {
-                  const feeTypes = feeTypeFilter ? [feeTypeFilter] : (fee.fee_breakdown ? Object.keys(fee.fee_breakdown) : [])
-                  return (
-                    <tr key={fee.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 sticky left-0 bg-white">
-                        <p className="font-medium text-sm whitespace-nowrap">
-                          {fee.student?.first_name}
-                          {fee.student?.middle_name && ` ${fee.student.middle_name}`}
-                          {` ${fee.student?.last_name}`}
-                        </p>
-                        <p className="text-xs text-gray-500">{fee.student?.admission_no}</p>
-                      </td>
-                      {/* Dynamic fee type values */}
-                      {feeTypes.map((feeType: string) => {
-                        const total = fee.fee_breakdown?.[feeType] || 0
-                        const paid = fee.paid_breakdown?.[feeType] || 0
-                        const outstanding = total - paid
-                        return (
-                          <td key={feeType} className="px-3 py-3 text-center">
-                            <div className="text-xs">
-                              <span className={paid > 0 ? 'text-green-600 font-semibold' : 'text-gray-400'}>
-                                {paid.toLocaleString()}
-                              </span>
-                              <span className="text-gray-400 mx-1">/</span>
-                              <span className="font-medium">{total.toLocaleString()}</span>
-                            </div>
-                            {outstanding > 0 && (
-                              <div className="text-[10px] text-red-600 font-medium">
-                                -{outstanding.toLocaleString()}
+          <>
+            {/* Desktop Table */}
+            <div className="hidden lg:block bg-white rounded-lg shadow overflow-x-auto">
+              <table className="min-w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase sticky left-0 bg-gray-50">Student</th>
+                    {/* Dynamic fee type columns - show only selected fee type or all */}
+                    {feeTypeFilter ? (
+                      <>
+                        <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                          <div>{feeTypeFilter}</div>
+                          <div className="text-[10px] font-normal text-gray-400">(Paid/Total)</div>
+                        </th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Total</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Paid</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Outstanding</th>
+                      </>
+                    ) : (
+                      filteredFees.length > 0 && filteredFees[0].fee_breakdown && Object.keys(filteredFees[0].fee_breakdown).map((feeType: string) => (
+                        <th key={feeType} className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                          <div>{feeType}</div>
+                          <div className="text-[10px] font-normal text-gray-400">(Paid/Total)</div>
+                        </th>
+                      ))
+                    )}
+                    {!feeTypeFilter && (
+                      <>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Total Fees</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Total Paid</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Outstanding</th>
+                      </>
+                    )}
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase sticky right-0 bg-gray-50">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {filteredFees.map((fee: any) => {
+                    const feeTypes = feeTypeFilter ? [feeTypeFilter] : (fee.fee_breakdown ? Object.keys(fee.fee_breakdown) : [])
+                    return (
+                      <tr key={fee.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 sticky left-0 bg-white">
+                          <p className="font-medium text-sm whitespace-nowrap">
+                            {fee.student?.first_name}
+                            {fee.student?.middle_name && ` ${fee.student.middle_name}`}
+                            {` ${fee.student?.last_name}`}
+                          </p>
+                          <p className="text-xs text-gray-500">{fee.student?.admission_no}</p>
+                        </td>
+                        {/* Dynamic fee type values */}
+                        {feeTypes.map((feeType: string) => {
+                          const total = fee.fee_breakdown?.[feeType] || 0
+                          const paid = fee.paid_breakdown?.[feeType] || 0
+                          const outstanding = total - paid
+                          return (
+                            <td key={feeType} className="px-3 py-3 text-center">
+                              <div className="text-xs">
+                                <span className={paid > 0 ? 'text-green-600 font-semibold' : 'text-gray-400'}>
+                                  {paid.toLocaleString()}
+                                </span>
+                                <span className="text-gray-400 mx-1">/</span>
+                                <span className="font-medium">{total.toLocaleString()}</span>
                               </div>
-                            )}
-                          </td>
-                        )
-                      })}
-                      {feeTypeFilter ? (
-                        <>
-                          <td className="px-4 py-3 text-center font-semibold text-sm">UGX {(fee.fee_breakdown?.[feeTypeFilter] || 0).toLocaleString()}</td>
-                          <td className="px-4 py-3 text-center font-semibold text-green-600 text-sm">UGX {(fee.paid_breakdown?.[feeTypeFilter] || 0).toLocaleString()}</td>
-                          <td className="px-4 py-3 text-center font-semibold text-red-600 text-sm">UGX {((fee.fee_breakdown?.[feeTypeFilter] || 0) - (fee.paid_breakdown?.[feeTypeFilter] || 0)).toLocaleString()}</td>
-                        </>
-                      ) : (
-                        <>
-                          <td className="px-4 py-3 text-center font-semibold text-sm">UGX {fee.total_fees?.toLocaleString()}</td>
-                          <td className="px-4 py-3 text-center font-semibold text-green-600 text-sm">UGX {fee.amount_paid?.toLocaleString()}</td>
-                          <td className="px-4 py-3 text-center font-semibold text-red-600 text-sm">UGX {fee.outstanding?.toLocaleString()}</td>
-                        </>
-                      )}
-                      <td className="px-4 py-3 text-center sticky right-0 bg-white">
-                        <div className="flex justify-center gap-2 flex-wrap">
-                          <button onClick={() => { setSelectedFeeDetails(fee); setShowDetailsModal(true) }} className="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600 whitespace-nowrap">Details</button>
-                          <button onClick={() => { 
-                            setSelectedFee(fee);
-                            setFeeItems(Object.entries(fee.fee_breakdown || {}).map(([category, amount]: [string, any]) => ({ category, amount })));
-                            setShowEditFeeModal(true);
-                          }} className="bg-yellow-500 text-white px-3 py-1 rounded text-xs hover:bg-yellow-600 whitespace-nowrap">✏️ Edit</button>
-                          <button onClick={() => { 
-                            setSelectedFee(fee)
-                            // Auto-load payment items with fee breakdown
-                            if (fee.fee_breakdown) {
-                              const items = Object.entries(fee.fee_breakdown).map(([category, total]: [string, any]) => {
-                                const paid = fee.paid_breakdown?.[category] || 0
-                                const outstanding = total - paid
-                                return { category, amount: 0, max: outstanding }
-                              })
-                              setPaymentItems(items)
-                            } else {
-                              setPaymentItems([])
-                            }
-                            setShowPaymentModal(true)
-                          }} className="bg-green-500 text-white px-3 py-1 rounded text-xs hover:bg-green-600 whitespace-nowrap">Pay</button>
-                          {fee.payments && fee.payments.length > 0 && (
-                            <button 
-                              onClick={() => {
-                                const lastPayment = fee.payments[0]
-                                setReceiptData({
-                                  payment: lastPayment,
-                                  studentFees: { ...fee, student: fee.student }
+                              {outstanding > 0 && (
+                                <div className="text-[10px] text-red-600 font-medium">
+                                  -{outstanding.toLocaleString()}
+                                </div>
+                              )}
+                            </td>
+                          )
+                        })}
+                        {feeTypeFilter ? (
+                          <>
+                            <td className="px-4 py-3 text-center font-semibold text-sm">UGX {(fee.fee_breakdown?.[feeTypeFilter] || 0).toLocaleString()}</td>
+                            <td className="px-4 py-3 text-center font-semibold text-green-600 text-sm">UGX {(fee.paid_breakdown?.[feeTypeFilter] || 0).toLocaleString()}</td>
+                            <td className="px-4 py-3 text-center font-semibold text-red-600 text-sm">UGX {((fee.fee_breakdown?.[feeTypeFilter] || 0) - (fee.paid_breakdown?.[feeTypeFilter] || 0)).toLocaleString()}</td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="px-4 py-3 text-center font-semibold text-sm">UGX {fee.total_fees?.toLocaleString()}</td>
+                            <td className="px-4 py-3 text-center font-semibold text-green-600 text-sm">UGX {fee.amount_paid?.toLocaleString()}</td>
+                            <td className="px-4 py-3 text-center font-semibold text-red-600 text-sm">UGX {fee.outstanding?.toLocaleString()}</td>
+                          </>
+                        )}
+                        <td className="px-4 py-3 text-center sticky right-0 bg-white">
+                          <div className="flex justify-center gap-2 flex-wrap">
+                            <button onClick={() => { setSelectedFeeDetails(fee); setShowDetailsModal(true) }} className="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600 whitespace-nowrap">Details</button>
+                            <button onClick={() => { 
+                              setSelectedFee(fee);
+                              setFeeItems(Object.entries(fee.fee_breakdown || {}).map(([category, amount]: [string, any]) => ({ category, amount })));
+                              setShowEditFeeModal(true);
+                            }} className="bg-yellow-500 text-white px-3 py-1 rounded text-xs hover:bg-yellow-600 whitespace-nowrap">✏️ Edit</button>
+                            <button onClick={() => { 
+                              setSelectedFee(fee)
+                              // Auto-load payment items with fee breakdown
+                              if (fee.fee_breakdown) {
+                                const items = Object.entries(fee.fee_breakdown).map(([category, total]: [string, any]) => {
+                                  const paid = fee.paid_breakdown?.[category] || 0
+                                  const outstanding = total - paid
+                                  return { category, amount: 0, max: outstanding }
                                 })
-                                setShowReceipt(true)
-                              }}
-                              className="bg-purple-500 text-white px-3 py-1 rounded text-xs hover:bg-purple-600 whitespace-nowrap"
-                            >
-                              Receipt
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-            
+                                setPaymentItems(items)
+                              } else {
+                                setPaymentItems([])
+                              }
+                              setShowPaymentModal(true)
+                            }} className="bg-green-500 text-white px-3 py-1 rounded text-xs hover:bg-green-600 whitespace-nowrap">Pay</button>
+                            {fee.payments && fee.payments.length > 0 && (
+                              <button 
+                                onClick={() => {
+                                  const lastPayment = fee.payments[0]
+                                  setReceiptData({
+                                    payment: lastPayment,
+                                    studentFees: { ...fee, student: fee.student }
+                                  })
+                                  setShowReceipt(true)
+                                }}
+                                className="bg-purple-500 text-white px-3 py-1 rounded text-xs hover:bg-purple-600 whitespace-nowrap"
+                              >
+                                Receipt
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="lg:hidden space-y-3">
+              {filteredFees.map((fee: any) => (
+                <div key={fee.id} className="bg-white rounded-lg shadow p-4 space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-semibold text-sm">
+                        {fee.student?.first_name}
+                        {fee.student?.middle_name && ` ${fee.student.middle_name}`}
+                        {` ${fee.student?.last_name}`}
+                      </p>
+                      <p className="text-xs text-gray-500">{fee.student?.admission_no}</p>
+                    </div>
+                    <span className={`text-xs px-2 py-1 rounded-full ${
+                      fee.outstanding === 0 ? 'bg-green-100 text-green-700' :
+                      fee.amount_paid > 0 ? 'bg-yellow-100 text-yellow-700' :
+                      'bg-red-100 text-red-700'
+                    }`}>
+                      {fee.outstanding === 0 ? 'Paid' : fee.amount_paid > 0 ? 'Partial' : 'Unpaid'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="bg-blue-50 rounded p-2">
+                      <p className="text-[10px] text-blue-600 font-medium">Total</p>
+                      <p className="text-xs font-bold text-blue-700">{fee.total_fees?.toLocaleString()}</p>
+                    </div>
+                    <div className="bg-green-50 rounded p-2">
+                      <p className="text-[10px] text-green-600 font-medium">Paid</p>
+                      <p className="text-xs font-bold text-green-700">{fee.amount_paid?.toLocaleString()}</p>
+                    </div>
+                    <div className="bg-red-50 rounded p-2">
+                      <p className="text-[10px] text-red-600 font-medium">Balance</p>
+                      <p className="text-xs font-bold text-red-700">{fee.outstanding?.toLocaleString()}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => { setSelectedFeeDetails(fee); setShowDetailsModal(true) }} 
+                      className="flex-1 bg-blue-500 text-white px-3 py-2 rounded text-xs hover:bg-blue-600"
+                    >
+                      Details
+                    </button>
+                    <button 
+                      onClick={() => { 
+                        setSelectedFee(fee);
+                        setFeeItems(Object.entries(fee.fee_breakdown || {}).map(([category, amount]: [string, any]) => ({ category, amount })));
+                        setShowEditFeeModal(true);
+                      }} 
+                      className="flex-1 bg-yellow-500 text-white px-3 py-2 rounded text-xs hover:bg-yellow-600"
+                    >
+                      Edit
+                    </button>
+                    <button 
+                      onClick={() => { 
+                        setSelectedFee(fee)
+                        if (fee.fee_breakdown) {
+                          const items = Object.entries(fee.fee_breakdown).map(([category, total]: [string, any]) => {
+                            const paid = fee.paid_breakdown?.[category] || 0
+                            const outstanding = total - paid
+                            return { category, amount: 0, max: outstanding }
+                          })
+                          setPaymentItems(items)
+                        } else {
+                          setPaymentItems([])
+                        }
+                        setShowPaymentModal(true)
+                      }} 
+                      className="flex-1 bg-green-500 text-white px-3 py-2 rounded text-xs hover:bg-green-600"
+                    >
+                      Pay
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
             {/* Pagination */}
             {totalFees > 10 && (
-              <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-200 px-4">
-                <div className="text-sm text-gray-600">
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mt-4 pt-4 border-t border-gray-200 px-2">
+                <div className="text-xs md:text-sm text-gray-600">
                   Page {currentPage} of {totalPages}
                 </div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                     disabled={currentPage === 1}
-                    className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 py-2 text-xs md:text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Previous
                   </button>
                   <button
                     onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                     disabled={currentPage === totalPages}
-                    className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 py-2 text-xs md:text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Next
                   </button>
                 </div>
               </div>
             )}
-          </div>
+          </>
         ) : selectedClass ? (
-          <div className="bg-white rounded-lg shadow p-12 text-center text-gray-500">No fees records found</div>
+          <div className="bg-white rounded-lg shadow p-8 md:p-12 text-center text-gray-500">No fees records found</div>
         ) : (
-          <div className="bg-white rounded-lg shadow p-12 text-center text-gray-500">Select a class to view fees</div>
+          <div className="bg-white rounded-lg shadow p-8 md:p-12 text-center text-gray-500">Select a class to view fees</div>
         )}
 
         {/* Add Modal */}
@@ -655,6 +771,108 @@ export default function FeesPage() {
                 <div className="flex gap-3">
                   <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Create Fees Record</button>
                   <button type="button" onClick={() => { setShowAddModal(false); setFeeItems([{category: '', amount: 0}]) }} className="flex-1 bg-gray-300 py-2 rounded-lg hover:bg-gray-400">Cancel</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Bulk Create Modal */}
+        {showBulkModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+              <h3 className="text-lg font-bold mb-4">Bulk Create Fees for All Students</h3>
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>Class:</strong> {classes.find(c => c.id === selectedClass)?.name}
+                </p>
+                <p className="text-sm text-blue-800">
+                  <strong>Term:</strong> {term} {year}
+                </p>
+                <p className="text-sm text-blue-800">
+                  <strong>Students:</strong> {students.length} students will get these fees
+                </p>
+              </div>
+              
+              <form onSubmit={handleBulkCreateFees} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Fee Structure (Same for all students)</label>
+                  <div className="space-y-3">
+                    {feeItems.map((item, index) => (
+                      <div key={index} className="flex gap-2 items-center">
+                        <select
+                          value={item.category}
+                          onChange={(e) => {
+                            const newItems = [...feeItems]
+                            newItems[index].category = e.target.value
+                            setFeeItems(newItems)
+                          }}
+                          className="flex-1 border rounded-lg px-3 py-2"
+                          required
+                          disabled={loadingFeeTypes}
+                        >
+                          <option value="">{loadingFeeTypes ? 'Loading fee types...' : 'Select fee type'}</option>
+                          {standardFeeTypes.map(feeType => (
+                            <option key={feeType.code} value={feeType.name}>
+                              {feeType.name}
+                              {feeType.description && ` - ${feeType.description}`}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="number"
+                          placeholder="Amount"
+                          value={item.amount || ''}
+                          onChange={(e) => {
+                            const newItems = [...feeItems]
+                            newItems[index].amount = parseFloat(e.target.value) || 0
+                            setFeeItems(newItems)
+                          }}
+                          className="w-40 border rounded-lg px-3 py-2"
+                          required
+                          min="0"
+                        />
+                        {feeItems.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setFeeItems(feeItems.filter((_, i) => i !== index))}
+                            className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setFeeItems([...feeItems, {category: '', amount: 0}])}
+                      className="text-blue-600 text-sm font-medium hover:text-blue-700"
+                    >
+                      + Add Another Fee Type
+                    </button>
+                  </div>
+                  <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm font-medium text-gray-700">Total Fees per Student:</span>
+                      <span className="text-2xl font-bold text-purple-600">UGX {feeItems.reduce((sum, item) => sum + (item.amount || 0), 0).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm text-gray-600">
+                      <span>Total for {students.length} students:</span>
+                      <span className="font-semibold">UGX {(feeItems.reduce((sum, item) => sum + (item.amount || 0), 0) * students.length).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <p className="text-sm text-yellow-800">
+                    ⚠️ <strong>Warning:</strong> This will create fee records for all {students.length} students in this class. 
+                    Students who already have fees for {term} {year} will be skipped.
+                  </p>
+                </div>
+                
+                <div className="flex gap-3">
+                  <button type="submit" className="flex-1 bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 font-semibold">Create Fees for All Students</button>
+                  <button type="button" onClick={() => { setShowBulkModal(false); setFeeItems([{category: '', amount: 0}]) }} className="flex-1 bg-gray-300 py-2 rounded-lg hover:bg-gray-400">Cancel</button>
                 </div>
               </form>
             </div>

@@ -265,9 +265,6 @@ export default function PaymentReceipt({ payment, studentFees, onClose }: Paymen
             <p style={{ fontSize: '12px', color: '#333', fontWeight: '600', margin: 0 }}>
               This is an official receipt. Please retain for your records.
             </p>
-            <p style={{ fontSize: '11px', color: '#666', marginTop: '6px' }}>
-              Generated: {new Date().toLocaleString('en-GB')}
-            </p>
           </div>
         </div>
       </div>
@@ -277,6 +274,10 @@ export default function PaymentReceipt({ payment, studentFees, onClose }: Paymen
           @page { 
             margin: 0.5in; 
             size: A4 portrait; 
+          }
+          html, body {
+            height: auto !important;
+            overflow: visible !important;
           }
           body * { 
             visibility: hidden !important; 
@@ -290,7 +291,8 @@ export default function PaymentReceipt({ payment, studentFees, onClose }: Paymen
             left: 0 !important;
             top: 0 !important;
             width: 100% !important;
-            padding: 0 !important;
+            padding: 20px !important;
+            margin: 0 !important;
           }
           .no-print { 
             display: none !important; 

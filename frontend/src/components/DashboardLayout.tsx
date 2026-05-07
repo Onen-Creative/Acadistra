@@ -250,6 +250,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         return [
           { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
           { href: '/fees', label: 'Fee Management', icon: DollarSign },
+          { href: '/payroll', label: 'Payroll', icon: DollarSign },
           { href: '/finance', label: 'Finance', icon: DollarSign },
           { href: '/finance/budget', label: 'Budget', icon: DollarSign },
           { href: '/finance/requisitions', label: 'Requisitions', icon: ClipboardList },

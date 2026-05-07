@@ -26,9 +26,9 @@ export default function SchoolAdminDashboard() {
         api.get('/api/v1/students', { params: { limit: -1 } }),
         api.get('/api/v1/staff'),
         api.get('/api/v1/classes'),
-        api.get('/api/v1/fees', { params: { term, year } }),
+        api.get('/api/v1/fees', { params: { term, year: year.toString(), limit: -1 } }), // Fetch ALL fees without pagination
         api.get('/api/v1/attendance/stats', { params: { period: 'today' } }).catch(() => ({ data: { present: 0, total_days: 0, percentage: 0 } })),
-        api.get('/api/v1/finance/summary', { params: { term, year } })
+        api.get('/api/v1/finance/summary', { params: { term, year: year.toString() } })
       ])
 
       const students = Array.isArray(studentsRes.data?.students) ? studentsRes.data.students : []
