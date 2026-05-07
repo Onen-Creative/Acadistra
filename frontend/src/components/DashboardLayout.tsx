@@ -211,6 +211,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           { href: '/report-cards', label: 'Report Cards', icon: FileText },
           { href: '/attendance', label: 'Attendance', icon: Calendar },
           { href: '/lessons', label: 'Lesson Monitoring', icon: BookOpen },
+          { href: '/library', label: 'Library', icon: Library },
+          { href: '/clinic', label: 'Clinic', icon: Stethoscope },
           { href: '/inventory', label: 'Inventory', icon: Package },
           { href: '/reports', label: 'Reports', icon: BarChart3 },
           { href: '/analytics', label: 'Performance Analytics', icon: BarChart3 },
@@ -218,6 +220,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           { href: '/finance', label: 'Finance', icon: DollarSign },
           { href: '/finance/budget', label: 'Budget', icon: DollarSign },
           { href: '/finance/requisitions', label: 'Requisitions', icon: ClipboardList },
+          { href: '/finance/schoolpay', label: 'SchoolPay', icon: DollarSign },
+          { href: '/sms', label: 'SMS Management', icon: Bell },
           { href: '/announcements', label: 'Announcements', icon: Bell },
           { href: '/settings', label: 'Settings', icon: Settings },
         ]
@@ -249,6 +253,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           { href: '/finance', label: 'Finance', icon: DollarSign },
           { href: '/finance/budget', label: 'Budget', icon: DollarSign },
           { href: '/finance/requisitions', label: 'Requisitions', icon: ClipboardList },
+          { href: '/finance/schoolpay', label: 'SchoolPay', icon: DollarSign },
+          { href: '/sms', label: 'SMS Management', icon: Bell },
           { href: '/reports/financial', label: 'Financial Reports', icon: BarChart3 },
         ]
       case 'librarian':

@@ -54,7 +54,7 @@ export default function SchoolsPage() {
 
   const handleToggleActive = async (id: string, isActive: boolean) => {
     try {
-      await schoolsApi.toggleActive(id, !isActive)
+      await schoolsApi.toggleActive(id)
       notifications.show({ title: 'Success', message: 'School status updated', color: 'green' })
       loadSchools()
     } catch (error) {

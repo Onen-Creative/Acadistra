@@ -2,31 +2,23 @@ package handlers
 
 import (
 	"fmt"
-	"log"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/school-system/backend/internal/models"
 	"github.com/school-system/backend/internal/services"
 	"github.com/school-system/backend/internal/utils"
 	ws "github.com/school-system/backend/internal/websocket"
-	"gorm.io/gorm"
 )
 
 type RegistrationHandler struct {
-	db           *gorm.DB
-	emailService *services.EmailService
+	service *services.RegistrationService
 }
 
-func NewRegistrationHandler(db *gorm.DB, emailService *services.EmailService) *RegistrationHandler {
-	return &RegistrationHandler{
-		db:           db,
-		emailService: emailService,
-	}
+func NewRegistrationHandler(service *services.RegistrationService) *RegistrationHandler {
+	return &RegistrationHandler{service: service}
 }
 
 type GuardianInput struct {
@@ -46,38 +38,30 @@ type GuardianInput struct {
 }
 
 type ComprehensiveRegistrationRequest struct {
-	// Student Basic Info
-	FirstName   string `json:"first_name" binding:"required"`
-	MiddleName  string `json:"middle_name"`
-	LastName    string `json:"last_name" binding:"required"`
-	DateOfBirth string `json:"date_of_birth"`
-	Gender      string `json:"gender" binding:"required"`
-	Nationality string `json:"nationality"`
-	Religion    string `json:"religion"`
-	LIN         string `json:"lin"`
-
-	// Contact Info
-	Email   string `json:"email"`
-	Phone   string `json:"phone"`
-	Address string `json:"address"`
-	District string `json:"district"`
-	Village string `json:"village"`
-
-	// Academic Info
-	ClassLevel     string `json:"class_level" binding:"required"`
-	ClassID        string `json:"class_id"`
-	Term           string `json:"term" binding:"required"`
-	Year           int    `json:"year" binding:"required"`
-	ResidenceType  string `json:"residence_type"`
-	PreviousSchool string `json:"previous_school"`
-	PreviousClass  string `json:"previous_class"`
-
-	// Special Needs
-	SpecialNeeds     string `json:"special_needs"`
-	DisabilityStatus string `json:"disability_status"`
-
-	// Guardians (at least one required)
-	Guardians []GuardianInput `json:"guardians" binding:"required,min=1"`
+	FirstName        string          `json:"first_name" binding:"required"`
+	MiddleName       string          `json:"middle_name"`
+	LastName         string          `json:"last_name" binding:"required"`
+	DateOfBirth      string          `json:"date_of_birth"`
+	Gender           string          `json:"gender" binding:"required"`
+	Nationality      string          `json:"nationality"`
+	Religion         string          `json:"religion"`
+	LIN              string          `json:"lin"`
+	SchoolPayCode    string          `json:"schoolpay_code"`
+	Email            string          `json:"email"`
+	Phone            string          `json:"phone"`
+	Address          string          `json:"address"`
+	District         string          `json:"district"`
+	Village          string          `json:"village"`
+	ClassLevel       string          `json:"class_level" binding:"required"`
+	ClassID          string          `json:"class_id"`
+	Term             string          `json:"term" binding:"required"`
+	Year             int             `json:"year" binding:"required"`
+	ResidenceType    string          `json:"residence_type"`
+	PreviousSchool   string          `json:"previous_school"`
+	PreviousClass    string          `json:"previous_class"`
+	SpecialNeeds     string          `json:"special_needs"`
+	DisabilityStatus string          `json:"disability_status"`
+	Guardians        []GuardianInput `json:"guardians" binding:"required,min=1"`
 }
 
 func (h *RegistrationHandler) RegisterStudent(c *gin.Context) {
@@ -89,12 +73,6 @@ func (h *RegistrationHandler) RegisterStudent(c *gin.Context) {
 	}
 
 	// Validate guardians
-	if len(req.Guardians) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "At least one guardian is required"})
-		return
-	}
-
-	// Validate guardian data
 	for i, g := range req.Guardians {
 		if err := utils.ValidateGuardianRelationship(g.Relationship); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Guardian %d: %s", i+1, err.Error())})
@@ -122,119 +100,24 @@ func (h *RegistrationHandler) RegisterStudent(c *gin.Context) {
 		return
 	}
 
-	// Get school
-	userRole := c.GetString("user_role")
-	var school models.School
-	if userRole != "system_admin" {
-		tenantSchoolID := c.GetString("tenant_school_id")
-		if tenantSchoolID == "" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "No school assigned to user"})
-			return
-		}
-		if err := h.db.First(&school, "id = ?", tenantSchoolID).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "School not found"})
-			return
-		}
-	} else {
-		var class models.Class
-		if err := h.db.Preload("School").Where("level = ? AND term = ? AND year = ?", req.ClassLevel, req.Term, req.Year).First(&class).Error; err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Class not found"})
-			return
-		}
-		school = *class.School
+	// Get school ID
+	tenantSchoolID := c.GetString("tenant_school_id")
+	if tenantSchoolID == "" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "No school assigned to user"})
+		return
 	}
+	schoolID, _ := uuid.Parse(tenantSchoolID)
 
-	// Find or create class
-	var class models.Class
+	// Parse class ID if provided
+	var classID *uuid.UUID
 	if req.ClassID != "" {
-		// Use provided class_id
-		if err := h.db.Where("id = ? AND school_id = ?", req.ClassID, school.ID).First(&class).Error; err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Class not found"})
+		parsedClassID, err := uuid.Parse(req.ClassID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid class_id"})
 			return
 		}
-	} else {
-		// Find or create class by level
-		if err := h.db.Where("school_id = ? AND level = ? AND term = ? AND year = ?", school.ID, req.ClassLevel, req.Term, req.Year).First(&class).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				class = models.Class{
-					SchoolID: school.ID,
-					Name:     req.ClassLevel,
-					Level:    req.ClassLevel,
-					Year:     req.Year,
-					Term:     req.Term,
-				}
-				if err := h.db.Create(&class).Error; err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create class: " + err.Error()})
-					return
-				}
-			} else {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error: " + err.Error()})
-				return
-			}
-		}
+		classID = &parsedClassID
 	}
-
-	// Start transaction
-	tx := h.db.Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
-
-	// Generate admission number using first letters of school name
-	var schoolInitials string
-	for _, word := range strings.Fields(school.Name) {
-		if len(word) > 0 {
-			schoolInitials += strings.ToUpper(string(word[0]))
-		}
-	}
-
-	// Find last admission number (excluding soft-deleted)
-	var lastStudent models.Student
-	var sequence int = 0
-	pattern := fmt.Sprintf("%s/%s/%d/%%", schoolInitials, class.Name, req.Year)
-	if err := tx.Where("school_id = ? AND admission_no LIKE ?", school.ID, pattern).
-		Order("admission_no DESC").First(&lastStudent).Error; err == nil {
-		parts := strings.Split(lastStudent.AdmissionNo, "/")
-		if len(parts) == 4 {
-			if num, err := strconv.Atoi(parts[3]); err == nil {
-				sequence = num
-			}
-		}
-	}
-	sequence++
-	admissionNo := fmt.Sprintf("%s/%s/%d/%03d", schoolInitials, class.Name, req.Year, sequence)
-	
-	// Check if admission number already exists (including soft-deleted records)
-	var existingStudent models.Student
-	if err := tx.Unscoped().Where("school_id = ? AND admission_no = ?", school.ID, admissionNo).First(&existingStudent).Error; err == nil {
-		// Admission number exists (even if soft-deleted), try next sequence
-		for i := 0; i < 100; i++ { // Try up to 100 times
-			sequence++
-			admissionNo = fmt.Sprintf("%s/%s/%d/%03d", schoolInitials, class.Name, req.Year, sequence)
-			if err := tx.Unscoped().Where("school_id = ? AND admission_no = ?", school.ID, admissionNo).First(&existingStudent).Error; err != nil {
-				// Found available admission number
-				break
-			}
-			if i == 99 {
-				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Unable to generate unique admission number after 100 attempts"})
-				return
-			}
-		}
-	}
-
-	// Set defaults
-	nationality := req.Nationality
-	if nationality == "" {
-		nationality = "Ugandan"
-	}
-	residenceType := req.ResidenceType
-	if residenceType == "" {
-		residenceType = "Day"
-	}
-	admissionDate := time.Now()
 
 	// Parse date of birth
 	var dateOfBirth *time.Time
@@ -245,59 +128,10 @@ func (h *RegistrationHandler) RegisterStudent(c *gin.Context) {
 		}
 	}
 
-	// Create student
-	student := models.Student{
-		SchoolID:         school.ID,
-		AdmissionNo:      admissionNo,
-		LIN:              req.LIN,
-		FirstName:        strings.Title(strings.ToLower(utils.NormalizeText(req.FirstName))),
-		MiddleName:       strings.Title(strings.ToLower(utils.NormalizeText(req.MiddleName))),
-		LastName:         strings.Title(strings.ToLower(utils.NormalizeText(req.LastName))),
-		DateOfBirth:      dateOfBirth,
-		Gender:           strings.Title(strings.ToLower(req.Gender)),
-		Nationality:      nationality,
-		Religion:         req.Religion,
-		Email:            req.Email,
-		Phone:            req.Phone,
-		Address:          req.Address,
-		District:         req.District,
-		Village:          req.Village,
-		ResidenceType:    residenceType,
-		AdmissionDate:    &admissionDate,
-		Status:           "active",
-		PreviousSchool:   req.PreviousSchool,
-		PreviousClass:    req.PreviousClass,
-		SpecialNeeds:     req.SpecialNeeds,
-		DisabilityStatus: req.DisabilityStatus,
-	}
-
-	if err := tx.Create(&student).Error; err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create student: " + err.Error()})
-		return
-	}
-
-	// Create enrollment
-	enrollment := models.Enrollment{
-		StudentID:  student.ID,
-		ClassID:    class.ID,
-		Year:       req.Year,
-		Term:       req.Term,
-		Status:     "active",
-		EnrolledOn: time.Now(),
-	}
-	if err := tx.Create(&enrollment).Error; err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create enrollment: " + err.Error()})
-		return
-	}
-
-	// Create guardians
-	var createdGuardians []models.Guardian
+	// Convert guardians
+	var guardians []services.GuardianInput
 	for _, g := range req.Guardians {
-		guardian := models.Guardian{
-			StudentID:        student.ID,
-			SchoolID:         school.ID,
+		guardians = append(guardians, services.GuardianInput{
 			Relationship:     g.Relationship,
 			FullName:         g.FullName,
 			Phone:            g.Phone,
@@ -311,41 +145,51 @@ func (h *RegistrationHandler) RegisterStudent(c *gin.Context) {
 			IsEmergency:      g.IsEmergency,
 			IsFeePayer:       g.IsFeePayer,
 			NationalID:       g.NationalID,
-		}
-		if err := tx.Create(&guardian).Error; err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create guardian: " + err.Error()})
-			return
-		}
-		createdGuardians = append(createdGuardians, guardian)
+		})
 	}
 
-	// Commit transaction
-	if err := tx.Commit().Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to complete registration: " + err.Error()})
+	// Create service request
+	svcReq := &services.RegistrationRequest{
+		FirstName:        strings.Title(strings.ToLower(utils.NormalizeText(req.FirstName))),
+		MiddleName:       strings.Title(strings.ToLower(utils.NormalizeText(req.MiddleName))),
+		LastName:         strings.Title(strings.ToLower(utils.NormalizeText(req.LastName))),
+		DateOfBirth:      dateOfBirth,
+		Gender:           strings.Title(strings.ToLower(req.Gender)),
+		Nationality:      req.Nationality,
+		Religion:         req.Religion,
+		LIN:              req.LIN,
+		SchoolPayCode:    req.SchoolPayCode,
+		Email:            req.Email,
+		Phone:            req.Phone,
+		Address:          req.Address,
+		District:         req.District,
+		Village:          req.Village,
+		ClassLevel:       req.ClassLevel,
+		ClassID:          req.ClassID,
+		Term:             req.Term,
+		Year:             req.Year,
+		ResidenceType:    req.ResidenceType,
+		PreviousSchool:   req.PreviousSchool,
+		PreviousClass:    req.PreviousClass,
+		SpecialNeeds:     req.SpecialNeeds,
+		DisabilityStatus: req.DisabilityStatus,
+		Guardians:        guardians,
+	}
+
+	// Register student
+	result, err := h.service.RegisterStudentComprehensive(schoolID, classID, svcReq)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	ws.GlobalHub.Broadcast("student:registered", student, school.ID.String())
-	
-	// Send registration confirmation email to guardians
-	go func(studentID uuid.UUID, studentName, admissionNo, schoolName string) {
-		var guardians []models.Guardian
-		h.db.Where("student_id = ?", studentID).Find(&guardians)
-		
-		for _, guardian := range guardians {
-			if guardian.Email != "" {
-				if err := h.emailService.SendRegistrationConfirmation(guardian.Email, studentName, admissionNo, schoolName); err != nil {
-					log.Printf("Failed to send registration confirmation: %v", err)
-				}
-			}
-		}
-	}(student.ID, fmt.Sprintf("%s %s", student.FirstName, student.LastName), student.AdmissionNo, school.Name)
-	
+	// Broadcast WebSocket event
+	ws.GlobalHub.Broadcast("student:registered", result.Student, schoolID.String())
+
 	c.JSON(http.StatusCreated, gin.H{
 		"message":   "Student registered successfully",
-		"student":   student,
-		"guardians": createdGuardians,
-		"class":     class,
+		"student":   result.Student,
+		"guardians": result.Guardians,
+		"class":     result.Class,
 	})
 }

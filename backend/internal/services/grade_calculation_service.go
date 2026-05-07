@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/google/uuid"
 	"github.com/school-system/backend/internal/grading"
@@ -33,11 +34,12 @@ func (s *GradeCalculationService) CalculateGradeForResult(
 	
 	switch level {
 	case "S1", "S2", "S3", "S4":
-		// NCDC: Always fetch AOI marks from integration_activities
+		// NCDC (O-Level): Always fetch AOI marks from integration_activities
 		aoiCA := s.getAOIMarks(studentID, subjectID, term, year)
 		rawMarks["ca"] = aoiCA
 		rawMarks["total"] = aoiCA + examMark
 		
+		// Use standard NCDC grader from grading package
 		grader := &grading.NCDCGrader{}
 		gradeResult := grader.ComputeGrade(aoiCA, examMark, 20, 80)
 		return gradeResult, rawMarks, nil
@@ -51,6 +53,7 @@ func (s *GradeCalculationService) CalculateGradeForResult(
 		rawMarks["ca"] = ca
 		rawMarks["total"] = ca + examMark
 		
+		// Use standard Primary grader from grading package
 		grader := &grading.PrimaryGrader{}
 		gradeResult := grader.ComputeGrade(ca, examMark, 40, 60)
 		return gradeResult, rawMarks, nil
@@ -65,21 +68,71 @@ func (s *GradeCalculationService) CalculateGradeForResult(
 		avg := (ca + examMark) / 2
 		rawMarks["mark"] = avg
 		
+		// Use standard Nursery grader from grading package
 		grader := &grading.NurseryGrader{}
 		gradeResult := grader.ComputeGrade(ca, examMark, 100, 100)
 		return gradeResult, rawMarks, nil
 		
 	case "S5", "S6":
-		// UACE: Paper-based grading
+		// UACE (A-Level): Paper-based grading
 		rawMarks["mark"] = examMark
 		
+		// Check if subsidiary subject
+		var standardSubject models.StandardSubject
+		isSubsidiary := false
+		if err := s.db.First(&standardSubject, subjectID).Error; err == nil {
+			isSubsidiary = standardSubject.Papers == 1
+		}
+		
 		grader := &grading.UACEGrader{}
+		
+		if isSubsidiary {
+			// Subsidiary: Pass (O) if code ≤7 (mark ≥50%), Fail (F) if code >7
+			code := grader.MapMarkToCode(examMark)
+			if code <= 7 {
+				return grading.GradeResult{
+					FinalGrade:        "O",
+					ComputationReason: fmt.Sprintf("Subsidiary subject: %.2f/100 → Code %d → O (Pass, 1 point)", examMark, code),
+					RuleVersionHash:   "SUBSIDIARY_V1",
+				}, rawMarks, nil
+			}
+			return grading.GradeResult{
+				FinalGrade:        "F",
+				ComputationReason: fmt.Sprintf("Subsidiary subject: %.2f/100 → Code %d → F (Fail, 0 points)", examMark, code),
+				RuleVersionHash:   "SUBSIDIARY_V1",
+			}, rawMarks, nil
+		}
+		
+		// Principal subjects: Get all papers for this subject
+		var allPapers []models.SubjectResult
+		s.db.Where("student_id = ? AND subject_id = ? AND term = ? AND year = ? AND deleted_at IS NULL",
+			studentID, subjectID, term, year).Find(&allPapers)
+		
+		// Collect all paper marks including current one
+		paperMarks := []float64{examMark}
+		for _, p := range allPapers {
+			if p.RawMarks != nil {
+				if pm, ok := p.RawMarks["mark"].(float64); ok && pm > 0 {
+					paperMarks = append(paperMarks, pm)
+				} else if pm, ok := p.RawMarks["exam"].(float64); ok && pm > 0 {
+					paperMarks = append(paperMarks, pm)
+				}
+			}
+		}
+		
+		// If we have 2+ papers, compute final grade using standard UACE grader
+		if len(paperMarks) >= 2 {
+			gradeResult := grader.ComputeGradeFromPapers(paperMarks)
+			return gradeResult, rawMarks, nil
+		}
+		
+		// Single paper - show individual code but no final grade yet
 		code := grader.MapMarkToCode(examMark)
 		letterGrade := s.mapCodeToLetterGrade(code)
 		
 		gradeResult := grading.GradeResult{
 			FinalGrade:        letterGrade,
-			ComputationReason: fmt.Sprintf("Paper mark %.2f/100 → Grade %s", examMark, letterGrade),
+			ComputationReason: fmt.Sprintf("Paper mark %.2f/100 → Code %d (%s). Awaiting %d more paper(s) for final grade.", examMark, code, letterGrade, standardSubject.Papers-len(paperMarks)),
 			RuleVersionHash:   "UACE_SINGLE_PAPER_V1",
 		}
 		return gradeResult, rawMarks, nil
@@ -136,7 +189,7 @@ func (s *GradeCalculationService) UpdateAllResultsWithAOI(
 		return err
 	}
 	
-	// Update all existing results with new AOI CA
+	// Update all existing results with new AOI CA using standard NCDC grader
 	grader := &grading.NCDCGrader{}
 	
 	for _, result := range results {
@@ -147,7 +200,7 @@ func (s *GradeCalculationService) UpdateAllResultsWithAOI(
 			}
 		}
 		
-		// Recalculate grade
+		// Recalculate grade using standard NCDC grader
 		gradeResult := grader.ComputeGrade(aoiCA, exam, 20, 80)
 		
 		if result.RawMarks == nil {
@@ -203,8 +256,75 @@ func (s *GradeCalculationService) calculateAOICA(aoiMarks models.JSONB) float64 
 	}
 	avg := sum / float64(len(activities))
 	
-	// Convert to CA out of 20 (activities are out of 3)
-	return (avg / 3.0) * 20.0
+	// Convert to CA out of 20 (activities are out of 3) and round to nearest whole number
+	return math.Round((avg / 3.0) * 20.0)
+}
+
+// RecalculateStudentGrade recalculates grade for a student's subject after all papers are imported
+func (s *GradeCalculationService) RecalculateStudentGrade(
+	studentID, subjectID uuid.UUID,
+	term string,
+	year int,
+	level string,
+) error {
+	// Only for S5/S6
+	if level != "S5" && level != "S6" {
+		return nil
+	}
+
+	// Get all papers for this student/subject/term/year
+	var allPapers []models.SubjectResult
+	s.db.Where("student_id = ? AND subject_id = ? AND term = ? AND year = ? AND deleted_at IS NULL",
+		studentID, subjectID, term, year).Find(&allPapers)
+
+	if len(allPapers) == 0 {
+		return nil
+	}
+
+	// Check if subsidiary
+	var standardSubject models.StandardSubject
+	isSubsidiary := false
+	if err := s.db.First(&standardSubject, subjectID).Error; err == nil {
+		isSubsidiary = standardSubject.Papers == 1
+	}
+
+	// Subsidiary subjects don't aggregate - skip
+	if isSubsidiary {
+		return nil
+	}
+
+	// Collect all paper marks
+	paperMarks := []float64{}
+	for _, p := range allPapers {
+		if p.RawMarks != nil {
+			if mark, ok := p.RawMarks["mark"].(float64); ok && mark > 0 {
+				paperMarks = append(paperMarks, mark)
+			} else if mark, ok := p.RawMarks["exam"].(float64); ok && mark > 0 {
+				paperMarks = append(paperMarks, mark)
+			}
+		}
+	}
+
+	// Need at least 2 papers to compute final grade
+	if len(paperMarks) < 2 {
+		return nil
+	}
+
+	// Compute final grade using standard UACE grader
+	grader := &grading.UACEGrader{}
+	gradeResult := grader.ComputeGradeFromPapers(paperMarks)
+
+	// Update all paper records with the final grade
+	for i := range allPapers {
+		allPapers[i].FinalGrade = gradeResult.FinalGrade
+		allPapers[i].ComputationReason = gradeResult.ComputationReason
+		allPapers[i].RuleVersionHash = gradeResult.RuleVersionHash
+		if err := s.db.Save(&allPapers[i]).Error; err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // mapCodeToLetterGrade converts UNEB code to letter grade

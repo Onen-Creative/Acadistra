@@ -108,6 +108,7 @@ type Student struct {
 	BaseModel
 	SchoolID         uuid.UUID    `gorm:"type:char(36);not null;index" json:"school_id"`
 	AdmissionNo      string       `gorm:"type:varchar(50);not null;uniqueIndex:idx_admission_school" json:"admission_no"`
+	SchoolPayCode    string       `gorm:"column:schoolpay_code;type:varchar(50);uniqueIndex:idx_schoolpay_code" json:"schoolpay_code"` // SchoolPay payment code
 	LIN              string       `gorm:"type:varchar(50)" json:"lin"` // Learner Identification Number
 	FirstName        string       `gorm:"type:varchar(100);not null" json:"first_name"`
 	MiddleName       string       `gorm:"type:varchar(100)" json:"middle_name"`

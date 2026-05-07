@@ -10,24 +10,29 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/school-system/backend/internal/models"
+	"github.com/school-system/backend/internal/repositories"
 	"github.com/school-system/backend/internal/utils"
 	"github.com/xuri/excelize/v2"
 	"gorm.io/gorm"
 )
 
 type BulkImportXLSXService struct {
-	db *gorm.DB
+	repo repositories.BulkImportXLSXRepository
+	db   *gorm.DB
 }
 
-func NewBulkImportXLSXService(db *gorm.DB) *BulkImportXLSXService {
-	return &BulkImportXLSXService{db: db}
+func NewBulkImportXLSXService(repo repositories.BulkImportXLSXRepository, db *gorm.DB) *BulkImportXLSXService {
+	return &BulkImportXLSXService{
+		repo: repo,
+		db:   db,
+	}
 }
 
 // GenerateStudentTemplate creates XLSX template for student import
 func (s *BulkImportXLSXService) GenerateStudentTemplate(classID uuid.UUID) (*excelize.File, error) {
 	// Get class info
-	var class models.Class
-	if err := s.db.First(&class, classID).Error; err != nil {
+	class, err := s.repo.FindClassByID(classID)
+	if err != nil {
 		return nil, fmt.Errorf("class not found: %w", err)
 	}
 
@@ -44,10 +49,10 @@ func (s *BulkImportXLSXService) GenerateStudentTemplate(classID uuid.UUID) (*exc
 	f.MergeCell(sheet, "A1", "AC1")
 	f.SetCellStyle(sheet, "A1", "AC1", titleStyle)
 
-	// Comprehensive headers matching all student fields (removed Class Level)
+	// Comprehensive headers matching all student fields
 	headers := []string{
 		"First Name", "Middle Name", "Last Name", "Date of Birth", "Gender",
-		"Nationality", "Religion", "LIN", "Email", "Phone",
+		"Nationality", "Religion", "LIN", "SchoolPay Code", "Email", "Phone",
 		"Address", "District", "Village", "Residence Type",
 		"Previous School", "Previous Class", "Special Needs", "Disability Status",
 		"Guardian Relationship", "Guardian Name", "Guardian Phone",
@@ -85,24 +90,24 @@ func (s *BulkImportXLSXService) GenerateStudentTemplate(classID uuid.UUID) (*exc
 	f.SetCellStyle(sheet, "A3", lastCol+"3", instructionStyle)
 	f.SetRowHeight(sheet, 3, 40)
 
-	// Sample data with comprehensive examples (removed Class Level column)
+	// Sample data with comprehensive examples
 	samples := [][]interface{}{
 		{"John", "Paul", "Doe", "2010-01-15", "male",
-			"Ugandan", "Catholic", "LIN123456", "john.doe@example.com", "+256700123456",
+			"Ugandan", "Catholic", "LIN123456", "SP001", "john.doe@example.com", "+256700123456",
 			"Plot 123, Main Street, Kampala", "Kampala", "Nakawa", "Day",
 			"ABC Primary School", "Baby Class", "None", "None",
 			"Father", "Robert Doe", "+256700000001",
 			"+256700000002", "robert.doe@example.com", "Teacher",
 			"Plot 456, Garden Street", "Ministry of Education", "Plot 789, Government Road", "CM12345678"},
 		{"Mary", "Jane", "Smith", "2011-03-20", "female",
-			"Ugandan", "Protestant", "LIN789012", "mary.smith@example.com", "+256700234567",
+			"Ugandan", "Protestant", "LIN789012", "SP002", "mary.smith@example.com", "+256700234567",
 			"Plot 456, Lake Road, Entebbe", "Wakiso", "Entebbe", "Boarding",
 			"XYZ Nursery School", "Top Class", "None", "None",
 			"Mother", "Sarah Smith", "+256700000003",
 			"+256700000004", "sarah.smith@example.com", "Nurse",
 			"Plot 789, Hospital Road", "Mulago Hospital", "Plot 101, Medical Center", "CM87654321"},
 		{"David", "", "Okello", "2009-07-10", "male",
-			"Ugandan", "Muslim", "", "", "+256700345678",
+			"Ugandan", "Muslim", "", "", "", "+256700345678",
 			"Gulu Town", "Gulu", "Central", "Day",
 			"", "", "None", "None",
 			"Guardian", "James Okello", "+256700000005",
@@ -368,10 +373,10 @@ func (s *BulkImportXLSXService) ParseStudentXLSX(file *excelize.File, schoolID u
 		return nil, errors.New("class not found")
 	}
 
-	// Validate headers (row 2, removed Class Level)
+	// Validate headers (row 2)
 	expectedHeaders := []string{
 		"First Name", "Middle Name", "Last Name", "Date of Birth", "Gender",
-		"Nationality", "Religion", "LIN", "Email", "Phone",
+		"Nationality", "Religion", "LIN", "SchoolPay Code", "Email", "Phone",
 		"Address", "District", "Village", "Residence Type",
 		"Previous School", "Previous Class", "Special Needs", "Disability Status",
 		"Guardian Relationship", "Guardian Name", "Guardian Phone",
@@ -391,8 +396,8 @@ func (s *BulkImportXLSXService) ParseStudentXLSX(file *excelize.File, schoolID u
 	for i, row := range rows[3:] {
 		rowNum := i + 4
 		
-		// Pad row with empty strings if it has fewer than 28 columns (removed Class Level)
-		for len(row) < 28 {
+		// Pad row with empty strings if it has fewer than 29 columns
+		for len(row) < 29 {
 			row = append(row, "")
 		}
 
@@ -570,26 +575,27 @@ func (s *BulkImportXLSXService) validateStudentRow(row []string, _ uuid.UUID, cl
 	nationality := strings.TrimSpace(row[5])
 	religion := strings.TrimSpace(row[6])
 	lin := strings.TrimSpace(row[7])
-	email := strings.TrimSpace(row[8])
-	phone := strings.TrimSpace(row[9])
-	address := strings.TrimSpace(row[10])
-	district := strings.TrimSpace(row[11])
-	village := strings.TrimSpace(row[12])
-	residenceType := strings.TrimSpace(row[13])
-	previousSchool := strings.TrimSpace(row[14])
-	previousClass := strings.TrimSpace(row[15])
-	specialNeeds := strings.TrimSpace(row[16])
-	disabilityStatus := strings.TrimSpace(row[17])
-	guardianRelationship := strings.TrimSpace(row[18])
-	guardianName := strings.TrimSpace(row[19])
-	guardianPhone := strings.TrimSpace(row[20])
-	guardianAltPhone := strings.TrimSpace(row[21])
-	guardianEmail := strings.TrimSpace(row[22])
-	guardianOccupation := strings.TrimSpace(row[23])
-	guardianAddress := strings.TrimSpace(row[24])
-	guardianWorkplace := strings.TrimSpace(row[25])
-	guardianWorkAddress := strings.TrimSpace(row[26])
-	guardianNationalID := strings.TrimSpace(row[27])
+	schoolPayCode := strings.TrimSpace(row[8])
+	email := strings.TrimSpace(row[9])
+	phone := strings.TrimSpace(row[10])
+	address := strings.TrimSpace(row[11])
+	district := strings.TrimSpace(row[12])
+	village := strings.TrimSpace(row[13])
+	residenceType := strings.TrimSpace(row[14])
+	previousSchool := strings.TrimSpace(row[15])
+	previousClass := strings.TrimSpace(row[16])
+	specialNeeds := strings.TrimSpace(row[17])
+	disabilityStatus := strings.TrimSpace(row[18])
+	guardianRelationship := strings.TrimSpace(row[19])
+	guardianName := strings.TrimSpace(row[20])
+	guardianPhone := strings.TrimSpace(row[21])
+	guardianAltPhone := strings.TrimSpace(row[22])
+	guardianEmail := strings.TrimSpace(row[23])
+	guardianOccupation := strings.TrimSpace(row[24])
+	guardianAddress := strings.TrimSpace(row[25])
+	guardianWorkplace := strings.TrimSpace(row[26])
+	guardianWorkAddress := strings.TrimSpace(row[27])
+	guardianNationalID := strings.TrimSpace(row[28])
 
 	// Validate required fields
 	if firstName == "" || lastName == "" {
@@ -646,6 +652,7 @@ func (s *BulkImportXLSXService) validateStudentRow(row []string, _ uuid.UUID, cl
 		"nationality":  nationality,
 		"religion":     religion,
 		"lin":          lin,
+		"schoolpay_code": schoolPayCode,
 		"email":        email,
 		"phone":        phone,
 		"address":      address,
@@ -987,6 +994,9 @@ func (s *BulkImportXLSXService) createStudent(tx *gorm.DB, data map[string]inter
 	if lin, ok := data["lin"].(string); ok && lin != "" {
 		student.LIN = lin
 	}
+	if schoolPayCode, ok := data["schoolpay_code"].(string); ok && schoolPayCode != "" {
+		student.SchoolPayCode = schoolPayCode
+	}
 	if email, ok := data["email"].(string); ok && email != "" {
 		student.Email = email
 	}
@@ -1119,6 +1129,57 @@ func (s *BulkImportXLSXService) createOrUpdateResult(tx *gorm.DB, data map[strin
 // RejectImport rejects the import
 func (s *BulkImportXLSXService) RejectImport(importID uuid.UUID) error {
 	return s.db.Model(&models.BulkImport{}).Where("id = ?", importID).Update("status", "rejected").Error
+}
+
+// GetClassInfo retrieves class name and level
+func (s *BulkImportXLSXService) GetClassInfo(classID uuid.UUID) (string, string, error) {
+	var class struct {
+		Name  string
+		Level string
+	}
+	if err := s.db.Table("classes").Select("name, level").Where("id = ?", classID).First(&class).Error; err != nil {
+		return "", "", err
+	}
+	return class.Name, class.Level, nil
+}
+
+// ListImports lists bulk imports by school and status
+func (s *BulkImportXLSXService) ListImports(schoolID uuid.UUID, status string) ([]map[string]interface{}, error) {
+	var imports []map[string]interface{}
+	err := s.db.Table("bulk_imports").
+		Select("id, import_type, status, total_rows, valid_rows, invalid_rows, uploaded_by, created_at").
+		Where("school_id = ? AND status = ?", schoolID, status).
+		Order("created_at DESC").
+		Scan(&imports).Error
+	return imports, err
+}
+
+// GetImportDetails retrieves import details
+func (s *BulkImportXLSXService) GetImportDetails(importID, schoolID uuid.UUID) (map[string]interface{}, error) {
+	var bulkImport models.BulkImport
+	if err := s.db.Where("id = ? AND school_id = ?", importID, schoolID).First(&bulkImport).Error; err != nil {
+		return nil, err
+	}
+	
+	result := map[string]interface{}{
+		"id":           bulkImport.ID,
+		"school_id":    bulkImport.SchoolID,
+		"import_type":  bulkImport.ImportType,
+		"status":       bulkImport.Status,
+		"uploaded_by":  bulkImport.UploadedBy,
+		"total_rows":   bulkImport.TotalRows,
+		"valid_rows":   bulkImport.ValidRows,
+		"invalid_rows": bulkImport.InvalidRows,
+		"errors":       bulkImport.Errors,
+		"data":         bulkImport.Data,
+		"metadata":     bulkImport.Metadata,
+		"approved_by":  bulkImport.ApprovedBy,
+		"approved_at":  bulkImport.ApprovedAt,
+		"created_at":   bulkImport.CreatedAt,
+		"updated_at":   bulkImport.UpdatedAt,
+	}
+	
+	return result, nil
 }
 
 func validateXLSXHeaders(actual, expected []string) bool {

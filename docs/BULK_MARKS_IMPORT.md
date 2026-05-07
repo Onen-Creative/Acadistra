@@ -81,12 +81,30 @@ POST   /api/v1/marks/imports/:id/reject
 - Added to School Admin sidebar: "Import Marks" 📤
 
 ## Excel Template Format
+
+### For Primary, Nursery, and O-Level (S1-S4)
 ```
 | admission_no | student_name | ca | exam |
 |--------------|--------------|-----|------|
 | STD001       | John Doe     | 15  | 65   |
 | STD002       | Jane Smith   | 18  | 72   |
 ```
+
+### For Advanced Level (S5-S6)
+```
+| admission_no | student_name | mark |
+|--------------|--------------|------|
+| STD001       | John Doe     | 88   |
+| STD002       | Jane Smith   | 77   |
+```
+
+**Note for Advanced Level:**
+- Each paper is imported separately
+- Select paper number (1, 2, 3, or 4) before uploading
+- Template shows only "mark" column (out of 100)
+- System automatically stores paper number with marks
+- Subsidiary subjects (1 paper) use same format
+- Principal subjects (2-4 papers) require separate uploads per paper
 
 ## Database Migration
 - Added `marks_imports` table to database migration

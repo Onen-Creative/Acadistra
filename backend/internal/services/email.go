@@ -695,3 +695,75 @@ func (e *EmailService) SendPasswordResetRequestToAdmin(to, adminName, userName, 
 
 	return e.QueueEmail(to, "Password Reset Request - Action Required", body.String(), "password_reset_request", nil, 1)
 }
+
+
+func (e *EmailService) ListQueuedEmails(status, emailType string, page, limit int) ([]models.EmailQueue, int64, error) {
+	query := e.db.Model(&models.EmailQueue{})
+
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+	if emailType != "" {
+		query = query.Where("email_type = ?", emailType)
+	}
+
+	var total int64
+	query.Count(&total)
+
+	var emails []models.EmailQueue
+	err := query.Order("created_at DESC").
+		Limit(limit).
+		Offset((page - 1) * limit).
+		Find(&emails).Error
+
+	return emails, total, err
+}
+
+func (e *EmailService) RetryFailedEmail(id string) (*models.EmailQueue, error) {
+	var email models.EmailQueue
+	if err := e.db.First(&email, "id = ?", id).Error; err != nil {
+		return nil, fmt.Errorf("Email not found")
+	}
+
+	if email.Status != "failed" && email.Status != "pending" {
+		return nil, fmt.Errorf("Can only retry failed or pending emails")
+	}
+
+	email.Status = "pending"
+	email.Attempts = 0
+	email.Error = ""
+	now := time.Now()
+	email.NextRetry = &now
+
+	if err := e.db.Save(&email).Error; err != nil {
+		return nil, err
+	}
+
+	return &email, nil
+}
+
+func (e *EmailService) CancelQueuedEmail(id string) (*models.EmailQueue, error) {
+	var email models.EmailQueue
+	if err := e.db.First(&email, "id = ?", id).Error; err != nil {
+		return nil, fmt.Errorf("Email not found")
+	}
+
+	if email.Status != "pending" {
+		return nil, fmt.Errorf("Can only cancel pending emails")
+	}
+
+	email.Status = "cancelled"
+	if err := e.db.Save(&email).Error; err != nil {
+		return nil, err
+	}
+
+	return &email, nil
+}
+
+func (e *EmailService) GetEmailDetails(id string) (*models.EmailQueue, error) {
+	var email models.EmailQueue
+	if err := e.db.First(&email, "id = ?", id).Error; err != nil {
+		return nil, err
+	}
+	return &email, nil
+}

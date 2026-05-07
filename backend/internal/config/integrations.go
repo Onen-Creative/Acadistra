@@ -6,6 +6,9 @@ type IntegrationConfig struct {
 	FlutterwaveSecretKey  string
 	FlutterwaveEncryptKey string
 	
+	// SchoolPay
+	SchoolPayBaseURL string
+	
 	// SMS
 	AfricasTalkingAPIKey  string
 	AfricasTalkingUsername string
@@ -30,6 +33,8 @@ func LoadIntegrationConfig() *IntegrationConfig {
 		FlutterwavePublicKey:  getEnv("FLUTTERWAVE_PUBLIC_KEY", ""),
 		FlutterwaveSecretKey:  getEnv("FLUTTERWAVE_SECRET_KEY", ""),
 		FlutterwaveEncryptKey: getEnv("FLUTTERWAVE_ENCRYPT_KEY", ""),
+		
+		SchoolPayBaseURL: getEnv("SCHOOLPAY_BASE_URL", "https://schoolpay.co.ug/paymentapi"),
 		
 		AfricasTalkingAPIKey:  getEnv("AFRICASTALKING_API_KEY", ""),
 		AfricasTalkingUsername: getEnv("AFRICASTALKING_USERNAME", ""),

@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/school-system/backend/internal/models"
+	"github.com/school-system/backend/internal/repositories"
 	"gorm.io/gorm"
 )
 
@@ -17,7 +18,7 @@ type SchoolSetupService struct {
 func NewSchoolSetupService(db *gorm.DB) *SchoolSetupService {
 	return &SchoolSetupService{
 		db:                    db,
-		userAssignmentService: NewUserAssignmentService(db),
+		userAssignmentService: NewUserAssignmentService(repositories.NewUserAssignmentRepository(db), db),
 	}
 }
 

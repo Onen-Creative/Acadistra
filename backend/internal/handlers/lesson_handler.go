@@ -2,19 +2,16 @@ package handlers
 
 import (
 	"net/http"
-	"time"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
-	"github.com/school-system/backend/internal/models"
-	"gorm.io/gorm"
+	"github.com/school-system/backend/internal/services"
 )
 
 type LessonHandler struct {
-	db *gorm.DB
+	lessonService *services.LessonService
 }
 
-func NewLessonHandler(db *gorm.DB) *LessonHandler {
-	return &LessonHandler{db: db}
+func NewLessonHandler(lessonService *services.LessonService) *LessonHandler {
+	return &LessonHandler{lessonService: lessonService}
 }
 
 func (h *LessonHandler) GetSchoolSubjects(c *gin.Context) {
@@ -28,60 +25,14 @@ func (h *LessonHandler) GetSchoolSubjects(c *gin.Context) {
 		return
 	}
 	
-	var school models.School
-	if err := h.db.First(&school, "id = ?", schoolID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "School not found"})
-		return
-	}
-	
-	var levels []string
-	if school.Config != nil {
-		if configLevels, ok := school.Config["levels"].([]interface{}); ok {
-			for _, lvl := range configLevels {
-				if level, ok := lvl.(string); ok {
-					levels = append(levels, level)
-				}
-			}
+	subjects, err := h.lessonService.GetSchoolSubjects(schoolID)
+	if err != nil {
+		if err.Error() == "school not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
 		}
-	}
-	
-	// Auto-fix: If no levels configured, set them based on school type
-	if len(levels) == 0 && school.Type != "" {
-		switch school.Type {
-		case "nursery":
-			levels = []string{"Baby", "Middle", "Top"}
-		case "primary":
-			levels = []string{"P1", "P2", "P3", "P4", "P5", "P6", "P7"}
-		case "ordinary":
-			levels = []string{"S1", "S2", "S3", "S4"}
-		case "advanced":
-			levels = []string{"S5", "S6"}
-		case "secondary":
-			levels = []string{"S1", "S2", "S3", "S4", "S5", "S6"}
-		}
-	}
-	
-	// If still no levels, return empty array
-	if len(levels) == 0 {
-		c.JSON(http.StatusOK, []models.StandardSubject{})
-		return
-	}
-	
-	// Fetch subjects for configured levels
-	var allSubjects []models.StandardSubject
-	if err := h.db.Where("level IN ?", levels).Order("name").Find(&allSubjects).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
-	}
-	
-	// Deduplicate by name (keep first occurrence)
-	seen := make(map[string]bool)
-	var subjects []models.StandardSubject
-	for _, subject := range allSubjects {
-		if !seen[subject.Name] {
-			seen[subject.Name] = true
-			subjects = append(subjects, subject)
-		}
 	}
 	
 	c.JSON(http.StatusOK, subjects)
@@ -98,8 +49,8 @@ func (h *LessonHandler) GetSchoolTeachers(c *gin.Context) {
 		return
 	}
 	
-	var teachers []models.Staff
-	if err := h.db.Where("school_id = ? AND role = ? AND status = ?", schoolID, "teacher", "active").Find(&teachers).Error; err != nil {
+	teachers, err := h.lessonService.GetSchoolTeachers(schoolID)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch teachers"})
 		return
 	}
@@ -130,51 +81,30 @@ func (h *LessonHandler) CreateLesson(c *gin.Context) {
 		return
 	}
 
-	lessonDate, err := time.Parse("2006-01-02", req.LessonDate)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid lesson date format"})
-		return
-	}
-
-	teacherID, err := uuid.Parse(req.TeacherID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid teacher ID"})
-		return
-	}
-
-	recorderID, err := uuid.Parse(userID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
-		return
-	}
-
-	duration := req.DurationMinutes
-	if duration == 0 {
-		duration = 40
-	}
-
-	lesson := models.LessonRecord{
-		SchoolID:        schoolID,
+	lessonReq := services.CreateLessonRequest{
 		ClassID:         req.ClassID,
 		SubjectID:       req.SubjectID,
-		TeacherID:       teacherID,
-		LessonDate:      lessonDate,
+		TeacherID:       req.TeacherID,
+		LessonDate:      req.LessonDate,
 		LessonTime:      req.LessonTime,
-		DurationMinutes: duration,
+		DurationMinutes: req.DurationMinutes,
 		Topic:           req.Topic,
 		SubTopic:        req.SubTopic,
 		Status:          req.Status,
 		ReasonMissed:    req.ReasonMissed,
 		Notes:           req.Notes,
-		RecordedBy:      recorderID,
 	}
 
-	if err := h.db.Create(&lesson).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create lesson record"})
+	lesson, err := h.lessonService.CreateLessonRecord(schoolID, userID, lessonReq)
+	if err != nil {
+		status := http.StatusInternalServerError
+		if err.Error() == "invalid lesson date format" || err.Error() == "invalid teacher ID" || err.Error() == "invalid user ID" {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, gin.H{"error": err.Error()})
 		return
 	}
 
-	h.db.Preload("Class").Preload("Subject").Preload("Teacher").First(&lesson, lesson.ID)
 	c.JSON(http.StatusCreated, lesson)
 }
 
@@ -187,32 +117,8 @@ func (h *LessonHandler) ListLessons(c *gin.Context) {
 	dateFrom := c.Query("date_from")
 	dateTo := c.Query("date_to")
 
-	query := h.db.Where("school_id = ?", schoolID).
-		Preload("Class").
-		Preload("Subject").
-		Preload("Teacher")
-
-	if classID != "" {
-		query = query.Where("class_id = ?", classID)
-	}
-	if subjectID != "" {
-		query = query.Where("subject_id = ?", subjectID)
-	}
-	if teacherID != "" {
-		query = query.Where("teacher_id = ?", teacherID)
-	}
-	if status != "" {
-		query = query.Where("status = ?", status)
-	}
-	if dateFrom != "" {
-		query = query.Where("lesson_date >= ?", dateFrom)
-	}
-	if dateTo != "" {
-		query = query.Where("lesson_date <= ?", dateTo)
-	}
-
-	var lessons []models.LessonRecord
-	if err := query.Order("lesson_date DESC, lesson_time DESC").Find(&lessons).Error; err != nil {
+	lessons, err := h.lessonService.ListLessonRecords(schoolID, classID, subjectID, teacherID, status, dateFrom, dateTo)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch lessons"})
 		return
 	}
@@ -224,14 +130,9 @@ func (h *LessonHandler) GetLesson(c *gin.Context) {
 	schoolID := c.GetString("school_id")
 	lessonID := c.Param("id")
 
-	var lesson models.LessonRecord
-	if err := h.db.Where("id = ? AND school_id = ?", lessonID, schoolID).
-		Preload("Class").
-		Preload("Subject").
-		Preload("Teacher").
-		Preload("Recorder").
-		First(&lesson).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Lesson not found"})
+	lesson, err := h.lessonService.GetLessonRecord(schoolID, lessonID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -241,12 +142,6 @@ func (h *LessonHandler) GetLesson(c *gin.Context) {
 func (h *LessonHandler) UpdateLesson(c *gin.Context) {
 	schoolID := c.GetString("school_id")
 	lessonID := c.Param("id")
-
-	var lesson models.LessonRecord
-	if err := h.db.Where("id = ? AND school_id = ?", lessonID, schoolID).First(&lesson).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Lesson not found"})
-		return
-	}
 
 	var req struct {
 		LessonTime      string `json:"lesson_time"`
@@ -263,34 +158,39 @@ func (h *LessonHandler) UpdateLesson(c *gin.Context) {
 		return
 	}
 
+	updates := make(map[string]interface{})
 	if req.LessonTime != "" {
-		lesson.LessonTime = req.LessonTime
+		updates["lesson_time"] = req.LessonTime
 	}
 	if req.DurationMinutes > 0 {
-		lesson.DurationMinutes = req.DurationMinutes
+		updates["duration_minutes"] = req.DurationMinutes
 	}
 	if req.Topic != "" {
-		lesson.Topic = req.Topic
+		updates["topic"] = req.Topic
 	}
 	if req.SubTopic != "" {
-		lesson.SubTopic = req.SubTopic
+		updates["sub_topic"] = req.SubTopic
 	}
 	if req.Status != "" {
-		lesson.Status = req.Status
+		updates["status"] = req.Status
 	}
 	if req.ReasonMissed != "" {
-		lesson.ReasonMissed = req.ReasonMissed
+		updates["reason_missed"] = req.ReasonMissed
 	}
 	if req.Notes != "" {
-		lesson.Notes = req.Notes
+		updates["notes"] = req.Notes
 	}
 
-	if err := h.db.Save(&lesson).Error; err != nil {
+	lesson, err := h.lessonService.UpdateLessonRecord(schoolID, lessonID, updates)
+	if err != nil {
+		if err.Error() == "lesson not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update lesson"})
 		return
 	}
 
-	h.db.Preload("Class").Preload("Subject").Preload("Teacher").First(&lesson, lesson.ID)
 	c.JSON(http.StatusOK, lesson)
 }
 
@@ -298,13 +198,12 @@ func (h *LessonHandler) DeleteLesson(c *gin.Context) {
 	schoolID := c.GetString("school_id")
 	lessonID := c.Param("id")
 
-	result := h.db.Where("id = ? AND school_id = ?", lessonID, schoolID).Delete(&models.LessonRecord{})
-	if result.Error != nil {
+	if err := h.lessonService.DeleteLessonRecord(schoolID, lessonID); err != nil {
+		if err.Error() == "lesson not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete lesson"})
-		return
-	}
-	if result.RowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Lesson not found"})
 		return
 	}
 
@@ -313,96 +212,27 @@ func (h *LessonHandler) DeleteLesson(c *gin.Context) {
 
 func (h *LessonHandler) GetStats(c *gin.Context) {
 	schoolID := c.GetString("school_id")
-	period := c.Query("period") // today, this_week, this_month, this_term
+	period := c.Query("period")
 
-	var dateFrom time.Time
-	now := time.Now()
-
-	switch period {
-	case "today":
-		dateFrom = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	case "this_week":
-		weekday := int(now.Weekday())
-		if weekday == 0 {
-			weekday = 7
-		}
-		dateFrom = now.AddDate(0, 0, -weekday+1)
-		dateFrom = time.Date(dateFrom.Year(), dateFrom.Month(), dateFrom.Day(), 0, 0, 0, 0, dateFrom.Location())
-	case "this_month":
-		dateFrom = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-	default:
-		dateFrom = time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location())
+	stats, err := h.lessonService.GetLessonStats(schoolID, period)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
-
-	var stats struct {
-		TotalLessons     int64 `json:"total_lessons"`
-		CompletedLessons int64 `json:"completed_lessons"`
-		MissedLessons    int64 `json:"missed_lessons"`
-	}
-
-	h.db.Model(&models.LessonRecord{}).
-		Where("school_id = ? AND lesson_date >= ?", schoolID, dateFrom).
-		Count(&stats.TotalLessons)
-
-	h.db.Model(&models.LessonRecord{}).
-		Where("school_id = ? AND lesson_date >= ? AND status = ?", schoolID, dateFrom, "completed").
-		Count(&stats.CompletedLessons)
-
-	h.db.Model(&models.LessonRecord{}).
-		Where("school_id = ? AND lesson_date >= ? AND status = ?", schoolID, dateFrom, "missed").
-		Count(&stats.MissedLessons)
 
 	c.JSON(http.StatusOK, stats)
 }
 
 func (h *LessonHandler) ExportReport(c *gin.Context) {
 	schoolID := c.GetString("school_id")
-	period := c.Query("period") // today, this_week, last_week, this_month, last_month, this_term, last_term, this_year
+	period := c.Query("period")
 
-	var dateFrom, dateTo time.Time
-	now := time.Now()
-
-	switch period {
-	case "today":
-		dateFrom = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-		dateTo = dateFrom.AddDate(0, 0, 1)
-	case "this_week":
-		weekday := int(now.Weekday())
-		if weekday == 0 {
-			weekday = 7
+	lessons, dateFrom, dateTo, err := h.lessonService.ExportLessonReport(schoolID, period)
+	if err != nil {
+		if err.Error() == "invalid period" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
 		}
-		dateFrom = now.AddDate(0, 0, -weekday+1)
-		dateFrom = time.Date(dateFrom.Year(), dateFrom.Month(), dateFrom.Day(), 0, 0, 0, 0, dateFrom.Location())
-		dateTo = dateFrom.AddDate(0, 0, 7)
-	case "last_week":
-		weekday := int(now.Weekday())
-		if weekday == 0 {
-			weekday = 7
-		}
-		dateFrom = now.AddDate(0, 0, -weekday-6)
-		dateFrom = time.Date(dateFrom.Year(), dateFrom.Month(), dateFrom.Day(), 0, 0, 0, 0, dateFrom.Location())
-		dateTo = dateFrom.AddDate(0, 0, 7)
-	case "this_month":
-		dateFrom = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-		dateTo = dateFrom.AddDate(0, 1, 0)
-	case "last_month":
-		dateFrom = time.Date(now.Year(), now.Month()-1, 1, 0, 0, 0, 0, now.Location())
-		dateTo = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-	case "this_year":
-		dateFrom = time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location())
-		dateTo = time.Date(now.Year()+1, 1, 1, 0, 0, 0, 0, now.Location())
-	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid period"})
-		return
-	}
-
-	var lessons []models.LessonRecord
-	if err := h.db.Where("school_id = ? AND lesson_date >= ? AND lesson_date < ?", schoolID, dateFrom, dateTo).
-		Preload("Class").
-		Preload("Subject").
-		Preload("Teacher").
-		Order("lesson_date DESC, lesson_time DESC").
-		Find(&lessons).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch lessons"})
 		return
 	}
@@ -410,7 +240,7 @@ func (h *LessonHandler) ExportReport(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"lessons":   lessons,
 		"period":    period,
-		"date_from": dateFrom.Format("2006-01-02"),
-		"date_to":   dateTo.Format("2006-01-02"),
+		"date_from": dateFrom,
+		"date_to":   dateTo,
 	})
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/school-system/backend/internal/config"
 	"github.com/school-system/backend/internal/models"
+	"github.com/school-system/backend/internal/repositories"
 	"gorm.io/gorm"
 )
 
@@ -54,7 +55,7 @@ func NewAuthService(db *gorm.DB, cfg *config.Config) *AuthService {
 		db:           db,
 		cfg:          cfg,
 		params:       params,
-		auditService: NewAuditService(db),
+		auditService: NewAuditService(repositories.NewAuditRepository(db)),
 	}
 }
 
@@ -77,8 +78,9 @@ func (s *AuthService) Login(identifier, password string) (*TokenPair, *models.Us
 			return nil, nil, ErrUserNotActive
 		}
 
+		// Check if school is active (except for system_admin and parent)
 		if user.Role != "system_admin" && user.Role != "parent" && user.School != nil && !user.School.IsActive {
-			return nil, nil, errors.New("school is inactive")
+			return nil, nil, errors.New("your school is currently inactive. Please contact your school administrator")
 		}
 
 		match, err := s.VerifyPassword(user.PasswordHash, password)
@@ -131,6 +133,11 @@ func (s *AuthService) Login(identifier, password string) (*TokenPair, *models.Us
 
 	if !user.IsActive {
 		return nil, nil, ErrUserNotActive
+	}
+
+	// Check if school is active for parent users
+	if user.School != nil && !user.School.IsActive {
+		return nil, nil, errors.New("your school is currently inactive. Please contact your school administrator")
 	}
 
 	// For parents, verify password or allow first-time login
@@ -292,14 +299,19 @@ func (s *AuthService) RefreshTokens(refreshToken string) (*TokenPair, error) {
 		return nil, ErrTokenRevoked
 	}
 
-	// Get user
+	// Get user with school
 	var user models.User
-	if err := s.db.First(&user, "id = ?", claims.UserID).Error; err != nil {
+	if err := s.db.Preload("School").First(&user, "id = ?", claims.UserID).Error; err != nil {
 		return nil, err
 	}
 
 	if !user.IsActive {
 		return nil, ErrUserNotActive
+	}
+
+	// Check if school is active (except for system_admin and parent)
+	if user.Role != "system_admin" && user.Role != "parent" && user.School != nil && !user.School.IsActive {
+		return nil, errors.New("your school is currently inactive. Please contact your school administrator")
 	}
 
 	// Revoke old token

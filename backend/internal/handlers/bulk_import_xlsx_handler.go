@@ -11,18 +11,15 @@ import (
 	"github.com/google/uuid"
 	"github.com/school-system/backend/internal/services"
 	"github.com/xuri/excelize/v2"
-	"gorm.io/gorm"
 )
 
 type BulkImportXLSXHandler struct {
 	service *services.BulkImportXLSXService
-	db      *gorm.DB
 }
 
-func NewBulkImportXLSXHandler(db *gorm.DB) *BulkImportXLSXHandler {
+func NewBulkImportXLSXHandler(service *services.BulkImportXLSXService) *BulkImportXLSXHandler {
 	return &BulkImportXLSXHandler{
-		service: services.NewBulkImportXLSXService(db),
-		db:      db,
+		service: service,
 	}
 }
 
@@ -40,16 +37,13 @@ func (h *BulkImportXLSXHandler) DownloadStudentTemplate(c *gin.Context) {
 	}
 
 	// Get class info for filename
-	var class struct {
-		Name  string `gorm:"column:name"`
-		Level string `gorm:"column:level"`
-	}
-	if err := h.db.Table("classes").Select("name, level").Where("id = ?", classID).First(&class).Error; err != nil {
+	className, classLevel, err := h.service.GetClassInfo(uuid.MustParse(classID))
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Class not found"})
 		return
 	}
 	
-	log.Printf("[DEBUG] Class info - Name: %s, Level: %s", class.Name, class.Level)
+	log.Printf("[DEBUG] Class info - Name: %s, Level: %s", className, classLevel)
 
 	file, err := h.service.GenerateStudentTemplate(uuid.MustParse(classID))
 	if err != nil {
@@ -60,13 +54,10 @@ func (h *BulkImportXLSXHandler) DownloadStudentTemplate(c *gin.Context) {
 	// Generate descriptive filename
 	var filename string
 	if year != "" && term != "" {
-		// Format: student_import_ClassName_Level_Year_Term.xlsx
-		filename = fmt.Sprintf("student_import_%s_%s_%s_%s.xlsx", class.Name, class.Level, year, term)
+		filename = fmt.Sprintf("student_import_%s_%s_%s_%s.xlsx", className, classLevel, year, term)
 	} else {
-		// Format: student_import_ClassName_Level.xlsx
-		filename = fmt.Sprintf("student_import_%s_%s.xlsx", class.Name, class.Level)
+		filename = fmt.Sprintf("student_import_%s_%s.xlsx", className, classLevel)
 	}
-	// Sanitize filename (remove spaces and special chars)
 	filename = sanitizeFilename(filename)
 	
 	log.Printf("[DEBUG] Generated filename: %s", filename)
@@ -82,7 +73,7 @@ func (h *BulkImportXLSXHandler) DownloadStudentTemplate(c *gin.Context) {
 // DownloadMarksTemplate generates XLSX template with student list
 func (h *BulkImportXLSXHandler) DownloadMarksTemplate(c *gin.Context) {
 	classID := c.Query("class_id")
-	classLevel := c.Query("class_level") // Fallback for backward compatibility
+	classLevel := c.Query("class_level")
 	subjectID := c.Query("subject_id")
 	examType := c.DefaultQuery("exam_type", "BOT")
 	term := c.Query("term")
@@ -91,14 +82,12 @@ func (h *BulkImportXLSXHandler) DownloadMarksTemplate(c *gin.Context) {
 
 	// If class_id is provided, get the level from the class
 	if classID != "" {
-		var class struct {
-			Level string `gorm:"column:level"`
-		}
-		if err := h.db.Table("classes").Select("level").Where("id = ?", classID).First(&class).Error; err != nil {
+		_, level, err := h.service.GetClassInfo(uuid.MustParse(classID))
+		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Class not found"})
 			return
 		}
-		classLevel = class.Level
+		classLevel = level
 	}
 
 	if classLevel == "" || subjectID == "" || term == "" || yearStr == "" {
@@ -180,8 +169,9 @@ func (h *BulkImportXLSXHandler) UploadStudents(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "File uploaded and validated",
-		"import":  result,
+		"message":   "File uploaded and validated",
+		"import_id": result.ID.String(),
+		"import":    result,
 	})
 }
 
@@ -191,7 +181,7 @@ func (h *BulkImportXLSXHandler) UploadMarks(c *gin.Context) {
 	userID := c.GetString("user_id")
 
 	classID := c.PostForm("class_id")
-	classLevel := c.PostForm("class_level") // Fallback for backward compatibility
+	classLevel := c.PostForm("class_level")
 	subjectID := c.PostForm("subject_id")
 	examType := c.PostForm("exam_type")
 	term := c.PostForm("term")
@@ -199,14 +189,12 @@ func (h *BulkImportXLSXHandler) UploadMarks(c *gin.Context) {
 
 	// If class_id is provided, get the level from the class
 	if classID != "" {
-		var class struct {
-			Level string `gorm:"column:level"`
-		}
-		if err := h.db.Table("classes").Select("level").Where("id = ?", classID).First(&class).Error; err != nil {
+		_, level, err := h.service.GetClassInfo(uuid.MustParse(classID))
+		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Class not found"})
 			return
 		}
-		classLevel = class.Level
+		classLevel = level
 	}
 
 	if classLevel == "" || subjectID == "" || examType == "" || term == "" || yearStr == "" {
@@ -265,8 +253,9 @@ func (h *BulkImportXLSXHandler) UploadMarks(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "File uploaded and validated",
-		"import":  result,
+		"message":   "File uploaded and validated",
+		"import_id": result.ID.String(),
+		"import":    result,
 	})
 }
 
@@ -275,22 +264,11 @@ func (h *BulkImportXLSXHandler) ListImports(c *gin.Context) {
 	schoolID := c.GetString("tenant_school_id")
 	status := c.DefaultQuery("status", "pending")
 
-	var imports []struct {
-		ID          string `json:"id"`
-		ImportType  string `json:"import_type"`
-		Status      string `json:"status"`
-		TotalRows   int    `json:"total_rows"`
-		ValidRows   int    `json:"valid_rows"`
-		InvalidRows int    `json:"invalid_rows"`
-		UploadedBy  string `json:"uploaded_by"`
-		CreatedAt   string `json:"created_at"`
+	imports, err := h.service.ListImports(uuid.MustParse(schoolID), status)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch imports"})
+		return
 	}
-
-	h.db.Table("bulk_imports").
-		Select("id, import_type, status, total_rows, valid_rows, invalid_rows, uploaded_by, created_at").
-		Where("school_id = ? AND status = ?", schoolID, status).
-		Order("created_at DESC").
-		Scan(&imports)
 
 	c.JSON(http.StatusOK, gin.H{"imports": imports})
 }
@@ -300,22 +278,8 @@ func (h *BulkImportXLSXHandler) GetImportDetails(c *gin.Context) {
 	importID := c.Param("id")
 	schoolID := c.GetString("tenant_school_id")
 
-	var bulkImport struct {
-		ID          string `json:"id"`
-		ImportType  string `json:"import_type"`
-		Status      string `json:"status"`
-		TotalRows   int    `json:"total_rows"`
-		ValidRows   int    `json:"valid_rows"`
-		InvalidRows int    `json:"invalid_rows"`
-		Errors      string `json:"errors"`
-		Data        string `json:"data"`
-		Metadata    string `json:"metadata"`
-		CreatedAt   string `json:"created_at"`
-	}
-
-	if err := h.db.Table("bulk_imports").
-		Where("id = ? AND school_id = ?", importID, schoolID).
-		First(&bulkImport).Error; err != nil {
+	bulkImport, err := h.service.GetImportDetails(uuid.MustParse(importID), uuid.MustParse(schoolID))
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Import not found"})
 		return
 	}

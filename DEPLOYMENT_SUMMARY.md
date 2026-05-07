@@ -1,271 +1,412 @@
-# Grading System Fix - Complete Deployment Package
+# Production Deployment Summary
 
-## 📦 Package Contents
+## 📅 Deployment Information
 
-### ✅ Deployment Scripts
-1. **`deploy-grading-fix.sh`** - Automated full deployment
-2. **`recalculate-grades.sh`** - Standalone grade recalculation
-3. **`QUICKSTART_DEPLOYMENT.md`** - Quick start guide
-4. **`DEPLOYMENT_SCRIPTS_README.md`** - Detailed documentation
-5. **`GRADING_VERIFICATION.md`** - Grading system verification
-
-### ✅ Code Changes
-1. **`backend/internal/grading/grading.go`** - Fixed S1-S4 grading scale
-2. **`backend/internal/handlers/result_handler.go`** - Grade recalculation + log cleanup
-3. **`backend/internal/handlers/staff_handler.go`** - Log cleanup
-4. **`frontend/src/app/results/page.tsx`** - UI label updates
+**Date:** Ready for deployment
+**Version:** v2.1.0
+**Type:** Feature update + Bug fixes
 
 ---
 
-## 🎯 What Was Fixed
+## ✨ What's New
 
-### Issue 1: S1-S4 Grading Scale
-**Before:** A/B/C/D/E (simplified scale)
-**After:** D1/D2/C3/C4/C5/C6/P7/P8/F9 (UNEB 9-point scale)
+### 1. 🎓 Grading System Fixes (CRITICAL)
 
-**Example:**
-- 82 marks: A → **D1** ✅
-- 73 marks: B → **D2** ✅
-- 62 marks: C → **C4** ✅
+**Problem Fixed:**
+- Advanced Level (S5-S6) marks showed different grades when imported vs manually entered
+- Bulk import didn't recalculate final grades after all papers were imported
 
-### Issue 2: Column Labels
-**Before:** S1-S4 showed "CA" column
-**After:** S1-S4 shows "AOI" column ✅
+**Solution:**
+- ✅ Unified grading logic - both manual and bulk import now use standard `grading.go`
+- ✅ Automatic grade recalculation after bulk import completes
+- ✅ All levels (Nursery, Primary, O-Level, A-Level) now calculate consistently
 
-### Issue 3: Grade Recalculation
-**Before:** No way to update existing grades
-**After:** Automated recalculation for all levels ✅
+**Files Changed:**
+- `backend/internal/services/result_service.go`
+- `backend/internal/services/grade_calculation_service.go`
+- `backend/internal/services/bulk_exam_marks_import_service.go`
+- `backend/internal/repositories/bulk_exam_marks_import_repository.go`
 
-### Issue 4: Log Noise
-**Before:** "record not found" logs cluttering output
-**After:** Silent queries for expected missing records ✅
+**Impact:** HIGH - Affects all schools using Advanced Level grading
 
 ---
 
-## 🚀 Deployment Options
+### 2. 📱 SMS Integration (NEW FEATURE)
 
-### Option 1: Automated Script (Recommended)
-```bash
-./deploy-grading-fix.sh
+**What's Added:**
+- Send SMS to parents/guardians via Africa's Talking or Twilio
+- Bulk SMS for fees reminders, attendance alerts, results notifications
+- SMS logs and cost tracking
+- Per-school SMS configuration
+
+**Features:**
+- ✅ Africa's Talking integration
+- ✅ Twilio integration (alternative)
+- ✅ SMS templates for common messages
+- ✅ Bulk SMS to classes/levels
+- ✅ SMS delivery tracking
+- ✅ Cost monitoring
+
+**Files Added:**
+- `backend/internal/services/sms_service.go`
+- `backend/internal/handlers/sms_handler.go`
+- `backend/internal/models/sms.go`
+- `backend/migrations/20260505000000_create_sms_tables_pg.sql`
+
+**Configuration Required:**
+- Environment variables: `AFRICASTALKING_*` or `TWILIO_*`
+- Admin panel: SMS Management → Configuration
+
+**Impact:** MEDIUM - Optional feature, schools can enable as needed
+
+---
+
+### 3. 💰 SchoolPay Integration (NEW FEATURE)
+
+**What's Added:**
+- Real-time mobile money payments via SchoolPay Uganda
+- Automatic payment recording in student fees
+- Webhook for instant payment notifications
+- Manual transaction sync
+
+**Features:**
+- ✅ MTN Mobile Money integration
+- ✅ Airtel Money integration
+- ✅ Real-time payment webhooks
+- ✅ Automatic fee balance updates
+- ✅ Transaction history
+- ✅ Manual sync fallback
+
+**Files Added:**
+- `backend/internal/services/schoolpay_service.go`
+- `backend/internal/handlers/schoolpay_handler.go`
+- `backend/internal/models/schoolpay.go`
+- `backend/migrations/20260129000000_create_schoolpay_tables.sql`
+- `backend/migrations/20260130000000_add_schoolpay_code_to_students.sql`
+- `SCHOOLPAY_SETUP.md` (setup guide)
+
+**Configuration Required:**
+- Each school needs SchoolPay merchant account
+- Webhook URL: `https://yourdomain.com/api/v1/webhooks/schoolpay/{SCHOOL_ID}`
+- Admin panel: Settings → SchoolPay Integration
+
+**Impact:** MEDIUM - Optional feature, schools can enable as needed
+
+---
+
+## 🔧 Technical Changes
+
+### Docker Configuration
+
+**Updated Files:**
+- `docker-compose.prod.yml` - Added SMS and SchoolPay environment variables
+- `.env.production.example` - Added SMS and SchoolPay configuration
+- `backend/Dockerfile` - Already includes migrations (no changes needed)
+
+### Deployment Scripts
+
+**Updated Files:**
+- `deploy.sh` - Added SchoolPay migrations
+- `update-production.sh` - NEW: Quick update script for existing deployments
+
+### Database Migrations
+
+**New Migrations:**
+1. `20260505000000_create_sms_tables_pg.sql` - SMS system tables
+2. `20260129000000_create_schoolpay_tables.sql` - SchoolPay tables
+3. `20260130000000_add_schoolpay_code_to_students.sql` - SchoolPay code column
+
+---
+
+## 📋 Deployment Checklist
+
+### Pre-Deployment
+
+- [ ] Backup production database
+- [ ] Review all changes in staging
+- [ ] Update `.env` file with SMS/SchoolPay credentials (optional)
+- [ ] Notify users of scheduled maintenance
+- [ ] Prepare rollback plan
+
+### Deployment
+
+- [ ] Pull latest code
+- [ ] Rebuild Docker images
+- [ ] Run database migrations
+- [ ] Restart services
+- [ ] Verify health checks
+
+### Post-Deployment
+
+- [ ] Test grading system (all levels)
+- [ ] Test SMS sending (if configured)
+- [ ] Test SchoolPay webhook (if configured)
+- [ ] Monitor logs for errors
+- [ ] Verify all services are running
+
+---
+
+## 🧪 Testing Guide
+
+### Test 1: Grading System
+
+**Advanced Level (S5-S6):**
 ```
-- ✅ Pulls code
-- ✅ Rebuilds services
-- ✅ Recalculates grades
-- ✅ Shows summary
+1. Import Paper 1 marks for a subject
+2. Import Paper 2 marks for same subject
+3. Verify final grades are calculated correctly
+4. Compare with manual entry - should match
+```
 
-### Option 2: Manual Deployment + Script
+**Expected Results:**
+- Paper 1 import: Shows individual codes (D1, C3, etc.)
+- Paper 2 import: Shows final grades (A, B, C, D, E, O, F)
+- Manual entry: Same grades as bulk import
+
+### Test 2: SMS Integration
+
+**Setup:**
+```
+1. Login as admin
+2. Go to SMS Management → Configuration
+3. Select provider (Africa's Talking or Twilio)
+4. Enter credentials
+5. Test connection
+```
+
+**Send Test SMS:**
+```
+1. Go to SMS Management → Send SMS
+2. Enter phone number (+256...)
+3. Type message
+4. Send
+5. Verify SMS received
+```
+
+### Test 3: SchoolPay Integration
+
+**Setup:**
+```
+1. Login as admin
+2. Go to Settings → SchoolPay Integration
+3. Enter School Code and API Password
+4. Set Webhook URL
+5. Enable and activate
+```
+
+**Test Payment:**
+```
+1. Assign SchoolPay code to student
+2. Make test payment via SchoolPay
+3. Verify webhook receives payment
+4. Check student fees updated
+5. Verify balance reduced
+```
+
+---
+
+## 🚨 Known Issues & Limitations
+
+### SMS Integration
+- Requires active account with Africa's Talking or Twilio
+- SMS costs are charged by provider
+- International SMS may have higher rates
+- Sender ID approval required (Africa's Talking)
+
+### SchoolPay Integration
+- Only available in Uganda
+- Requires SchoolPay merchant account
+- Webhook requires public internet access
+- Manual sync available as fallback
+
+### Grading System
+- Grade recalculation only for S5-S6 bulk imports
+- Other levels already working correctly
+- No impact on existing grades
+
+---
+
+## 🔄 Rollback Plan
+
+If issues occur:
+
 ```bash
-# Deploy manually
-git pull
+# 1. Stop services
+docker compose -f docker-compose.prod.yml down
+
+# 2. Restore database
+docker exec -i acadistra_postgres psql -U acadistra -d acadistra < backup_YYYYMMDD.sql
+
+# 3. Checkout previous version
+git checkout PREVIOUS_COMMIT
+
+# 4. Rebuild and start
 docker compose -f docker-compose.prod.yml up -d --build
-
-# Then recalculate
-./recalculate-grades.sh
-```
-
-### Option 3: Browser Console
-```javascript
-fetch('https://acadistra.com/api/v1/recalculate-grades?term=Term%201&year=2026', {
-  method: 'POST',
-  headers: {'Authorization': 'Bearer ' + localStorage.getItem('access_token')}
-}).then(r => r.json()).then(console.log)
 ```
 
 ---
 
-## 📊 Grading Systems Summary
+## 📊 Monitoring
 
-### Nursery (Baby, Middle, Top)
-- **Marks:** CA(100) + Exam(100)
-- **Formula:** Average
-- **Grades:** Mastering, Secure, Developing, Emerging, Not Yet
+### Key Metrics to Watch
 
-### Primary (P1-P7)
-- **Marks:** CA(40) + Exam(60)
-- **Formula:** (CA/40)×40 + (Exam/60)×60
-- **Grades:** D1, D2, C3, C4, C5, C6, P7, P8, F9
+**After Deployment:**
+- Service uptime (all containers running)
+- API response times
+- Database connections
+- Error rates in logs
 
-### O-Level (S1-S4)
-- **Marks:** AOI(20) + Exam(80)
-- **Formula:** (AOI/20)×20 + (Exam/80)×80
-- **Grades:** D1, D2, C3, C4, C5, C6, P7, P8, F9
-- **Label:** "AOI" (not "CA")
+**SMS Monitoring:**
+- SMS delivery rate
+- Failed SMS count
+- SMS costs
+- Provider API status
 
-### A-Level (S5-S6)
-- **Marks:** Paper 1-4 (100 each)
-- **Formula:** Paper codes → Principal grade
-- **Grades:** A, B, C, D, E, O, F
+**SchoolPay Monitoring:**
+- Webhook success rate
+- Payment processing time
+- Failed transactions
+- Sync job status
 
----
+### Log Commands
 
-## ✅ Pre-Deployment Checklist
-
-- [ ] Backend compiles successfully
-- [ ] All tests pass
-- [ ] Git repository is up to date
-- [ ] Docker Compose file is correct
-- [ ] Admin credentials are known
-- [ ] Database backup created (optional but recommended)
-
----
-
-## 🔍 Post-Deployment Verification
-
-### 1. Check Services
 ```bash
-docker compose -f docker-compose.prod.yml ps
+# All services
+docker compose -f docker-compose.prod.yml logs -f
+
+# Backend only
+docker compose -f docker-compose.prod.yml logs -f backend
+
+# Filter errors
+docker compose -f docker-compose.prod.yml logs backend | grep -i error
+
+# SMS logs
+docker compose -f docker-compose.prod.yml logs backend | grep -i sms
+
+# SchoolPay logs
+docker compose -f docker-compose.prod.yml logs backend | grep -i schoolpay
 ```
-All services should show "running"
-
-### 2. Check Backend Health
-```bash
-curl https://acadistra.com/health
-```
-Should return: `{"status":"ok"}`
-
-### 3. Check Grades
-- Visit: `https://acadistra.com/results`
-- Select P4 class
-- Verify: 60 marks → **C4** (not C3)
-- Verify: 80 marks → **D2** (not D1)
-
-### 4. Check Labels
-- Select S1 class
-- Verify: Column shows **"AOI"** (not "CA")
-
-### 5. Check Recalculation
-Script output should show:
-```json
-{
-  "message": "Grade recalculation completed",
-  "updated": 48,
-  "errors": 0,
-  "skipped": 5,
-  "total": 53
-}
-```
-
----
-
-## 📁 File Structure
-
-```
-acadistra/
-├── deploy-grading-fix.sh              # Main deployment script
-├── recalculate-grades.sh              # Grade recalculation only
-├── QUICKSTART_DEPLOYMENT.md           # Quick start guide
-├── DEPLOYMENT_SCRIPTS_README.md       # Detailed docs
-├── GRADING_VERIFICATION.md            # Verification report
-├── DEPLOYMENT_SUMMARY.md              # This file
-├── backend/
-│   └── internal/
-│       ├── grading/
-│       │   └── grading.go             # ✅ Fixed grading logic
-│       └── handlers/
-│           ├── result_handler.go      # ✅ Recalculation + logs
-│           └── staff_handler.go       # ✅ Log cleanup
-└── frontend/
-    └── src/
-        └── app/
-            └── results/
-                └── page.tsx           # ✅ UI labels
-```
-
----
-
-## 🛠️ System Requirements
-
-### Required
-- ✅ bash
-- ✅ curl
-- ✅ git
-- ✅ docker & docker compose
-- ✅ PostgreSQL (via Docker)
-- ✅ Redis (via Docker)
-
-### Optional
-- python3 or jq (for pretty JSON output)
 
 ---
 
 ## 📞 Support
 
-### Documentation
-- `QUICKSTART_DEPLOYMENT.md` - Quick start
-- `DEPLOYMENT_SCRIPTS_README.md` - Full documentation
-- `GRADING_VERIFICATION.md` - Grading details
+### Technical Issues
+- **Email:** support@acadistra.com
+- **Documentation:** See `PRODUCTION_DEPLOYMENT_CHECKLIST.md`
 
-### Troubleshooting
-1. Check logs: `docker compose -f docker-compose.prod.yml logs backend`
-2. Check services: `docker compose -f docker-compose.prod.yml ps`
-3. Restart: `docker compose -f docker-compose.prod.yml restart`
+### SMS Provider Support
+- **Africa's Talking:** support@africastalking.com
+- **Twilio:** support@twilio.com
 
-### Manual Recalculation
-If scripts fail, use browser console method (see QUICKSTART_DEPLOYMENT.md)
+### SchoolPay Support
+- **Email:** support@schoolpay.co.ug
+- **Setup Guide:** See `SCHOOLPAY_SETUP.md`
 
 ---
 
-## 🎉 Success Criteria
+## 📚 Documentation
+
+**New Documentation:**
+- `PRODUCTION_DEPLOYMENT_CHECKLIST.md` - Complete deployment guide
+- `SCHOOLPAY_SETUP.md` - SchoolPay integration guide
+- `update-production.sh` - Quick update script
+
+**Updated Documentation:**
+- `deploy.sh` - Added SchoolPay migrations
+- `.env.production.example` - Added SMS and SchoolPay variables
+- `docker-compose.prod.yml` - Added environment variables
+
+---
+
+## ✅ Deployment Commands
+
+### Fresh Installation
+
+```bash
+# Clone repository
+git clone https://github.com/yourusername/acadistra.git
+cd acadistra
+
+# Run deployment script
+./deploy.sh
+```
+
+### Update Existing Installation
+
+```bash
+# Navigate to project
+cd /path/to/acadistra
+
+# Run update script
+./update-production.sh
+```
+
+### Manual Deployment
+
+```bash
+# Pull latest code
+git pull origin main
+
+# Backup database
+docker exec acadistra_postgres pg_dump -U acadistra acadistra > backup.sql
+
+# Rebuild and restart
+docker compose -f docker-compose.prod.yml up -d --build
+
+# Run migrations
+docker exec acadistra_backend ./main migrate
+docker exec acadistra_backend sh -c "PGPASSWORD=\$DB_PASSWORD psql -h \$DB_HOST -U \$DB_USER -d \$DB_NAME -f migrations/20260505000000_create_sms_tables_pg.sql"
+docker exec acadistra_backend sh -c "PGPASSWORD=\$DB_PASSWORD psql -h \$DB_HOST -U \$DB_USER -d \$DB_NAME -f migrations/20260129000000_create_schoolpay_tables.sql"
+docker exec acadistra_backend sh -c "PGPASSWORD=\$DB_PASSWORD psql -h \$DB_HOST -U \$DB_USER -d \$DB_NAME -f migrations/20260130000000_add_schoolpay_code_to_students.sql"
+```
+
+---
+
+## 🎯 Success Criteria
 
 Deployment is successful when:
 
-- ✅ All Docker services are running
-- ✅ Backend health check passes
-- ✅ Grades show D1/D2/C3/C4 (not A/B/C)
-- ✅ S1-S4 shows "AOI" column (not "CA")
-- ✅ Grade recalculation completes without errors
-- ✅ No "record not found" logs in output
+- ✅ All Docker containers are running
+- ✅ Health checks pass for all services
+- ✅ Database migrations completed
+- ✅ No errors in logs
+- ✅ Frontend loads correctly
+- ✅ API endpoints respond
+- ✅ Grading system works for all levels
+- ✅ SMS can be configured (if needed)
+- ✅ SchoolPay can be configured (if needed)
 
 ---
 
-## 📈 Impact
+## 📝 Change Log
 
-### Before
-- ❌ S1-S4 using wrong grading scale (A/B/C)
-- ❌ Incorrect column labels ("CA" instead of "AOI")
-- ❌ No way to update existing grades
-- ❌ Log spam from expected missing records
+### v2.1.0 - Production Ready
 
-### After
-- ✅ All levels use correct UNEB/NCDC grading
-- ✅ Proper labels for all levels
-- ✅ Automated grade recalculation
-- ✅ Clean logs
+**Added:**
+- SMS integration with Africa's Talking and Twilio
+- SchoolPay mobile money payment integration
+- Comprehensive deployment documentation
+- Quick update script for production
 
----
+**Fixed:**
+- Advanced Level grading inconsistency between manual and bulk import
+- Bulk import not recalculating final grades after all papers imported
+- Grade calculation now uses standard grading logic consistently
 
-## 🔐 Security Notes
+**Changed:**
+- Improved bulk import service with automatic grade recalculation
+- Enhanced deployment scripts with SMS and SchoolPay migrations
+- Updated environment configuration examples
 
-- Scripts use admin credentials (keep secure)
-- Access tokens are temporary (expire after session)
-- Only System Admin and School Admin can recalculate grades
-- All changes are logged in audit trail
-
----
-
-## 📅 Maintenance
-
-### Future Grade Recalculations
-```bash
-# Recalculate new term
-TERM="Term 2" YEAR="2026" ./recalculate-grades.sh
-
-# Recalculate specific level
-LEVEL="P5" ./recalculate-grades.sh
-```
-
-### Monitoring
-```bash
-# Watch logs
-docker compose -f docker-compose.prod.yml logs -f backend
-
-# Check database
-docker exec -it acadistra_postgres psql -U acadistra -d acadistra
-```
+**Documentation:**
+- Added PRODUCTION_DEPLOYMENT_CHECKLIST.md
+- Added SCHOOLPAY_SETUP.md
+- Updated deploy.sh with new migrations
+- Created update-production.sh for quick updates
 
 ---
 
-**Version:** 1.0.0  
-**Date:** 2026-04-09  
-**Status:** ✅ Ready for Production Deployment  
-**Tested:** ✅ Backend compiles, scripts validated
+**Ready for Production Deployment** ✅
+
+All changes have been tested and documented. Follow the deployment checklist for a smooth rollout.

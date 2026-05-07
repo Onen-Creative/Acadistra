@@ -5,16 +5,21 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/school-system/backend/internal/models"
+	"github.com/school-system/backend/internal/repositories"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
 type UserAssignmentService struct {
-	db *gorm.DB
+	repo repositories.UserAssignmentRepository
+	db   *gorm.DB
 }
 
-func NewUserAssignmentService(db *gorm.DB) *UserAssignmentService {
-	return &UserAssignmentService{db: db}
+func NewUserAssignmentService(repo repositories.UserAssignmentRepository, db *gorm.DB) *UserAssignmentService {
+	return &UserAssignmentService{
+		repo: repo,
+		db:   db,
+	}
 }
 
 // CreateSchoolAdmin creates a default admin user for a school
@@ -41,7 +46,7 @@ func (s *UserAssignmentService) CreateSchoolAdmin(schoolID uuid.UUID, schoolName
 		},
 	}
 
-	if err := s.db.Create(admin).Error; err != nil {
+	if err := s.repo.CreateUser(admin); err != nil {
 		return nil, fmt.Errorf("failed to create admin user: %w", err)
 	}
 
@@ -51,14 +56,13 @@ func (s *UserAssignmentService) CreateSchoolAdmin(schoolID uuid.UUID, schoolName
 // AssignTeacherToClass assigns a teacher to a specific class
 func (s *UserAssignmentService) AssignTeacherToClass(teacherID, classID uuid.UUID) error {
 	// Verify teacher exists and belongs to the same school as the class
-	var teacher models.User
-	var class models.Class
-	
-	if err := s.db.First(&teacher, "id = ? AND role = 'teacher'", teacherID).Error; err != nil {
+	teacher, err := s.repo.FindTeacherByID(teacherID)
+	if err != nil {
 		return fmt.Errorf("teacher not found: %w", err)
 	}
 	
-	if err := s.db.First(&class, "id = ?", classID).Error; err != nil {
+	class, err := s.repo.FindClassByID(classID)
+	if err != nil {
 		return fmt.Errorf("class not found: %w", err)
 	}
 	
@@ -66,9 +70,7 @@ func (s *UserAssignmentService) AssignTeacherToClass(teacherID, classID uuid.UUI
 		return fmt.Errorf("teacher and class must belong to the same school")
 	}
 
-	// Update class with teacher assignment
-	class.TeacherProfileID = &teacherID
-	if err := s.db.Save(&class).Error; err != nil {
+	if err := s.repo.AssignTeacherToClass(classID, teacherID); err != nil {
 		return fmt.Errorf("failed to assign teacher to class: %w", err)
 	}
 
@@ -96,7 +98,7 @@ func (s *UserAssignmentService) CreateTeacher(schoolID uuid.UUID, fullName, emai
 		},
 	}
 
-	if err := s.db.Create(teacher).Error; err != nil {
+	if err := s.repo.CreateUser(teacher); err != nil {
 		return nil, fmt.Errorf("failed to create teacher: %w", err)
 	}
 
@@ -105,8 +107,8 @@ func (s *UserAssignmentService) CreateTeacher(schoolID uuid.UUID, fullName, emai
 
 // GetSchoolUsers returns all users for a specific school
 func (s *UserAssignmentService) GetSchoolUsers(schoolID uuid.UUID) ([]models.User, error) {
-	var users []models.User
-	if err := s.db.Where("school_id = ?", schoolID).Find(&users).Error; err != nil {
+	users, err := s.repo.FindUsersBySchoolID(schoolID)
+	if err != nil {
 		return nil, fmt.Errorf("failed to get school users: %w", err)
 	}
 	return users, nil
@@ -126,7 +128,7 @@ func (s *UserAssignmentService) UpdateUserRole(userID uuid.UUID, newRole string)
 		return fmt.Errorf("invalid role: %s", newRole)
 	}
 
-	if err := s.db.Model(&models.User{}).Where("id = ?", userID).Update("role", newRole).Error; err != nil {
+	if err := s.repo.UpdateUserRole(userID, newRole); err != nil {
 		return fmt.Errorf("failed to update user role: %w", err)
 	}
 
@@ -154,7 +156,7 @@ func (s *UserAssignmentService) CreateStoreKeeper(schoolID uuid.UUID, fullName, 
 		},
 	}
 
-	if err := s.db.Create(storeKeeper).Error; err != nil {
+	if err := s.repo.CreateUser(storeKeeper); err != nil {
 		return nil, fmt.Errorf("failed to create store keeper: %w", err)
 	}
 

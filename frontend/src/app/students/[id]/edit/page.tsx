@@ -86,6 +86,7 @@ export default function EditStudentPage() {
       nationality: studentData.nationality || '',
       religion: studentData.religion || '',
       lin: studentData.lin || '',
+      schoolpay_code: studentData.schoolpay_code || '',
       email: studentData.email || '',
       phone: studentData.phone || '',
       address: studentData.address || '',
@@ -164,6 +165,7 @@ export default function EditStudentPage() {
       nationality: data.nationality,
       religion: data.religion,
       lin: data.lin,
+      schoolpay_code: data.schoolpay_code,
       email: data.email,
       phone: data.phone,
       address: data.address,
@@ -288,6 +290,7 @@ export default function EditStudentPage() {
               <FormInput {...register('nationality')} label="Nationality" placeholder="Ugandan" />
               <FormInput {...register('religion')} label="Religion" />
               <FormInput {...register('lin')} label="LIN" placeholder="Learner ID" />
+              <FormInput {...register('schoolpay_code')} label="SchoolPay Code" placeholder="SchoolPay Code" />
               <FormSelect {...register('status')} label="Status" options={[
                 { value: 'active', label: 'Active' }, { value: 'suspended', label: 'Suspended' },
                 { value: 'graduated', label: 'Graduated' }, { value: 'transferred', label: 'Transferred' }, { value: 'withdrawn', label: 'Withdrawn' }

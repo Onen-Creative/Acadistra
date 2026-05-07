@@ -5,16 +5,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/school-system/backend/internal/models"
-	"gorm.io/gorm"
+	"github.com/school-system/backend/internal/services"
 )
 
 type WebVitalsHandler struct {
-	db *gorm.DB
+	service *services.WebVitalsService
 }
 
-func NewWebVitalsHandler(db *gorm.DB) *WebVitalsHandler {
-	return &WebVitalsHandler{db: db}
+func NewWebVitalsHandler(service *services.WebVitalsService) *WebVitalsHandler {
+	return &WebVitalsHandler{service: service}
 }
 
 type WebVitalRequest struct {
@@ -35,29 +34,29 @@ func (h *WebVitalsHandler) RecordWebVital(c *gin.Context) {
 	userID := c.GetString("user_id")
 	schoolID := c.GetString("tenant_school_id")
 
-	vital := &models.WebVital{
+	svcReq := &services.WebVitalRequest{
 		Name:      req.Name,
 		Value:     req.Value,
 		Rating:    req.Rating,
 		Delta:     req.Delta,
-		MetricID:  req.ID,
+		ID:        req.ID,
 		URL:       c.Request.Referer(),
 		UserAgent: c.Request.UserAgent(),
 	}
 
 	if userID != "" {
-		if uid, err := parseUUID(userID); err == nil {
-			vital.UserID = &uid
+		if uid, err := uuid.Parse(userID); err == nil {
+			svcReq.UserID = &uid
 		}
 	}
 
 	if schoolID != "" {
-		if sid, err := parseUUID(schoolID); err == nil {
-			vital.SchoolID = &sid
+		if sid, err := uuid.Parse(schoolID); err == nil {
+			svcReq.SchoolID = &sid
 		}
 	}
 
-	if err := h.db.Create(vital).Error; err != nil {
+	if err := h.service.RecordWebVital(svcReq); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to record metric"})
 		return
 	}
@@ -69,43 +68,11 @@ func (h *WebVitalsHandler) GetWebVitalsStats(c *gin.Context) {
 	schoolID := c.GetString("tenant_school_id")
 	metricName := c.Query("name")
 
-	type Stats struct {
-		Name    string  `json:"name"`
-		Average float64 `json:"average"`
-		P50     float64 `json:"p50"`
-		P75     float64 `json:"p75"`
-		P95     float64 `json:"p95"`
-		Count   int64   `json:"count"`
-	}
-
-	query := h.db.Model(&models.WebVital{})
-	
-	if schoolID != "" {
-		query = query.Where("school_id = ?", schoolID)
-	}
-
-	if metricName != "" {
-		query = query.Where("name = ?", metricName)
-	}
-
-	var stats []Stats
-	err := query.Select(`
-		name,
-		AVG(value) as average,
-		PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY value) as p50,
-		PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY value) as p75,
-		PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY value) as p95,
-		COUNT(*) as count
-	`).Group("name").Scan(&stats).Error
-
+	stats, err := h.service.GetStats(schoolID, metricName)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"stats": stats})
-}
-
-func parseUUID(s string) (uuid.UUID, error) {
-	return uuid.Parse(s)
 }

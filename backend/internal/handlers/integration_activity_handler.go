@@ -6,15 +6,15 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/school-system/backend/internal/models"
-	"gorm.io/gorm"
+	"github.com/school-system/backend/internal/services"
 )
 
 type IntegrationActivityHandler struct {
-	db *gorm.DB
+	service *services.IntegrationActivityService
 }
 
-func NewIntegrationActivityHandler(db *gorm.DB) *IntegrationActivityHandler {
-	return &IntegrationActivityHandler{db: db}
+func NewIntegrationActivityHandler(service *services.IntegrationActivityService) *IntegrationActivityHandler {
+	return &IntegrationActivityHandler{service: service}
 }
 
 func (h *IntegrationActivityHandler) GetByClass(c *gin.Context) {
@@ -29,13 +29,8 @@ func (h *IntegrationActivityHandler) GetByClass(c *gin.Context) {
 		return
 	}
 
-	query := h.db.Where("class_id = ? AND term = ? AND year = ? AND school_id = ?", classID, term, year, schoolID)
-	if subjectID != "" {
-		query = query.Where("subject_id = ?", subjectID)
-	}
-
-	var activities []models.IntegrationActivity
-	if err := query.Preload("Student").Preload("Subject").Find(&activities).Error; err != nil {
+	activities, err := h.service.GetByClass(schoolID, classID, subjectID, term, year)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -63,63 +58,27 @@ func (h *IntegrationActivityHandler) CreateOrUpdate(c *gin.Context) {
 		return
 	}
 
-	studentID, err := uuid.Parse(req.StudentID)
-	if err != nil {
+	if _, err := uuid.Parse(req.StudentID); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid student ID"})
 		return
 	}
 
-	subjectID, err := uuid.Parse(req.SubjectID)
-	if err != nil {
+	if _, err := uuid.Parse(req.SubjectID); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid subject ID: " + req.SubjectID})
 		return
 	}
 
-	classID, err := uuid.Parse(req.ClassID)
-	if err != nil {
+	if _, err := uuid.Parse(req.ClassID); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid class ID"})
 		return
 	}
 
 	schoolID := c.GetString("tenant_school_id")
 
-	// Validate marks are between 0 and 3
-	for _, v := range req.Marks {
-		if mark, ok := v.(float64); ok {
-			if mark < 0 || mark > 3 {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Marks must be between 0 and 3"})
-				return
-			}
-		}
-	}
-
-	var activity models.IntegrationActivity
-	err = h.db.Where("student_id = ? AND subject_id = ? AND term = ? AND year = ?", studentID, subjectID, req.Term, req.Year).
-		First(&activity).Error
-
-	if err == gorm.ErrRecordNotFound {
-		activity = models.IntegrationActivity{
-			StudentID: studentID,
-			SubjectID: subjectID,
-			ClassID:   classID,
-			SchoolID:  uuid.MustParse(schoolID),
-			Term:      req.Term,
-			Year:      req.Year,
-			Marks:     req.Marks,
-		}
-		if err := h.db.Create(&activity).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-	} else if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	activity, err := h.service.CreateOrUpdate(schoolID, req.StudentID, req.SubjectID, req.ClassID, req.Term, req.Year, req.Marks)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
-	} else {
-		activity.Marks = req.Marks
-		if err := h.db.Save(&activity).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
 	}
 
 	c.JSON(http.StatusOK, activity)

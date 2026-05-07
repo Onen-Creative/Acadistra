@@ -24,9 +24,17 @@ generate_password() {
 
 # Check if .env exists
 if [ ! -f .env ]; then
-    echo -e "${RED}Error: .env file not found!${NC}"
-    echo -e "${YELLOW}Please create .env file with required configuration${NC}"
-    exit 1
+    echo -e "${YELLOW}Creating .env file from example...${NC}"
+    if [ -f .env.production.example ]; then
+        cp .env.production.example .env
+        echo -e "${GREEN}✓ .env created from .env.production.example${NC}"
+        echo -e "${RED}IMPORTANT: Edit .env file and add your credentials before continuing!${NC}"
+        echo -e "${YELLOW}Press Enter after editing .env file...${NC}"
+        read
+    else
+        echo -e "${RED}Error: .env.production.example not found!${NC}"
+        exit 1
+    fi
 else
     echo -e "${GREEN}✓ .env already exists${NC}"
 fi
@@ -83,6 +91,21 @@ echo ""
 echo -e "${YELLOW}Seeding standard subjects...${NC}"
 docker exec acadistra_backend ./main seed-standard-subjects || echo -e "${YELLOW}Subjects may already exist${NC}"
 
+# Run SMS tables migration
+echo ""
+echo -e "${YELLOW}Creating SMS system tables...${NC}"
+docker exec acadistra_backend sh -c "PGPASSWORD=\$DB_PASSWORD psql -h \$DB_HOST -U \$DB_USER -d \$DB_NAME -f migrations/20260505000000_create_sms_tables_pg.sql" || echo -e "${YELLOW}SMS tables may already exist${NC}"
+
+# Run SchoolPay tables migration
+echo ""
+echo -e "${YELLOW}Creating SchoolPay system tables...${NC}"
+docker exec acadistra_backend sh -c "PGPASSWORD=\$DB_PASSWORD psql -h \$DB_HOST -U \$DB_USER -d \$DB_NAME -f migrations/20260129000000_create_schoolpay_tables.sql" || echo -e "${YELLOW}SchoolPay tables may already exist${NC}"
+
+# Add SchoolPay code to students
+echo ""
+echo -e "${YELLOW}Adding SchoolPay code column to students...${NC}"
+docker exec acadistra_backend sh -c "PGPASSWORD=\$DB_PASSWORD psql -h \$DB_HOST -U \$DB_USER -d \$DB_NAME -f migrations/20260130000000_add_schoolpay_code_to_students.sql" || echo -e "${YELLOW}SchoolPay code column may already exist${NC}"
+
 echo ""
 echo -e "${GREEN}=========================================="
 echo "  Deployment Complete!"
@@ -96,6 +119,11 @@ echo ""
 echo "Default credentials:"
 echo "  - Email: admin@acadistra.com"
 echo "  - Password: Admin@123"
+echo ""
+echo "Configuration:"
+echo "  - SMS: Configure in Admin Panel > SMS Management"
+echo "  - SchoolPay: Configure in Admin Panel > Settings > SchoolPay"
+echo "  - Email: Already configured from .env file"
 echo ""
 echo "To view logs:"
 echo "  docker compose -f docker-compose.prod.yml logs -f"

@@ -33,9 +33,7 @@ interface RequisitionReceiptProps {
 export default function RequisitionReceipt({ requisition, onClose }: RequisitionReceiptProps) {
   const [school, setSchool] = useState<any>(null)
 
-  useEffect(() => {
-    loadSchool()
-  }, [])
+  useEffect(() => { loadSchool() }, [])
 
   const loadSchool = async () => {
     try {
@@ -46,10 +44,6 @@ export default function RequisitionReceipt({ requisition, onClose }: Requisition
     }
   }
 
-  const handlePrint = () => {
-    window.print()
-  }
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -58,7 +52,7 @@ export default function RequisitionReceipt({ requisition, onClose }: Requisition
           <h3 className="text-lg font-bold text-gray-800">Requisition Payment Receipt</h3>
           <div className="flex gap-2">
             <button
-              onClick={handlePrint}
+              onClick={() => window.print()}
               className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
             >
               🖨️ Print
@@ -73,100 +67,107 @@ export default function RequisitionReceipt({ requisition, onClose }: Requisition
         </div>
 
         {/* Receipt Content */}
-        <div className="receipt-content p-8" style={{ fontFamily: 'Arial, sans-serif', lineHeight: '1.4' }}>
+        <div className="receipt-content p-8" style={{ fontFamily: 'Arial, sans-serif', lineHeight: '1.6', fontSize: '14px' }}>
           {/* Header */}
-          <div className="text-center border-b-2 border-black pb-4 mb-6">
+          <div className="text-center pb-4 mb-6" style={{ borderBottom: '3px solid #000' }}>
             {school?.logo_url && (
-              <div className="flex justify-center mb-2">
-                <ImageWithFallback 
-                  src={school.logo_url} 
-                  alt="School Logo" 
-                  className="h-12 w-12 object-contain"
-                  fallback="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2'%3E%3Cpath d='M22 10v6M2 10l10-5 10 5-10 5z'/%3E%3Cpath d='M6 12v5c3 3 9 3 12 0v-5'/%3E%3C/svg%3E"
+              <div className="flex justify-center mb-3">
+                <ImageWithFallback
+                  src={school.logo_url}
+                  alt="School Logo"
+                  className="h-20 w-20 object-contain"
+                  fallback="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2'%3E%3Cpath d='M22 10v6M2 10l10-5 10 5-10 5z'/%3E%3Cpath d='M6 12v5c3 3 9 3 12 0v-5'/%3E%3C/svg%3E"
                 />
               </div>
             )}
-            <h1 className="text-lg font-bold uppercase text-black mb-1">{school?.name || 'School Name'}</h1>
-            <p className="text-xs text-gray-700 italic mb-1">&quot;{school?.motto || 'School Motto'}&quot;</p>
-            <p className="text-xs text-gray-700">{school?.address}</p>
-            <p className="text-xs text-gray-700">Tel: {school?.phone} | Email: {school?.contact_email}</p>
-            <div className="mt-3 bg-black text-white py-1 px-3 inline-block">
-              <h2 className="text-sm font-bold">REQUISITION PAYMENT RECEIPT</h2>
+            <h1 style={{ fontSize: '22px', fontWeight: 'bold', textTransform: 'uppercase', color: '#000', marginBottom: '4px' }}>{school?.name || 'School Name'}</h1>
+            <p style={{ fontSize: '13px', color: '#333', fontStyle: 'italic', marginBottom: '4px' }}>&quot;{school?.motto || 'School Motto'}&quot;</p>
+            <p style={{ fontSize: '13px', color: '#333', marginBottom: '2px' }}>{school?.address}</p>
+            <p style={{ fontSize: '13px', color: '#333', marginBottom: '8px' }}>Tel: {school?.phone} | Email: {school?.contact_email}</p>
+            <div style={{ marginTop: '12px', backgroundColor: '#000', color: '#fff', padding: '8px 16px', display: 'inline-block', border: '2px solid #000' }}>
+              <h2 style={{ fontSize: '16px', fontWeight: 'bold', margin: 0 }}>REQUISITION PAYMENT RECEIPT</h2>
             </div>
           </div>
 
           {/* Receipt Info Bar */}
-          <div className="bg-gray-100 p-3 mb-4 text-center">
-            <div className="grid grid-cols-3 gap-4 text-xs">
+          <div style={{ backgroundColor: '#f5f5f5', padding: '12px', marginBottom: '16px', textAlign: 'center', border: '2px solid #000' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
               <div>
-                <span className="font-bold">Requisition No:</span><br/>
-                <span className="text-lg font-bold">{requisition.requisition_no}</span>
+                <span style={{ fontWeight: 'bold', fontSize: '13px', display: 'block', marginBottom: '4px' }}>Requisition No:</span>
+                <span style={{ fontSize: '18px', fontWeight: 'bold' }}>{requisition.requisition_no}</span>
               </div>
               <div>
-                <span className="font-bold">Payment Date:</span><br/>
-                <span>{new Date(requisition.completed_date).toLocaleDateString('en-GB')}</span>
+                <span style={{ fontWeight: 'bold', fontSize: '13px', display: 'block', marginBottom: '4px' }}>Payment Date:</span>
+                <span style={{ fontSize: '14px', fontWeight: '600' }}>{new Date(requisition.completed_date).toLocaleDateString('en-GB')}</span>
               </div>
               <div>
-                <span className="font-bold">Department:</span><br/>
-                <span>{requisition.department}</span>
+                <span style={{ fontWeight: 'bold', fontSize: '13px', display: 'block', marginBottom: '4px' }}>Department:</span>
+                <span style={{ fontSize: '14px', fontWeight: '600' }}>{requisition.department}</span>
               </div>
             </div>
           </div>
 
-          {/* Requisition Information */}
-          <div className="mb-4">
-            <h3 className="font-bold text-black mb-2 bg-gray-200 p-2 text-sm">REQUISITION DETAILS</h3>
-            <div className="grid grid-cols-2 gap-4 text-xs">
-              <div>
-                <p><span className="font-medium">Title:</span> {requisition.title}</p>
-                <p><span className="font-medium">Category:</span> {requisition.category}</p>
-              </div>
-              <div>
-                <p><span className="font-medium">Requested By:</span> {requisition.requester?.full_name || 'N/A'}</p>
-                <p><span className="font-medium">Email:</span> {requisition.requester?.email || 'N/A'}</p>
-              </div>
-            </div>
-            {requisition.description && (
-              <div className="mt-2">
-                <p className="text-xs"><span className="font-medium">Description:</span> {requisition.description}</p>
-              </div>
-            )}
+          {/* Requisition Details */}
+          <div style={{ marginBottom: '16px' }}>
+            <h3 style={{ fontWeight: 'bold', color: '#fff', backgroundColor: '#000', marginBottom: '0', padding: '8px', fontSize: '14px', border: '2px solid #000', borderBottom: 'none' }}>REQUISITION DETAILS</h3>
+            <table style={{ width: '100%', border: '2px solid #000', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <tbody>
+                <tr>
+                  <td style={{ padding: '8px', fontWeight: 'bold', backgroundColor: '#f5f5f5', border: '1px solid #000', width: '25%' }}>Title:</td>
+                  <td style={{ padding: '8px', border: '1px solid #000', width: '25%' }}>{requisition.title}</td>
+                  <td style={{ padding: '8px', fontWeight: 'bold', backgroundColor: '#f5f5f5', border: '1px solid #000', width: '25%' }}>Category:</td>
+                  <td style={{ padding: '8px', border: '1px solid #000', width: '25%' }}>{requisition.category}</td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '8px', fontWeight: 'bold', backgroundColor: '#f5f5f5', border: '1px solid #000' }}>Requested By:</td>
+                  <td style={{ padding: '8px', border: '1px solid #000' }}>{requisition.requester?.full_name || 'N/A'}</td>
+                  <td style={{ padding: '8px', fontWeight: 'bold', backgroundColor: '#f5f5f5', border: '1px solid #000' }}>Email:</td>
+                  <td style={{ padding: '8px', border: '1px solid #000' }}>{requisition.requester?.email || 'N/A'}</td>
+                </tr>
+                {requisition.description && (
+                  <tr>
+                    <td style={{ padding: '8px', fontWeight: 'bold', backgroundColor: '#f5f5f5', border: '1px solid #000' }}>Description:</td>
+                    <td colSpan={3} style={{ padding: '8px', border: '1px solid #000' }}>{requisition.description}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
 
           {/* Items Table */}
           {requisition.items && requisition.items.length > 0 && (
-            <div className="mb-4">
-              <h3 className="font-bold text-black mb-2 bg-gray-200 p-2 text-sm">ITEMS PURCHASED</h3>
-              <table className="w-full text-xs border border-gray-300">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="p-2 text-left border-b">#</th>
-                    <th className="p-2 text-left border-b">Item Name</th>
-                    <th className="p-2 text-center border-b">Qty</th>
-                    <th className="p-2 text-center border-b">Unit</th>
-                    <th className="p-2 text-right border-b">Unit Price</th>
-                    <th className="p-2 text-right border-b">Total</th>
+            <div style={{ marginBottom: '16px' }}>
+              <h3 style={{ fontWeight: 'bold', color: '#fff', backgroundColor: '#000', marginBottom: '0', padding: '8px', fontSize: '14px', border: '2px solid #000', borderBottom: 'none' }}>ITEMS PURCHASED</h3>
+              <table style={{ width: '100%', fontSize: '13px', border: '2px solid #000', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f5f5f5' }}>
+                    <th style={{ padding: '8px', textAlign: 'left', border: '1px solid #000' }}>#</th>
+                    <th style={{ padding: '8px', textAlign: 'left', border: '1px solid #000' }}>Item Name</th>
+                    <th style={{ padding: '8px', textAlign: 'center', border: '1px solid #000' }}>Qty</th>
+                    <th style={{ padding: '8px', textAlign: 'center', border: '1px solid #000' }}>Unit</th>
+                    <th style={{ padding: '8px', textAlign: 'right', border: '1px solid #000' }}>Unit Price</th>
+                    <th style={{ padding: '8px', textAlign: 'right', border: '1px solid #000' }}>Total</th>
                   </tr>
                 </thead>
                 <tbody>
                   {requisition.items.map((item, index) => (
-                    <tr key={index} className="border-b">
-                      <td className="p-2">{index + 1}</td>
-                      <td className="p-2">
+                    <tr key={index} style={{ borderBottom: '1px solid #000' }}>
+                      <td style={{ padding: '8px', border: '1px solid #000' }}>{index + 1}</td>
+                      <td style={{ padding: '8px', border: '1px solid #000' }}>
                         {item.item_name}
                         {item.specifications && (
-                          <div className="text-gray-600 text-xs italic">{item.specifications}</div>
+                          <div style={{ fontSize: '12px', color: '#555', fontStyle: 'italic' }}>{item.specifications}</div>
                         )}
                       </td>
-                      <td className="p-2 text-center">{item.quantity}</td>
-                      <td className="p-2 text-center">{item.unit}</td>
-                      <td className="p-2 text-right">UGX {item.unit_price.toLocaleString()}</td>
-                      <td className="p-2 text-right">UGX {item.total_price.toLocaleString()}</td>
+                      <td style={{ padding: '8px', textAlign: 'center', border: '1px solid #000' }}>{item.quantity}</td>
+                      <td style={{ padding: '8px', textAlign: 'center', border: '1px solid #000' }}>{item.unit}</td>
+                      <td style={{ padding: '8px', textAlign: 'right', border: '1px solid #000' }}>UGX {item.unit_price.toLocaleString()}</td>
+                      <td style={{ padding: '8px', textAlign: 'right', border: '1px solid #000' }}>UGX {item.total_price.toLocaleString()}</td>
                     </tr>
                   ))}
-                  <tr className="bg-green-50 font-bold">
-                    <td colSpan={5} className="p-2 text-right">TOTAL AMOUNT PAID:</td>
-                    <td className="p-2 text-right text-green-700">UGX {requisition.total_amount.toLocaleString()}</td>
+                  <tr style={{ backgroundColor: '#e5e5e5', borderTop: '2px solid #000' }}>
+                    <td colSpan={5} style={{ padding: '10px', fontWeight: 'bold', border: '1px solid #000', fontSize: '15px', textAlign: 'right' }}>TOTAL AMOUNT PAID</td>
+                    <td style={{ padding: '10px', fontWeight: 'bold', border: '1px solid #000', fontSize: '15px', textAlign: 'right' }}>UGX {requisition.total_amount.toLocaleString()}</td>
                   </tr>
                 </tbody>
               </table>
@@ -174,68 +175,65 @@ export default function RequisitionReceipt({ requisition, onClose }: Requisition
           )}
 
           {/* Amount in Words */}
-          <div className="mb-4 p-2 border border-gray-400">
-            <p className="text-xs">
-              <span className="font-bold">Amount Paid (In Words):</span><br/>
-              <span className="uppercase">{numberToWords(requisition.total_amount)} Shillings Only</span>
+          <div style={{ marginBottom: '16px', padding: '12px', border: '2px solid #000', backgroundColor: '#f9fafb' }}>
+            <p style={{ fontSize: '13px', margin: 0 }}>
+              <span style={{ fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>Amount Paid (In Words):</span>
+              <span style={{ textTransform: 'uppercase', fontWeight: '600', fontSize: '14px' }}>{numberToWords(requisition.total_amount)} Shillings Only</span>
             </p>
           </div>
 
           {/* Signature Section */}
-          <div className="mt-6">
-            <div className="grid grid-cols-2 gap-8">
+          <div style={{ marginTop: '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
               <div>
-                <div className="border-t border-black w-full mt-8 pt-1">
-                  <p className="font-bold text-xs text-center">RECEIVED BY</p>
-                  <p className="text-xs text-center text-gray-600">Name & Signature</p>
+                <div style={{ borderTop: '2px solid #000', marginTop: '40px', paddingTop: '6px' }}>
+                  <p style={{ fontWeight: 'bold', fontSize: '13px', textAlign: 'center', margin: 0 }}>RECEIVED BY</p>
+                  <p style={{ fontSize: '12px', textAlign: 'center', color: '#666', marginTop: '4px' }}>Name &amp; Signature</p>
                 </div>
               </div>
               <div>
-                <div className="border-t border-black w-full mt-8 pt-1">
-                  <p className="font-bold text-xs text-center">BURSAR SIGNATURE & STAMP</p>
-                  <p className="text-xs text-center text-gray-600">Date: {new Date().toLocaleDateString('en-GB')}</p>
+                <div style={{ borderTop: '2px solid #000', marginTop: '40px', paddingTop: '6px' }}>
+                  <p style={{ fontWeight: 'bold', fontSize: '13px', textAlign: 'center', margin: 0 }}>BURSAR SIGNATURE &amp; STAMP</p>
+                  <p style={{ fontSize: '12px', textAlign: 'center', color: '#666', marginTop: '4px' }}>Date: {new Date().toLocaleDateString('en-GB')}</p>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="text-center mt-6 pt-3 border-t border-gray-400">
-            <p className="text-xs text-gray-600 font-medium">
+          <div style={{ textAlign: 'center', marginTop: '24px', paddingTop: '12px', borderTop: '2px solid #000' }}>
+            <p style={{ fontSize: '12px', color: '#333', fontWeight: '600', margin: 0 }}>
               This is an official payment receipt. Please retain for your records.
             </p>
-            <p className="text-xs text-gray-500 mt-1">
+            <p style={{ fontSize: '11px', color: '#666', marginTop: '6px' }}>
               Generated: {new Date().toLocaleString('en-GB')}
             </p>
           </div>
         </div>
       </div>
 
-      <style jsx>{`
+      <style jsx global>{`
         @media print {
-          @page { 
-            margin: 0.5in; 
-            size: A4 portrait; 
+          @page {
+            margin: 0.5in;
+            size: A4 portrait;
           }
-          .no-print { 
-            display: none !important; 
+          body * {
+            visibility: hidden !important;
+          }
+          .receipt-content,
+          .receipt-content * {
+            visibility: visible !important;
           }
           .receipt-content {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
             padding: 0 !important;
-            font-size: 12px !important;
           }
-          body * { 
-            visibility: hidden; 
-          }
-          .receipt-content, .receipt-content * { 
-            visibility: visible; 
-          }
-          .receipt-content {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            font-size: 11px !important;
+          .no-print {
+            display: none !important;
           }
           table {
             border-collapse: collapse !important;
@@ -246,7 +244,6 @@ export default function RequisitionReceipt({ requisition, onClose }: Requisition
   )
 }
 
-// Helper function to convert numbers to words (simplified)
 function numberToWords(num: number): string {
   const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine']
   const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen']
@@ -257,37 +254,19 @@ function numberToWords(num: number): string {
 
   function convertHundreds(n: number): string {
     let result = ''
-    
-    if (n >= 100) {
-      result += ones[Math.floor(n / 100)] + ' Hundred '
-      n %= 100
-    }
-    
-    if (n >= 20) {
-      result += tens[Math.floor(n / 10)] + ' '
-      n %= 10
-    } else if (n >= 10) {
-      result += teens[n - 10] + ' '
-      return result
-    }
-    
-    if (n > 0) {
-      result += ones[n] + ' '
-    }
-    
+    if (n >= 100) { result += ones[Math.floor(n / 100)] + ' Hundred '; n %= 100 }
+    if (n >= 20) { result += tens[Math.floor(n / 10)] + ' '; n %= 10 }
+    else if (n >= 10) { return result + teens[n - 10] + ' ' }
+    if (n > 0) result += ones[n] + ' '
     return result
   }
 
   let result = ''
   let thousandIndex = 0
-  
   while (num > 0) {
-    if (num % 1000 !== 0) {
-      result = convertHundreds(num % 1000) + thousands[thousandIndex] + ' ' + result
-    }
+    if (num % 1000 !== 0) result = convertHundreds(num % 1000) + thousands[thousandIndex] + ' ' + result
     num = Math.floor(num / 1000)
     thousandIndex++
   }
-  
   return result.trim()
 }

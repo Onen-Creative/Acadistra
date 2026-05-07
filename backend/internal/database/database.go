@@ -163,6 +163,18 @@ func Migrate(db *gorm.DB) error {
 		&models.DailySystemReport{},
 		// System Settings
 		&models.SystemSetting{},
+		// Backup Logs
+		&models.BackupLog{},
+		// Generated Reports
+		&models.GeneratedReport{},
+		// SchoolPay Integration
+		&models.SchoolPayConfig{},
+		&models.SchoolPayTransaction{},
+		// SMS System
+		&models.SMSProvider{},
+		&models.SMSTemplate{},
+		&models.SMSQueue{},
+		&models.SMSBatch{},
 	)
 	if err != nil {
 		// Only ignore the uni_staff_email constraint error if it's about the constraint not existing

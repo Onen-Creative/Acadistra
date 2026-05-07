@@ -32,10 +32,23 @@ const nextConfig = {
   },
   
   async rewrites() {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
     return [
       {
         source: '/stats',
         destination: '/api/health',
+      },
+      {
+        source: '/api/v1/:path*',
+        destination: `${apiUrl}/api/v1/:path*`,
+      },
+      {
+        source: '/photos/:path*',
+        destination: `${apiUrl}/photos/:path*`,
+      },
+      {
+        source: '/logos/:path*',
+        destination: `${apiUrl}/logos/:path*`,
       },
     ]
   },

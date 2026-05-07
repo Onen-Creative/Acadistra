@@ -7,31 +7,21 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/school-system/backend/internal/services"
 	"github.com/xuri/excelize/v2"
-	"gorm.io/gorm"
 )
 
 type SystemReportsHandler struct {
-	db *gorm.DB
+	service *services.SystemReportsService
 }
 
-func NewSystemReportsHandler(db *gorm.DB) *SystemReportsHandler {
-	return &SystemReportsHandler{db: db}
+func NewSystemReportsHandler(service *services.SystemReportsService) *SystemReportsHandler {
+	return &SystemReportsHandler{service: service}
 }
 
 func (h *SystemReportsHandler) GenerateSchoolsReport(c *gin.Context) {
-	var schools []struct {
-		ID        string
-		Name      string
-		Type      string
-		IsActive  bool
-		CreatedAt time.Time
-	}
-
-	if err := h.db.Table("schools").
-		Select("id, name, type, is_active, created_at").
-		Order("created_at DESC").
-		Find(&schools).Error; err != nil {
+	schools, err := h.service.GetSchoolsReportData()
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch schools"})
 		return
 	}
@@ -40,14 +30,12 @@ func (h *SystemReportsHandler) GenerateSchoolsReport(c *gin.Context) {
 	sheet := "Schools"
 	f.SetSheetName("Sheet1", sheet)
 
-	// Headers
 	headers := []string{"ID", "Name", "Type", "Status", "Created At"}
 	for i, header := range headers {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
 		f.SetCellValue(sheet, cell, header)
 	}
 
-	// Data
 	for i, school := range schools {
 		status := "Active"
 		if !school.IsActive {
@@ -73,19 +61,8 @@ func (h *SystemReportsHandler) GenerateSchoolsReport(c *gin.Context) {
 }
 
 func (h *SystemReportsHandler) GenerateUsersReport(c *gin.Context) {
-	var users []struct {
-		ID        string
-		Email     string
-		Name      string
-		Role      string
-		IsActive  bool
-		CreatedAt time.Time
-	}
-
-	if err := h.db.Table("users").
-		Select("id, email, full_name as name, role, is_active, created_at").
-		Order("created_at DESC").
-		Find(&users).Error; err != nil {
+	users, err := h.service.GetUsersReportData()
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch users"})
 		return
 	}
@@ -122,20 +99,8 @@ func (h *SystemReportsHandler) GenerateUsersReport(c *gin.Context) {
 }
 
 func (h *SystemReportsHandler) GenerateStudentsReport(c *gin.Context) {
-	var students []struct {
-		ID          string
-		Name        string
-		AdmissionNo string
-		ClassLevel  string
-		SchoolName  string
-		CreatedAt   time.Time
-	}
-
-	if err := h.db.Table("students").
-		Select("students.id, students.name, students.admission_no, students.class_level, schools.name as school_name, students.created_at").
-		Joins("LEFT JOIN schools ON students.school_id = schools.id").
-		Order("students.created_at DESC").
-		Find(&students).Error; err != nil {
+	students, err := h.service.GetStudentsReportData()
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch students"})
 		return
 	}
@@ -168,19 +133,8 @@ func (h *SystemReportsHandler) GenerateStudentsReport(c *gin.Context) {
 }
 
 func (h *SystemReportsHandler) GenerateActivityReport(c *gin.Context) {
-	var activities []struct {
-		ID        string
-		Action    string
-		UserEmail string
-		Timestamp time.Time
-	}
-
-	if err := h.db.Table("audit_logs").
-		Select("audit_logs.id, audit_logs.action, users.email as user_email, audit_logs.timestamp").
-		Joins("LEFT JOIN users ON audit_logs.actor_user_id = users.id").
-		Order("audit_logs.timestamp DESC").
-		Limit(1000).
-		Find(&activities).Error; err != nil {
+	activities, err := h.service.GetActivityReportData()
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch activities"})
 		return
 	}
@@ -211,19 +165,11 @@ func (h *SystemReportsHandler) GenerateActivityReport(c *gin.Context) {
 }
 
 func (h *SystemReportsHandler) GeneratePerformanceReport(c *gin.Context) {
-	var stats struct {
-		TotalSchools  int64
-		TotalUsers    int64
-		TotalStudents int64
-		ActiveSchools int64
-		ActiveUsers   int64
+	stats, err := h.service.GetPerformanceStats()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch stats"})
+		return
 	}
-
-	h.db.Table("schools").Count(&stats.TotalSchools)
-	h.db.Table("users").Count(&stats.TotalUsers)
-	h.db.Table("students").Count(&stats.TotalStudents)
-	h.db.Table("schools").Where("is_active = ?", true).Count(&stats.ActiveSchools)
-	h.db.Table("users").Where("is_active = ?", true).Count(&stats.ActiveUsers)
 
 	f := excelize.NewFile()
 	sheet := "Performance"

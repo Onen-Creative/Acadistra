@@ -178,37 +178,19 @@ export default function AdvancedLevelReportCard({
               </thead>
               <tbody>
                 {subjects?.map((subject: any, index: number) => {
-                  // Get all paper results for this subject
-                  const subjectResults = results?.filter((r: any) => r.subject_id === subject.id) || []
+                  // For S5/S6, results are already grouped by subject with paper1, paper2, paper3 fields
+                  const subjectResult = results?.find((r: any) => r.subject_id === subject.id)
                   
-                  // Check if subsidiary subject (ICT or General Paper)
-                  const isSubsidiary = subject.name?.toLowerCase().includes('ict') || 
-                                      subject.name?.toLowerCase().includes('general paper') ||
-                                      subject.name?.toLowerCase().includes('subsidiary')
+                  // Check if subsidiary subject (1 paper only)
+                  const isSubsidiary = subject.papers === 1
                   
-                  // Extract marks for each paper - check paper column
-                  const paper1 = subjectResults.find((r: any) => r.paper === 1)
-                  const paper2 = subjectResults.find((r: any) => r.paper === 2)
-                  const paper3 = subjectResults.find((r: any) => r.paper === 3)
+                  // Extract paper marks from grouped result
+                  const p1 = subjectResult?.paper1 || 0
+                  const p2 = subjectResult?.paper2 || 0
+                  const p3 = subjectResult?.paper3 || 0
                   
-                  // Calculate marks - check mark, total, or ca+exam
-                  const p1 = paper1?.raw_marks ? (paper1.raw_marks.mark || paper1.raw_marks.total || ((paper1.raw_marks.ca || 0) + (paper1.raw_marks.exam || 0))) : 0
-                  const p2 = paper2?.raw_marks ? (paper2.raw_marks.mark || paper2.raw_marks.total || ((paper2.raw_marks.ca || 0) + (paper2.raw_marks.exam || 0))) : 0
-                  const p3 = paper3?.raw_marks ? (paper3.raw_marks.mark || paper3.raw_marks.total || ((paper3.raw_marks.ca || 0) + (paper3.raw_marks.exam || 0))) : 0
-                  
-                  // Get grade from any result that has it
-                  let grade = ''
-                  for (const result of subjectResults) {
-                    if (result?.final_grade?.trim()) {
-                      grade = result.final_grade.trim()
-                      break
-                    }
-                  }
-                  
-                  // For subsidiary subjects, override grade based on marks
-                  if (isSubsidiary && p1 > 0) {
-                    grade = p1 >= 50 ? 'O' : 'F'
-                  }
+                  // Get grade from grouped result
+                  const grade = subjectResult?.final_grade?.trim() || ''
                   
                   const hasMarks = p1 > 0 || p2 > 0 || p3 > 0
                   const remark = grade ? getGradeComment(grade, isSubsidiary, p1) : ''

@@ -198,25 +198,38 @@ func (g *UACEGrader) ComputeGradeFromPapers(paperMarks []float64) GradeResult {
 func (g *UACEGrader) compute2Papers(codes []int) (string, string) {
 	sum := codes[0] + codes[1]
 	
-	// All papers excellent (both ≤2) → A
+	// Grade A: Both papers ≤2 (Distinctions)
 	if codes[0] <= 2 && codes[1] <= 2 {
-		return "A", fmt.Sprintf("Both papers ≤2: (%d,%d)", codes[0], codes[1])
+		return "A", fmt.Sprintf("Both papers ≤2 (Distinctions): (%d,%d)", codes[0], codes[1])
 	}
 	
-	switch {
-	case (codes[0] == 3 || codes[1] == 3) && codes[0] <= 3 && codes[1] <= 3:
+	// Grade B: One paper =3, other ≤3
+	if (codes[0] == 3 || codes[1] == 3) && codes[0] <= 3 && codes[1] <= 3 {
 		return "B", fmt.Sprintf("One paper =3, other ≤3: (%d,%d)", codes[0], codes[1])
-	case (codes[0] == 4 || codes[1] == 4) && codes[0] <= 4 && codes[1] <= 4:
-		return "C", fmt.Sprintf("One paper =4, other ≤4: (%d,%d)", codes[0], codes[1])
-	case (codes[0] == 5 || codes[1] == 5) && codes[0] <= 5 && codes[1] <= 5:
-		return "D", fmt.Sprintf("One paper =5, other ≤5: (%d,%d)", codes[0], codes[1])
-	case (codes[0] == 6 || codes[1] == 6) || sum <= 12:
-		return "E", fmt.Sprintf("One paper =6 or sum ≤12: (%d,%d) sum=%d", codes[0], codes[1], sum)
-	case sum <= 16 || (codes[0] <= 6 && codes[1] == 9) || (codes[0] == 9 && codes[1] <= 6):
-		return "O", fmt.Sprintf("Sum ≤16 or one ≤6 and other =9: (%d,%d) sum=%d", codes[0], codes[1], sum)
-	default:
-		return "F", fmt.Sprintf("(8,9) or (9,9): (%d,%d)", codes[0], codes[1])
 	}
+	
+	// Grade C: One paper =4, other ≤4
+	if (codes[0] == 4 || codes[1] == 4) && codes[0] <= 4 && codes[1] <= 4 {
+		return "C", fmt.Sprintf("One paper =4, other ≤4: (%d,%d)", codes[0], codes[1])
+	}
+	
+	// Grade D: One paper =5, other ≤5
+	if (codes[0] == 5 || codes[1] == 5) && codes[0] <= 5 && codes[1] <= 5 {
+		return "D", fmt.Sprintf("One paper =5, other ≤5: (%d,%d)", codes[0], codes[1])
+	}
+	
+	// Grade E: One paper =6 or sum ≤12
+	if codes[0] == 6 || codes[1] == 6 || sum <= 12 {
+		return "E", fmt.Sprintf("One paper =6 or sum ≤12: (%d,%d) sum=%d", codes[0], codes[1], sum)
+	}
+	
+	// Grade O: Sum ≤16, or one ≤6 and other =9
+	if sum <= 16 || (codes[0] <= 6 && codes[1] == 9) || (codes[0] == 9 && codes[1] <= 6) {
+		return "O", fmt.Sprintf("Sum ≤16 or one ≤6 and other =9: (%d,%d) sum=%d", codes[0], codes[1], sum)
+	}
+	
+	// Grade F: (8,9) or (9,9)
+	return "F", fmt.Sprintf("(8,9) or (9,9): (%d,%d)", codes[0], codes[1])
 }
 
 func (g *UACEGrader) compute3Papers(codes []int) (string, string) {
@@ -225,43 +238,113 @@ func (g *UACEGrader) compute3Papers(codes []int) (string, string) {
 		return "F", fmt.Sprintf("Science exception (9,9,7): %v", codes)
 	}
 	
-	switch {
-	// Grade A: All papers ≤2, OR highest is 3 with others ≤2
-	case codes[2] <= 3 && codes[0] <= 2 && codes[1] <= 2:
-		return "A", fmt.Sprintf("Highest ≤3, others ≤2: %v", codes)
-	case codes[2] == 4 && codes[0] <= 4 && codes[1] <= 4:
-		return "B", fmt.Sprintf("One =4, others ≤4: %v", codes)
-	case codes[2] == 5 && codes[0] <= 5 && codes[1] <= 5:
-		return "C", fmt.Sprintf("One =5, others ≤5: %v", codes)
-	case codes[2] == 6 && codes[0] <= 6 && codes[1] <= 6:
-		return "D", fmt.Sprintf("One =6, others ≤6: %v", codes)
-	case (codes[2] == 7 && codes[0] <= 6 && codes[1] <= 6) || (codes[2] == 8 && ((codes[0] <= 6 && codes[1] > 6) || (codes[0] > 6 && codes[1] <= 6) || (codes[0] <= 6 && codes[1] <= 6))):
-		return "E", fmt.Sprintf("One =7 and others ≤6, OR one =8 and ≤1 of others =6: %v", codes)
-	case (codes[0] == 7 && codes[1] == 7 && codes[2] == 7) || (codes[0] == 8 && codes[1] == 8 && codes[2] == 8) || (codes[2] == 9 && codes[0] <= 8 && codes[1] <= 8) || (codes[1] == 9 && codes[2] == 9 && codes[0] <= 7):
-		return "O", fmt.Sprintf("(7,7,7), (8,8,8), one F9 with others ≤8, or two F9 with one ≤7: %v", codes)
-	default:
-		return "F", fmt.Sprintf("(9,9,8) or (9,9,9): %v", codes)
+	// Grade A: One paper =3, others ≤2
+	if codes[2] == 3 && codes[0] <= 2 && codes[1] <= 2 {
+		return "A", fmt.Sprintf("One =3, others ≤2: %v", codes)
 	}
+	
+	// Grade B: One paper =4, others ≤4
+	if (codes[2] == 4 || codes[1] == 4 || codes[0] == 4) && codes[0] <= 4 && codes[1] <= 4 && codes[2] <= 4 {
+		return "B", fmt.Sprintf("One =4, others ≤4: %v", codes)
+	}
+	
+	// Grade C: One paper =5, others ≤5
+	if (codes[2] == 5 || codes[1] == 5 || codes[0] == 5) && codes[0] <= 5 && codes[1] <= 5 && codes[2] <= 5 {
+		return "C", fmt.Sprintf("One =5, others ≤5: %v", codes)
+	}
+	
+	// Grade D: One paper =6, others ≤6
+	if (codes[2] == 6 || codes[1] == 6 || codes[0] == 6) && codes[0] <= 6 && codes[1] <= 6 && codes[2] <= 6 {
+		return "D", fmt.Sprintf("One =6, others ≤6: %v", codes)
+	}
+	
+	// Grade E: One =7 and others ≤6, OR one =8 and ≤1 of others =6
+	if (codes[2] == 7 && codes[0] <= 6 && codes[1] <= 6) {
+		return "E", fmt.Sprintf("One =7, others ≤6: %v", codes)
+	}
+	if codes[2] == 8 {
+		sixCount := 0
+		if codes[0] == 6 { sixCount++ }
+		if codes[1] == 6 { sixCount++ }
+		if sixCount <= 1 && codes[0] <= 6 && codes[1] <= 6 {
+			return "E", fmt.Sprintf("One =8 and ≤1 of others =6: %v", codes)
+		}
+	}
+	
+	// Grade O: (7,7,7), (8,8,8), one F9 with others ≤8, or two F9 with one ≤7
+	if codes[0] == 7 && codes[1] == 7 && codes[2] == 7 {
+		return "O", fmt.Sprintf("(7,7,7): %v", codes)
+	}
+	if codes[0] == 8 && codes[1] == 8 && codes[2] == 8 {
+		return "O", fmt.Sprintf("(8,8,8): %v", codes)
+	}
+	// One F9 with others ≤8
+	if codes[2] == 9 && codes[0] <= 8 && codes[1] <= 8 {
+		return "O", fmt.Sprintf("One F9 with others ≤8: %v", codes)
+	}
+	// Two F9 with one ≤7
+	if codes[1] == 9 && codes[2] == 9 && codes[0] <= 7 {
+		return "O", fmt.Sprintf("Two F9 with one ≤7: %v", codes)
+	}
+	
+	// Grade F: (9,9,8) or (9,9,9)
+	return "F", fmt.Sprintf("(9,9,8) or (9,9,9): %v", codes)
 }
 
 func (g *UACEGrader) compute4Papers(codes []int) (string, string) {
-	switch {
-	// Grade A: All papers ≤2, OR highest is 3 with others ≤2
-	case codes[3] <= 3 && codes[0] <= 2 && codes[1] <= 2 && codes[2] <= 2:
-		return "A", fmt.Sprintf("Highest ≤3, others ≤2: %v", codes)
-	case codes[3] == 4 && codes[0] <= 4 && codes[1] <= 4 && codes[2] <= 4:
-		return "B", fmt.Sprintf("One =4, others ≤4: %v", codes)
-	case codes[3] == 5 && codes[0] <= 5 && codes[1] <= 5 && codes[2] <= 5:
-		return "C", fmt.Sprintf("One =5, others ≤5: %v", codes)
-	case codes[3] == 6 && codes[0] <= 6 && codes[1] <= 6 && codes[2] <= 6:
-		return "D", fmt.Sprintf("One =6, others ≤6: %v", codes)
-	case (codes[3] == 7 && codes[0] <= 6 && codes[1] <= 6 && codes[2] <= 6) || (codes[3] == 8 && ((codes[0] <= 6 && codes[1] <= 6) || (codes[0] <= 6 && codes[2] <= 6) || (codes[1] <= 6 && codes[2] <= 6))):
-		return "E", fmt.Sprintf("One =7 and others ≤6, or one =8 and ≤2 of others =6: %v", codes)
-	case (codes[0] == 7 && codes[1] == 7 && codes[2] == 7 && codes[3] == 7) || (codes[0] == 8 && codes[1] == 8 && codes[2] == 8 && codes[3] == 8) || ((codes[2] == 9 || codes[3] == 9) && codes[0] <= 8 && codes[1] <= 8):
-		return "O", fmt.Sprintf("(7,7,7,7), (8,8,8,8), one/two F9 with others ≤8: %v", codes)
-	default:
-		return "F", fmt.Sprintf("(9,9,8,8) or (9,9,9,9): %v", codes)
+	// Grade A: One =3, others ≤2
+	if codes[3] == 3 && codes[0] <= 2 && codes[1] <= 2 && codes[2] <= 2 {
+		return "A", fmt.Sprintf("One =3, others ≤2: %v", codes)
 	}
+	
+	// Grade B: One =4, others ≤4
+	if (codes[3] == 4 || codes[2] == 4 || codes[1] == 4 || codes[0] == 4) && codes[0] <= 4 && codes[1] <= 4 && codes[2] <= 4 && codes[3] <= 4 {
+		return "B", fmt.Sprintf("One =4, others ≤4: %v", codes)
+	}
+	
+	// Grade C: One =5, others ≤5
+	if (codes[3] == 5 || codes[2] == 5 || codes[1] == 5 || codes[0] == 5) && codes[0] <= 5 && codes[1] <= 5 && codes[2] <= 5 && codes[3] <= 5 {
+		return "C", fmt.Sprintf("One =5, others ≤5: %v", codes)
+	}
+	
+	// Grade D: One =6, others ≤6
+	if (codes[3] == 6 || codes[2] == 6 || codes[1] == 6 || codes[0] == 6) && codes[0] <= 6 && codes[1] <= 6 && codes[2] <= 6 && codes[3] <= 6 {
+		return "D", fmt.Sprintf("One =6, others ≤6: %v", codes)
+	}
+	
+	// Grade E: One =7 and others ≤6, or one =8 and ≤2 of others =6
+	if codes[3] == 7 && codes[0] <= 6 && codes[1] <= 6 && codes[2] <= 6 {
+		return "E", fmt.Sprintf("One =7, others ≤6: %v", codes)
+	}
+	if codes[3] == 8 {
+		sixCount := 0
+		if codes[0] == 6 { sixCount++ }
+		if codes[1] == 6 { sixCount++ }
+		if codes[2] == 6 { sixCount++ }
+		if sixCount <= 2 && codes[0] <= 6 && codes[1] <= 6 && codes[2] <= 6 {
+			return "E", fmt.Sprintf("One =8 and ≤2 of others =6: %v", codes)
+		}
+	}
+	
+	// Grade O: (7,7,7,7), (8,8,8,8), one/two F9 with others ≤8
+	if codes[0] == 7 && codes[1] == 7 && codes[2] == 7 && codes[3] == 7 {
+		return "O", fmt.Sprintf("(7,7,7,7): %v", codes)
+	}
+	if codes[0] == 8 && codes[1] == 8 && codes[2] == 8 && codes[3] == 8 {
+		return "O", fmt.Sprintf("(8,8,8,8): %v", codes)
+	}
+	// One or two F9 with others ≤8
+	nineCount := 0
+	if codes[0] == 9 { nineCount++ }
+	if codes[1] == 9 { nineCount++ }
+	if codes[2] == 9 { nineCount++ }
+	if codes[3] == 9 { nineCount++ }
+	if (nineCount == 1 || nineCount == 2) && codes[0] <= 8 && codes[1] <= 8 && codes[2] <= 8 && codes[3] <= 8 {
+		return "O", fmt.Sprintf("One/two F9 with others ≤8: %v", codes)
+	}
+	
+	// Grade F: (9,9,8,8) or (9,9,9,9)
+	return "F", fmt.Sprintf("(9,9,8,8) or (9,9,9,9): %v", codes)
 }
 
 func hashRuleVersion(version string) string {

@@ -7,19 +7,20 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/school-system/backend/internal/models"
+	"github.com/school-system/backend/internal/repositories"
 	"gorm.io/gorm"
 )
 
 type PayrollService struct {
-	db *gorm.DB
+	repo repositories.PayrollRepository
+	db   *gorm.DB
 }
 
-func NewPayrollService(db *gorm.DB) *PayrollService {
-	return &PayrollService{db: db}
-}
-
-func (s *PayrollService) GetDB() *gorm.DB {
-	return s.db
+func NewPayrollService(repo repositories.PayrollRepository, db *gorm.DB) *PayrollService {
+	return &PayrollService{
+		repo: repo,
+		db:   db,
+	}
 }
 
 // Salary Structure Management
@@ -267,4 +268,13 @@ func (s *PayrollService) GetPayrollSummary(schoolID string, year int) (map[strin
 		"amount_pending":    payrollStats.TotalNet - paymentStats.PaidAmount,
 		"monthly_breakdown": monthlyData,
 	}, nil
+}
+
+
+func (s *PayrollService) GetUserByID(userID string) (*models.User, error) {
+	var user models.User
+	if err := s.db.Where("id = ?", userID).First(&user).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
 }

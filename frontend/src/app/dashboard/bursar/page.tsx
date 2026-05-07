@@ -26,10 +26,15 @@ export default function BursarDashboard() {
 
       const feesData = feesRes.data?.fees || []
       
+      // Calculate totals for the selected term and year across ALL classes
+      const totalExpected = feesData.reduce((sum: number, f: any) => sum + (parseFloat(f.total_fees) || 0), 0)
+      const totalCollected = feesData.reduce((sum: number, f: any) => sum + (parseFloat(f.amount_paid) || 0), 0)
+      const totalOutstanding = feesData.reduce((sum: number, f: any) => sum + (parseFloat(f.outstanding) || 0), 0)
+      
       setStats({
-        fees_expected: feesData.reduce((sum: number, f: any) => sum + (parseFloat(f.total_fees) || 0), 0),
-        fees_collected: feesData.reduce((sum: number, f: any) => sum + (parseFloat(f.amount_paid) || 0), 0),
-        fees_outstanding: feesData.reduce((sum: number, f: any) => sum + (parseFloat(f.outstanding) || 0), 0),
+        fees_expected: totalExpected,
+        fees_collected: totalCollected,
+        fees_outstanding: totalOutstanding,
         total_income: financeRes.data?.total_income || 0,
         total_expenditure: financeRes.data?.total_expenditure || 0,
         net_balance: financeRes.data?.net_balance || 0
@@ -76,13 +81,14 @@ export default function BursarDashboard() {
 
         {/* School Fees Stats */}
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">School Fees Overview</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">School Fees Overview - {term} {year} (All Classes)</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-blue-100 text-sm font-medium">Expected</p>
+                  <p className="text-blue-100 text-sm font-medium">Total Expected</p>
                   <p className="text-3xl font-bold mt-2">{formatCurrency(stats?.fees_expected || 0)}</p>
+                  <p className="text-blue-100 text-xs mt-2">All classes combined</p>
                 </div>
                 <div className="bg-white/20 p-3 rounded-lg">
                   <DollarSign className="w-8 h-8" />
@@ -93,10 +99,10 @@ export default function BursarDashboard() {
             <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-lg">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-green-100 text-sm font-medium">Collected</p>
+                  <p className="text-green-100 text-sm font-medium">Total Collected</p>
                   <p className="text-3xl font-bold mt-2">{formatCurrency(stats?.fees_collected || 0)}</p>
                   <p className="text-green-100 text-xs mt-2">
-                    {stats?.fees_expected > 0 ? ((stats?.fees_collected / stats?.fees_expected) * 100).toFixed(1) : 0}% collected
+                    {stats?.fees_expected > 0 ? ((stats?.fees_collected / stats?.fees_expected) * 100).toFixed(1) : 0}% collection rate
                   </p>
                 </div>
                 <div className="bg-white/20 p-3 rounded-lg">
@@ -108,8 +114,9 @@ export default function BursarDashboard() {
             <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-6 text-white shadow-lg">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-red-100 text-sm font-medium">Outstanding</p>
+                  <p className="text-red-100 text-sm font-medium">Total Outstanding</p>
                   <p className="text-3xl font-bold mt-2">{formatCurrency(stats?.fees_outstanding || 0)}</p>
+                  <p className="text-red-100 text-xs mt-2">Pending payment</p>
                 </div>
                 <div className="bg-white/20 p-3 rounded-lg">
                   <TrendingDown className="w-8 h-8" />

@@ -5,16 +5,15 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/school-system/backend/internal/models"
-	"gorm.io/gorm"
+	"github.com/school-system/backend/internal/services"
 )
 
 type AuditHandler struct {
-	db *gorm.DB
+	service *services.AuditService
 }
 
-func NewAuditHandler(db *gorm.DB) *AuditHandler {
-	return &AuditHandler{db: db}
+func NewAuditHandler(service *services.AuditService) *AuditHandler {
+	return &AuditHandler{service: service}
 }
 
 func (h *AuditHandler) GetRecentActivity(c *gin.Context) {
@@ -26,25 +25,8 @@ func (h *AuditHandler) GetRecentActivity(c *gin.Context) {
 
 	actionFilter := c.Query("action")
 
-	type ActivityWithUser struct {
-		models.AuditLog
-		UserName   string `json:"user_name"`
-		SchoolName string `json:"school_name,omitempty"`
-	}
-
-	query := h.db.Table("audit_logs").
-		Select("audit_logs.*, users.full_name as user_name, schools.name as school_name").
-		Joins("LEFT JOIN users ON audit_logs.actor_user_id = users.id").
-		Joins("LEFT JOIN schools ON users.school_id = schools.id")
-
-	if actionFilter != "" {
-		query = query.Where("audit_logs.action = ?", actionFilter)
-	}
-
-	var activities []ActivityWithUser
-	if err := query.Order("audit_logs.timestamp DESC").
-		Limit(limit).
-		Scan(&activities).Error; err != nil {
+	activities, err := h.service.GetRecentActivity(limit, actionFilter)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

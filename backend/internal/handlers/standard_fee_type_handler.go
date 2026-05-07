@@ -5,17 +5,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/school-system/backend/internal/services"
-	"gorm.io/gorm"
 )
 
 type StandardFeeTypeHandler struct {
 	service *services.StandardFeeTypeService
 }
 
-func NewStandardFeeTypeHandler(db *gorm.DB) *StandardFeeTypeHandler {
-	return &StandardFeeTypeHandler{
-		service: services.NewStandardFeeTypeService(db),
-	}
+func NewStandardFeeTypeHandler(service *services.StandardFeeTypeService) *StandardFeeTypeHandler {
+	return &StandardFeeTypeHandler{service: service}
 }
 
 // GetAllFeeTypes returns all standard fee types

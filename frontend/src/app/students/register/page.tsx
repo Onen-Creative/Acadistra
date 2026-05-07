@@ -27,6 +27,7 @@ const studentSchema = z.object({
   village: z.string().optional(),
   residence_type: z.enum(['Day', 'Boarding']),
   lin: z.string().optional(),
+  schoolpay_code: z.string().optional(),
   class_level: z.string().min(1, 'Required'),
   class_id: z.string().min(1, 'Required'),
   year: z.number().min(2020).max(2030),
@@ -179,6 +180,7 @@ export default function StudentRegistrationPage() {
       village: data.village || '',
       residence_type: data.residence_type,
       lin: data.lin || '',
+      schoolpay_code: data.schoolpay_code || '',
       class_level: data.class_level,
       class_id: data.class_id,
       year: data.year,
@@ -270,6 +272,7 @@ export default function StudentRegistrationPage() {
                     { value: 'Anglican', label: 'Anglican' }, { value: 'Muslim', label: 'Muslim' }, { value: 'Other', label: 'Other' }
                   ]} />
                   <FormInput {...register('lin')} label="LIN" placeholder="Optional" />
+                  <FormInput {...register('schoolpay_code')} label="SchoolPay Code" placeholder="Optional" />
                   <FormSelect {...register('residence_type')} label="Residence" options={[
                     { value: 'Day', label: 'Day Scholar' }, { value: 'Boarding', label: 'Boarding' }
                   ]} />

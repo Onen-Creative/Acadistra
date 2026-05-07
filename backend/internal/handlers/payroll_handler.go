@@ -82,8 +82,8 @@ func (h *PayrollHandler) CreateSalaryStructure(c *gin.Context) {
 
 	// If user_id is provided but employee_name is empty, fetch from user
 	if req.UserID != nil && req.EmployeeName == "" {
-		var user models.User
-		if err := h.service.GetDB().Where("id = ?", *req.UserID).First(&user).Error; err == nil {
+		user, err := h.service.GetUserByID(*req.UserID)
+		if err == nil {
 			req.EmployeeName = user.FullName
 			req.EmployeeRole = user.Role
 		}

@@ -10,15 +10,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/school-system/backend/internal/utils"
-	"gorm.io/gorm"
 )
 
-type UploadHandler struct {
-	db *gorm.DB
-}
+type UploadHandler struct{}
 
-func NewUploadHandler(db *gorm.DB) *UploadHandler {
-	return &UploadHandler{db: db}
+func NewUploadHandler() *UploadHandler {
+	return &UploadHandler{}
 }
 
 func (h *UploadHandler) UploadLogo(c *gin.Context) {

@@ -31,6 +31,8 @@ Access at http://localhost:3000 with `admin@acadistra.com` / `Admin@123`
 ✅ **Payroll management** - Salary structures, monthly processing, payment tracking
 ✅ **Automatic finance integration** - Payroll payments auto-create expenditure records
 ✅ **Budget & Requisitions** - Budget planning, purchase requests, approval workflow
+✅ **SMS Management** - Send fees reminders, attendance alerts via Africa's Talking/Twilio
+✅ **SchoolPay integration** - Real-time mobile money payments via SchoolPay Uganda
 ✅ Attendance tracking with holidays & term dates
 ✅ Library management with book issues
 ✅ Clinic management with health profiles
@@ -83,7 +85,7 @@ cd frontend && npm test
 ```bash
 # 1. Configure environment
 cp .env.production.example .env.production
-nano .env.production  # Set secure passwords
+nano .env.production  # Set secure passwords and API keys
 
 # 2. Start services
 docker compose -f docker-compose.prod.yml up -d
@@ -96,9 +98,31 @@ docker exec acadistra_backend ./main seed-admin
 
 # 5. Seed subjects
 docker exec acadistra_backend ./main seed-standard-subjects
+
+# 6. Create SMS tables
+docker exec acadistra_backend sh -c "PGPASSWORD=\$DB_PASSWORD psql -h \$DB_HOST -U \$DB_USER -d \$DB_NAME -f migrations/20260505000000_create_sms_tables_pg.sql"
 ```
 
 ## Configuration
+
+### Environment Variables
+Copy `.env.production.example` to `.env` and configure:
+
+```bash
+cp .env.production.example .env
+nano .env  # Edit with your credentials
+```
+
+Required variables:
+- Database: `POSTGRES_PASSWORD`
+- Redis: `REDIS_PASSWORD`
+- MinIO: `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`
+- JWT: `JWT_SECRET` (min 32 characters)
+- Email: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`
+
+Optional integrations:
+- SMS: `AFRICASTALKING_*` or `TWILIO_*` variables
+- SchoolPay: `SCHOOLPAY_*` variables
 
 ### DNS Setup
 Point these A records to your server:

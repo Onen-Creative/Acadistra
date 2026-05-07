@@ -339,8 +339,8 @@ export const schoolsApi = {
     return data;
   },
 
-  toggleActive: async (id: string, isActive: boolean) => {
-    const { data } = await api.patch(`/schools/${id}/toggle-active`, { is_active: isActive });
+  toggleActive: async (id: string) => {
+    const { data } = await api.patch(`/schools/${id}/toggle-active`);
     return data;
   },
 

@@ -77,66 +77,75 @@ export default function PaymentReceipt({ payment, studentFees, onClose }: Paymen
         </div>
 
         {/* Receipt Content */}
-        <div className="receipt-content p-8" style={{ fontFamily: 'Arial, sans-serif', lineHeight: '1.4' }}>
+        <div className="receipt-content p-8" style={{ fontFamily: 'Arial, sans-serif', lineHeight: '1.6', fontSize: '14px' }}>
           {/* Header */}
-          <div className="text-center border-b-2 border-black pb-4 mb-6">
+          <div className="text-center pb-4 mb-6" style={{ borderBottom: '3px solid #000' }}>
             {school?.logo_url && (
-              <div className="flex justify-center mb-2">
+              <div className="flex justify-center mb-3">
                 <ImageWithFallback 
                   src={school.logo_url} 
                   alt="School Logo" 
-                  className="h-12 w-12 object-contain"
-                  fallback="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2'%3E%3Cpath d='M22 10v6M2 10l10-5 10 5-10 5z'/%3E%3Cpath d='M6 12v5c3 3 9 3 12 0v-5'/%3E%3C/svg%3E"
+                  className="h-20 w-20 object-contain"
+                  fallback="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2'%3E%3Cpath d='M22 10v6M2 10l10-5 10 5-10 5z'/%3E%3Cpath d='M6 12v5c3 3 9 3 12 0v-5'/%3E%3C/svg%3E"
                 />
               </div>
             )}
-            <h1 className="text-lg font-bold uppercase text-black mb-1">{school?.name || 'School Name'}</h1>
-            <p className="text-xs text-gray-700 italic mb-1">&quot;{school?.motto || 'School Motto'}&quot;</p>
-            <p className="text-xs text-gray-700">{school?.address}</p>
-            <p className="text-xs text-gray-700">Tel: {school?.phone} | Email: {school?.contact_email}</p>
-            <div className="mt-3 bg-black text-white py-1 px-3 inline-block">
-              <h2 className="text-sm font-bold">FEES PAYMENT RECEIPT</h2>
+            <h1 style={{ fontSize: '22px', fontWeight: 'bold', textTransform: 'uppercase', color: '#000', marginBottom: '4px' }}>{school?.name || 'School Name'}</h1>
+            <p style={{ fontSize: '13px', color: '#333', fontStyle: 'italic', marginBottom: '4px' }}>&quot;{school?.motto || 'School Motto'}&quot;</p>
+            <p style={{ fontSize: '13px', color: '#333', marginBottom: '2px' }}>{school?.address}</p>
+            <p style={{ fontSize: '13px', color: '#333', marginBottom: '8px' }}>Tel: {school?.phone} | Email: {school?.contact_email}</p>
+            <div style={{ marginTop: '12px', backgroundColor: '#000', color: '#fff', padding: '8px 16px', display: 'inline-block', border: '2px solid #000' }}>
+              <h2 style={{ fontSize: '16px', fontWeight: 'bold', margin: 0 }}>FEES PAYMENT RECEIPT</h2>
             </div>
           </div>
 
           {/* Receipt Info Bar */}
-          <div className="bg-gray-100 p-3 mb-4 text-center">
-            <div className="grid grid-cols-3 gap-4 text-xs">
+          <div style={{ backgroundColor: '#f5f5f5', padding: '12px', marginBottom: '16px', textAlign: 'center', border: '2px solid #000' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
               <div>
-                <span className="font-bold">Receipt No:</span><br/>
-                <span className="text-lg font-bold">{payment.receipt_no || `RCP-${Date.now().toString().slice(-6)}`}</span>
+                <span style={{ fontWeight: 'bold', fontSize: '13px', display: 'block', marginBottom: '4px' }}>Receipt No:</span>
+                <span style={{ fontSize: '18px', fontWeight: 'bold' }}>{payment.receipt_no || `RCP-${Date.now().toString().slice(-6)}`}</span>
               </div>
               <div>
-                <span className="font-bold">Date:</span><br/>
-                <span>{new Date(payment.payment_date).toLocaleDateString('en-GB')}</span>
+                <span style={{ fontWeight: 'bold', fontSize: '13px', display: 'block', marginBottom: '4px' }}>Date:</span>
+                <span style={{ fontSize: '14px', fontWeight: '600' }}>{new Date(payment.payment_date).toLocaleDateString('en-GB')}</span>
               </div>
               <div>
-                <span className="font-bold">Payment Method:</span><br/>
-                <span>{payment.payment_method}</span>
+                <span style={{ fontWeight: 'bold', fontSize: '13px', display: 'block', marginBottom: '4px' }}>Payment Method:</span>
+                <span style={{ fontSize: '14px', fontWeight: '600' }}>{payment.payment_method}</span>
               </div>
             </div>
           </div>
 
           {/* Student Information */}
-          <div className="mb-4">
-            <h3 className="font-bold text-black mb-2 bg-gray-200 p-2 text-sm">STUDENT INFORMATION</h3>
-            <div className="grid grid-cols-2 gap-4 text-xs">
-              <div>
-                <p><span className="font-medium">Student Name:</span> {studentFees.student.first_name}{studentFees.student.middle_name && ` ${studentFees.student.middle_name}`} {studentFees.student.last_name}</p>
-                <p><span className="font-medium">Admission Number:</span> {studentFees.student.admission_no}</p>
-              </div>
-              <div>
-                <p><span className="font-medium">Class:</span> {studentFees.student.class_name || 'N/A'}</p>
-                <p><span className="font-medium">LIN:</span> {studentFees.student.lin || 'N/A'}</p>
-                <p><span className="font-medium">Academic Period:</span> {studentFees.term} {studentFees.year}</p>
-              </div>
-            </div>
+          <div style={{ marginBottom: '16px' }}>
+            <h3 style={{ fontWeight: 'bold', color: '#fff', backgroundColor: '#000', marginBottom: '0', padding: '8px', fontSize: '14px', border: '2px solid #000', borderBottom: 'none' }}>STUDENT INFORMATION</h3>
+            <table style={{ width: '100%', border: '2px solid #000', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <tbody>
+                <tr>
+                  <td style={{ padding: '8px', fontWeight: 'bold', backgroundColor: '#f5f5f5', border: '1px solid #000', width: '25%' }}>Student Name:</td>
+                  <td style={{ padding: '8px', border: '1px solid #000', width: '25%' }}>{studentFees.student.first_name}{studentFees.student.middle_name && ` ${studentFees.student.middle_name}`} {studentFees.student.last_name}</td>
+                  <td style={{ padding: '8px', fontWeight: 'bold', backgroundColor: '#f5f5f5', border: '1px solid #000', width: '25%' }}>Admission No:</td>
+                  <td style={{ padding: '8px', border: '1px solid #000', width: '25%' }}>{studentFees.student.admission_no}</td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '8px', fontWeight: 'bold', backgroundColor: '#f5f5f5', border: '1px solid #000' }}>Class:</td>
+                  <td style={{ padding: '8px', border: '1px solid #000' }}>{studentFees.student.class_name || 'N/A'}</td>
+                  <td style={{ padding: '8px', fontWeight: 'bold', backgroundColor: '#f5f5f5', border: '1px solid #000' }}>LIN:</td>
+                  <td style={{ padding: '8px', border: '1px solid #000' }}>{studentFees.student.lin || 'N/A'}</td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '8px', fontWeight: 'bold', backgroundColor: '#f5f5f5', border: '1px solid #000' }}>Academic Period:</td>
+                  <td colSpan={3} style={{ padding: '8px', border: '1px solid #000' }}>{studentFees.term} {studentFees.year}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
           {/* Payment Details */}
-          <div className="mb-4">
-            <h3 className="font-bold text-black mb-2 bg-gray-200 p-2 text-sm">PAYMENT BREAKDOWN</h3>
-            <table className="w-full text-xs border border-gray-300">
+          <div style={{ marginBottom: '16px' }}>
+            <h3 style={{ fontWeight: 'bold', color: '#fff', backgroundColor: '#000', marginBottom: '0', padding: '8px', fontSize: '14px', border: '2px solid #000', borderBottom: 'none' }}>PAYMENT BREAKDOWN</h3>
+            <table style={{ width: '100%', fontSize: '13px', border: '2px solid #000', borderCollapse: 'collapse' }}>
               <tbody>
                 {studentFees.fee_breakdown && Object.keys(studentFees.fee_breakdown).length > 0 ? (
                   <>
@@ -148,47 +157,47 @@ export default function PaymentReceipt({ payment, studentFees, onClose }: Paymen
                       const outstanding = total - totalPaid
                       
                       return (
-                        <tr key={category} className="border-b">
-                          <td className="p-2">
-                            <div className="font-medium">{category}</div>
-                            <div className="text-xs text-gray-600 ml-2">
+                        <tr key={category} style={{ borderBottom: '1px solid #000' }}>
+                          <td style={{ padding: '10px', border: '1px solid #000' }}>
+                            <div style={{ fontWeight: '600', marginBottom: '4px' }}>{category}</div>
+                            <div style={{ fontSize: '12px', color: '#000', marginLeft: '8px' }}>
                               Total: UGX {total.toLocaleString()} | 
                               Prev Paid: UGX {previousPaid.toLocaleString()} | 
-                              <span className="text-green-700 font-medium">Now: UGX {currentPayment.toLocaleString()}</span> | 
-                              <span className="text-red-700">Balance: UGX {outstanding.toLocaleString()}</span>
+                              <span style={{ fontWeight: '600' }}>Now: UGX {currentPayment.toLocaleString()}</span> | 
+                              <span style={{ fontWeight: '600' }}>Balance: UGX {outstanding.toLocaleString()}</span>
                             </div>
                           </td>
                         </tr>
                       )
                     })}
-                    <tr className="border-t-2 border-black">
-                      <td className="p-2">
-                        <div className="flex justify-between font-bold">
-                          <span>TOTAL</span>
+                    <tr style={{ borderTop: '2px solid #000', backgroundColor: '#f5f5f5' }}>
+                      <td style={{ padding: '10px', border: '1px solid #000' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '14px' }}>
+                          <span>TOTAL FEES</span>
                           <span>UGX {studentFees.total_fees.toLocaleString()}</span>
                         </div>
                       </td>
                     </tr>
-                    <tr className="bg-green-50">
-                      <td className="p-2">
-                        <div className="flex justify-between font-bold text-green-700">
-                          <span>Current Payment</span>
+                    <tr style={{ backgroundColor: '#e5e5e5' }}>
+                      <td style={{ padding: '10px', border: '1px solid #000' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '15px' }}>
+                          <span>CURRENT PAYMENT</span>
                           <span>UGX {payment.amount.toLocaleString()}</span>
                         </div>
                       </td>
                     </tr>
-                    <tr>
-                      <td className="p-2">
-                        <div className="flex justify-between font-medium">
-                          <span>Total Paid</span>
+                    <tr style={{ backgroundColor: '#f5f5f5' }}>
+                      <td style={{ padding: '10px', border: '1px solid #000' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '600', fontSize: '14px' }}>
+                          <span>Total Paid to Date</span>
                           <span>UGX {studentFees.amount_paid.toLocaleString()}</span>
                         </div>
                       </td>
                     </tr>
-                    <tr className="bg-red-50">
-                      <td className="p-2">
-                        <div className="flex justify-between font-bold text-red-700">
-                          <span>Outstanding Balance</span>
+                    <tr style={{ backgroundColor: '#f5f5f5' }}>
+                      <td style={{ padding: '10px', border: '1px solid #000' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '15px' }}>
+                          <span>OUTSTANDING BALANCE</span>
                           <span>UGX {studentFees.outstanding.toLocaleString()}</span>
                         </div>
                       </td>
@@ -197,25 +206,25 @@ export default function PaymentReceipt({ payment, studentFees, onClose }: Paymen
                 ) : (
                   <>
                     {/* Simple Breakdown */}
-                    <tr className="border-b">
-                      <td className="p-2 font-medium">Total School Fees</td>
-                      <td className="p-2 text-right">UGX {studentFees.total_fees.toLocaleString()}</td>
+                    <tr style={{ borderBottom: '1px solid #000' }}>
+                      <td style={{ padding: '10px', fontWeight: '600', border: '1px solid #000' }}>Total School Fees</td>
+                      <td style={{ padding: '10px', textAlign: 'right', border: '1px solid #000' }}>UGX {studentFees.total_fees.toLocaleString()}</td>
                     </tr>
-                    <tr className="border-b">
-                      <td className="p-2 font-medium">Previous Payments</td>
-                      <td className="p-2 text-right">UGX {(studentFees.amount_paid - payment.amount).toLocaleString()}</td>
+                    <tr style={{ borderBottom: '1px solid #000' }}>
+                      <td style={{ padding: '10px', fontWeight: '600', border: '1px solid #000' }}>Previous Payments</td>
+                      <td style={{ padding: '10px', textAlign: 'right', border: '1px solid #000' }}>UGX {(studentFees.amount_paid - payment.amount).toLocaleString()}</td>
                     </tr>
-                    <tr className="border-b bg-green-50">
-                      <td className="p-2 font-bold text-green-700">Current Payment</td>
-                      <td className="p-2 text-right font-bold text-green-700">UGX {payment.amount.toLocaleString()}</td>
+                    <tr style={{ borderBottom: '1px solid #000', backgroundColor: '#e5e5e5' }}>
+                      <td style={{ padding: '10px', fontWeight: 'bold', border: '1px solid #000', fontSize: '15px' }}>CURRENT PAYMENT</td>
+                      <td style={{ padding: '10px', textAlign: 'right', fontWeight: 'bold', border: '1px solid #000', fontSize: '15px' }}>UGX {payment.amount.toLocaleString()}</td>
                     </tr>
-                    <tr className="border-b">
-                      <td className="p-2 font-medium">Total Paid</td>
-                      <td className="p-2 text-right">UGX {studentFees.amount_paid.toLocaleString()}</td>
+                    <tr style={{ borderBottom: '1px solid #000', backgroundColor: '#f5f5f5' }}>
+                      <td style={{ padding: '10px', fontWeight: '600', border: '1px solid #000' }}>Total Paid to Date</td>
+                      <td style={{ padding: '10px', textAlign: 'right', border: '1px solid #000' }}>UGX {studentFees.amount_paid.toLocaleString()}</td>
                     </tr>
-                    <tr className="bg-red-50">
-                      <td className="p-2 font-bold text-red-700">Outstanding Balance</td>
-                      <td className="p-2 text-right font-bold text-red-700">UGX {studentFees.outstanding.toLocaleString()}</td>
+                    <tr style={{ backgroundColor: '#f5f5f5' }}>
+                      <td style={{ padding: '10px', fontWeight: 'bold', border: '1px solid #000', fontSize: '15px' }}>OUTSTANDING BALANCE</td>
+                      <td style={{ padding: '10px', textAlign: 'right', fontWeight: 'bold', border: '1px solid #000', fontSize: '15px' }}>UGX {studentFees.outstanding.toLocaleString()}</td>
                     </tr>
                   </>
                 )}
@@ -224,70 +233,67 @@ export default function PaymentReceipt({ payment, studentFees, onClose }: Paymen
           </div>
 
           {/* Amount in Words */}
-          <div className="mb-4 p-2 border border-gray-400">
-            <p className="text-xs">
-              <span className="font-bold">Amount Paid (In Words):</span><br/>
-              <span className="uppercase">{numberToWords(payment.amount)} Shillings Only</span>
+          <div style={{ marginBottom: '16px', padding: '12px', border: '2px solid #000', backgroundColor: '#f9fafb' }}>
+            <p style={{ fontSize: '13px', margin: 0 }}>
+              <span style={{ fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>Amount Paid (In Words):</span>
+              <span style={{ textTransform: 'uppercase', fontWeight: '600', fontSize: '14px' }}>{numberToWords(payment.amount)} Shillings Only</span>
             </p>
           </div>
 
           {/* Payment Notes */}
           {payment.notes && (
-            <div className="mb-4">
-              <h3 className="font-bold text-black mb-1 text-xs">REMARKS:</h3>
-              <p className="text-xs text-gray-700 border p-2">{payment.notes}</p>
+            <div style={{ marginBottom: '16px' }}>
+              <h3 style={{ fontWeight: 'bold', color: '#000', marginBottom: '6px', fontSize: '13px' }}>REMARKS:</h3>
+              <p style={{ fontSize: '13px', color: '#333', border: '2px solid #000', padding: '10px', backgroundColor: '#f9fafb' }}>{payment.notes}</p>
             </div>
           )}
 
           {/* Signature Section */}
-          <div className="mt-6">
-            <div className="text-right">
-              <div className="inline-block">
-                <div className="border-t border-black w-48 mt-8 pt-1">
-                  <p className="font-bold text-xs text-center">BURSAR SIGNATURE & STAMP</p>
-                  <p className="text-xs text-center text-gray-600">Date: {new Date().toLocaleDateString('en-GB')}</p>
+          <div style={{ marginTop: '24px' }}>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ display: 'inline-block' }}>
+                <div style={{ borderTop: '2px solid #000', width: '200px', marginTop: '40px', paddingTop: '6px' }}>
+                  <p style={{ fontWeight: 'bold', fontSize: '13px', textAlign: 'center', margin: 0 }}>BURSAR SIGNATURE & STAMP</p>
+                  <p style={{ fontSize: '12px', textAlign: 'center', color: '#666', marginTop: '4px' }}>Date: {new Date().toLocaleDateString('en-GB')}</p>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="text-center mt-6 pt-3 border-t border-gray-400">
-            <p className="text-xs text-gray-600 font-medium">
+          <div style={{ textAlign: 'center', marginTop: '24px', paddingTop: '12px', borderTop: '2px solid #000' }}>
+            <p style={{ fontSize: '12px', color: '#333', fontWeight: '600', margin: 0 }}>
               This is an official receipt. Please retain for your records.
             </p>
-            <p className="text-xs text-gray-500 mt-1">
+            <p style={{ fontSize: '11px', color: '#666', marginTop: '6px' }}>
               Generated: {new Date().toLocaleString('en-GB')}
             </p>
           </div>
         </div>
       </div>
 
-      <style jsx>{`
+      <style jsx global>{`
         @media print {
           @page { 
             margin: 0.5in; 
             size: A4 portrait; 
           }
+          body * { 
+            visibility: hidden !important; 
+          }
+          .receipt-content, 
+          .receipt-content * { 
+            visibility: visible !important; 
+          }
+          .receipt-content {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            padding: 0 !important;
+          }
           .no-print { 
             display: none !important; 
-          }
-          .receipt-content {
-            padding: 0 !important;
-            font-size: 12px !important;
-          }
-          body * { 
-            visibility: hidden; 
-          }
-          .receipt-content, .receipt-content * { 
-            visibility: visible; 
-          }
-          .receipt-content {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            font-size: 11px !important;
           }
           table {
             border-collapse: collapse !important;

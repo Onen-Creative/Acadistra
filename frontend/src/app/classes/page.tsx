@@ -109,8 +109,9 @@ export default function ClassesPage() {
     queryKey: ['teachers'],
     queryFn: async () => {
       const response = await classesApi.getTeachers()
-      return response
+      return Array.isArray(response) ? response : []
     },
+    staleTime: 5 * 60 * 1000,
   })
 
   const createClassMutation = useMutation({
@@ -289,10 +290,10 @@ export default function ClassesPage() {
                     icon="👨‍🏫"
                     options={[
                       { value: '', label: 'Select Teacher (Optional)' },
-                      ...(teachersData?.filter((t: any) => t.teacher_profile_id).map((t: any) => ({ 
-                        value: t.teacher_profile_id, 
+                      ...(Array.isArray(teachersData) ? teachersData.map((t: any) => ({ 
+                        value: t.teacher_profile_id || t.id, 
                         label: `${t.first_name} ${t.last_name}` 
-                      })) || [])
+                      })) : [])
                     ]}
                   />
                 </FormSection>

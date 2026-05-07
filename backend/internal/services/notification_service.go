@@ -6,17 +6,20 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/school-system/backend/internal/models"
+	"github.com/school-system/backend/internal/repositories"
 	"gorm.io/gorm"
 )
 
 type NotificationService struct {
+	repo         repositories.NotificationRepository
 	db           *gorm.DB
 	smsService   *SMSService
 	emailService *EmailService
 }
 
-func NewNotificationService(db *gorm.DB, sms *SMSService, email *EmailService) *NotificationService {
+func NewNotificationService(repo repositories.NotificationRepository, db *gorm.DB, sms *SMSService, email *EmailService) *NotificationService {
 	return &NotificationService{
+		repo:         repo,
 		db:           db,
 		smsService:   sms,
 		emailService: email,
@@ -207,4 +210,94 @@ func (n *NotificationService) logNotification(schoolID, recipientID uuid.UUID, n
 	}
 
 	n.db.Create(&log)
+}
+
+
+func (n *NotificationService) GetNotifications(userID, schoolID string, limit int) ([]models.Notification, error) {
+	var notifications []models.Notification
+	err := n.db.Where("user_id = ? OR school_id = ? OR (user_id IS NULL AND school_id IS NULL)", userID, schoolID).
+		Order("created_at DESC").
+		Limit(limit).
+		Find(&notifications).Error
+	return notifications, err
+}
+
+func (n *NotificationService) GetUnreadCount(userID, schoolID string) (int64, error) {
+	var count int64
+	err := n.db.Model(&models.Notification{}).
+		Where("is_read = ? AND (user_id = ? OR school_id = ? OR (user_id IS NULL AND school_id IS NULL))", false, userID, schoolID).
+		Count(&count).Error
+	return count, err
+}
+
+func (n *NotificationService) MarkAsRead(id, userID string) error {
+	now := time.Now()
+	return n.db.Model(&models.Notification{}).
+		Where("id = ? AND (user_id = ? OR user_id IS NULL)", id, userID).
+		Updates(map[string]interface{}{
+			"is_read": true,
+			"read_at": now,
+		}).Error
+}
+
+func (n *NotificationService) MarkAllAsRead(userID, schoolID string) error {
+	now := time.Now()
+	return n.db.Model(&models.Notification{}).
+		Where("is_read = ? AND (user_id = ? OR school_id = ? OR (user_id IS NULL AND school_id IS NULL))", false, userID, schoolID).
+		Updates(map[string]interface{}{
+			"is_read": true,
+			"read_at": now,
+		}).Error
+}
+
+func (n *NotificationService) DeleteNotification(id, userID string) error {
+	return n.db.Where("id = ? AND user_id = ?", id, userID).Delete(&models.Notification{}).Error
+}
+
+func (n *NotificationService) GetPreferences(guardianID, schoolID string) (*models.NotificationPreference, error) {
+	var prefs models.NotificationPreference
+	err := n.db.Where("guardian_id = ? AND school_id = ?", guardianID, schoolID).First(&prefs).Error
+
+	if err == gorm.ErrRecordNotFound {
+		return &models.NotificationPreference{
+			SMSEnabled:      true,
+			EmailEnabled:    true,
+			FeesReminders:   true,
+			PaymentConfirm:  true,
+			ResultsNotify:   true,
+			AttendanceAlert: true,
+			Announcements:   true,
+			WeeklySummary:   false,
+			MonthlySummary:  true,
+		}, nil
+	}
+
+	return &prefs, err
+}
+
+func (n *NotificationService) UpdatePreferences(guardianID, schoolID string, req *models.NotificationPreference) (*models.NotificationPreference, error) {
+	var prefs models.NotificationPreference
+	err := n.db.Where("guardian_id = ? AND school_id = ?", guardianID, schoolID).First(&prefs).Error
+
+	if err == gorm.ErrRecordNotFound {
+		prefs = *req
+		if err := n.db.Create(&prefs).Error; err != nil {
+			return nil, err
+		}
+	} else {
+		prefs.SMSEnabled = req.SMSEnabled
+		prefs.EmailEnabled = req.EmailEnabled
+		prefs.FeesReminders = req.FeesReminders
+		prefs.PaymentConfirm = req.PaymentConfirm
+		prefs.ResultsNotify = req.ResultsNotify
+		prefs.AttendanceAlert = req.AttendanceAlert
+		prefs.Announcements = req.Announcements
+		prefs.WeeklySummary = req.WeeklySummary
+		prefs.MonthlySummary = req.MonthlySummary
+		if err := n.db.Save(&prefs).Error; err != nil {
+			return nil, err
+		}
+	}
+
+	return &prefs, nil
 }

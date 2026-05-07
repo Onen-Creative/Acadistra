@@ -359,84 +359,153 @@ export default function ResultsPage() {
           {selectedClass && resultsData && resultsData.length > 0 && (
             <div className="overflow-x-auto">
               {['S5', 'S6'].includes(currentLevel) ? (
-                // Advanced Level Table
+                // Advanced Level Table - Rewritten for proper paper display
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="bg-gray-50 border-b-2 border-gray-300">
+                    <tr className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b-2 border-indigo-300">
                       {selectedStudent === 'all' && (
-                        <th className="text-left py-3 px-4 font-semibold text-gray-700">Student</th>
+                        <th className="text-left py-4 px-4 font-bold text-gray-800">Student</th>
                       )}
-                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Subject</th>
-                      <th className="text-center py-3 px-4 font-semibold text-gray-700">Exam</th>
+                      <th className="text-left py-4 px-4 font-bold text-gray-800">Subject</th>
+                      <th className="text-center py-4 px-4 font-bold text-gray-800">Type</th>
+                      <th className="text-center py-4 px-4 font-bold text-gray-800">Exam</th>
                       {(() => {
-                        const allPapers = new Set<number>()
+                        // Determine which papers have marks
+                        const papersWithMarks = new Set<number>()
                         resultsData.forEach((result: any) => {
-                          const paperNum = result.paper || 1
-                          allPapers.add(paperNum)
+                          if (result.paper1 && result.paper1 > 0) papersWithMarks.add(1)
+                          if (result.paper2 && result.paper2 > 0) papersWithMarks.add(2)
+                          if (result.paper3 && result.paper3 > 0) papersWithMarks.add(3)
                         })
-                        const sortedPapers = Array.from(allPapers).sort((a, b) => a - b)
+                        const sortedPapers = Array.from(papersWithMarks).sort((a, b) => a - b)
                         return sortedPapers.map(paperNum => (
-                          <th key={paperNum} className="text-center py-3 px-4 font-semibold text-gray-700">
-                            P{paperNum}
+                          <th key={paperNum} className="text-center py-4 px-4 font-bold text-gray-800">
+                            Paper {paperNum}
                           </th>
                         ))
                       })()}
-                      <th className="text-center py-3 px-4 font-semibold text-gray-700">Grade</th>
+                      <th className="text-center py-4 px-4 font-bold text-gray-800">Grade</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(() => {
-                      const grouped = resultsData.reduce((acc: any, result: any) => {
+                      // Group results by student, subject, and exam type
+                      // Each subject can have multiple papers (1, 2, 3)
+                      const groupedResults: Record<string, {
+                        student_name: string
+                        subject_name: string
+                        subject_type: string
+                        exam_type: string
+                        papers: Record<number, number>
+                        final_grade: string
+                      }> = {}
+
+                      resultsData.forEach((result: any) => {
                         const key = `${result.student_id || 'single'}-${result.subject_id}-${result.exam_type}`
-                        if (!acc[key]) {
-                          acc[key] = {
-                            student_name: result.student_name,
-                            subject_name: result.subject_name,
-                            exam_type: result.exam_type,
+                        
+                        if (!groupedResults[key]) {
+                          const subjectName = result.subject_name || 'Unknown Subject'
+                          const isSubsidiary = subjectName.toLowerCase().includes('subsidiary') || 
+                                             subjectName.toLowerCase().includes('general paper') || 
+                                             subjectName.toLowerCase() === 'ict' ||
+                                             subjectName.toLowerCase() === 'information communication technology'
+                          
+                          groupedResults[key] = {
+                            student_name: result.student_name || 'N/A',
+                            subject_name: subjectName,
+                            subject_type: isSubsidiary ? 'Subsidiary' : (result.subject?.subject_type || result.subject_type || 'Principal'),
+                            exam_type: result.exam_type || 'N/A',
                             papers: {},
-                            final_grade: result.final_grade
+                            final_grade: result.final_grade || '-'
                           }
                         }
-                        const paperNum = result.paper || 1
-                        // For Advanced level, marks are stored as 'mark', not ca+exam
-                        const total = result.raw_marks?.mark || result.raw_marks?.total || ((result.raw_marks?.ca || 0) + (result.raw_marks?.exam || 0))
-                        acc[key].papers[paperNum] = total
-                        if (result.final_grade) {
-                          acc[key].final_grade = result.final_grade
+
+                        // Check if result has pre-grouped paper fields (paper1, paper2, paper3)
+                        if (result.paper1 !== undefined || result.paper2 !== undefined || result.paper3 !== undefined) {
+                          groupedResults[key].papers[1] = result.paper1 || 0
+                          groupedResults[key].papers[2] = result.paper2 || 0
+                          groupedResults[key].papers[3] = result.paper3 || 0
+                        } else {
+                          // Extract paper number from individual result
+                          let paperNum = 1
+                          if (result.paper && result.paper > 0) {
+                            paperNum = result.paper
+                          } else if (result.raw_marks?.paper && result.raw_marks.paper > 0) {
+                            paperNum = result.raw_marks.paper
+                          }
+
+                          // Extract mark value
+                          let markValue = 0
+                          if (result.raw_marks) {
+                            if (result.raw_marks.mark !== undefined && result.raw_marks.mark !== null) {
+                              markValue = Number(result.raw_marks.mark)
+                            } else if (result.raw_marks.total !== undefined && result.raw_marks.total !== null) {
+                              markValue = Number(result.raw_marks.total)
+                            } else if (result.raw_marks.exam !== undefined && result.raw_marks.exam !== null) {
+                              markValue = Number(result.raw_marks.exam)
+                            }
+                          }
+
+                          groupedResults[key].papers[paperNum] = markValue
                         }
-                        return acc
-                      }, {})
-                      
-                      const allPapers = new Set<number>()
-                      resultsData.forEach((result: any) => {
-                        const paperNum = result.paper || 1
-                        allPapers.add(paperNum)
+                        
+                        // Update grade if available
+                        if (result.final_grade) {
+                          groupedResults[key].final_grade = result.final_grade
+                        }
                       })
-                      const sortedPapers = Array.from(allPapers).sort((a, b) => a - b)
-                      
-                      return Object.values(grouped).map((group: any, idx: number) => (
-                        <tr key={idx} className="border-b border-gray-200 hover:bg-gray-50">
-                          {selectedStudent === 'all' && (
-                            <td className="py-3 px-4 font-medium text-gray-800">{group.student_name}</td>
-                          )}
-                          <td className="py-3 px-4 text-gray-700">{group.subject_name}</td>
-                          <td className="py-3 px-4 text-center">
-                            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
-                              {group.exam_type || 'N/A'}
-                            </span>
-                          </td>
-                          {sortedPapers.map(paperNum => (
-                            <td key={paperNum} className="py-3 px-4 text-center font-medium text-gray-900">
-                              {group.papers[paperNum] !== undefined ? group.papers[paperNum].toFixed(1) : '-'}
+
+                      return Object.values(groupedResults).map((group, idx) => {
+                        // Determine which papers have marks for this dataset
+                        const papersWithMarks = new Set<number>()
+                        resultsData.forEach((result: any) => {
+                          if (result.paper1 && result.paper1 > 0) papersWithMarks.add(1)
+                          if (result.paper2 && result.paper2 > 0) papersWithMarks.add(2)
+                          if (result.paper3 && result.paper3 > 0) papersWithMarks.add(3)
+                        })
+                        const sortedPapers = Array.from(papersWithMarks).sort((a, b) => a - b)
+
+                        return (
+                          <tr key={idx} className="border-b border-gray-200 hover:bg-blue-50 transition-colors">
+                            {selectedStudent === 'all' && (
+                              <td className="py-4 px-4 font-medium text-gray-900">{group.student_name}</td>
+                            )}
+                            <td className="py-4 px-4">
+                              <div className="font-medium text-gray-900">{group.subject_name}</div>
                             </td>
-                          ))}
-                          <td className="py-3 px-4 text-center">
-                            <span className="px-3 py-1 rounded-full text-sm font-bold bg-green-100 text-green-800">
-                              {group.final_grade}
-                            </span>
-                          </td>
-                        </tr>
-                      ))
+                            <td className="py-4 px-4 text-center">
+                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                group.subject_type === 'Subsidiary' 
+                                  ? 'bg-purple-100 text-purple-800' 
+                                  : 'bg-blue-100 text-blue-800'
+                              }`}>
+                                {group.subject_type === 'Subsidiary' ? 'Sub' : 'Prin'}
+                              </span>
+                            </td>
+                            <td className="py-4 px-4 text-center">
+                              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">
+                                {group.exam_type}
+                              </span>
+                            </td>
+                            {sortedPapers.map(paperNum => (
+                              <td key={paperNum} className="py-4 px-4 text-center font-bold text-lg text-gray-900">
+                                {group.papers[paperNum] !== undefined && group.papers[paperNum] > 0 ? group.papers[paperNum] : '-'}
+                              </td>
+                            ))}
+                            <td className="py-4 px-4 text-center">
+                              <span className={`px-4 py-2 rounded-lg text-base font-bold ${
+                                ['A', 'B', 'C', 'D', 'E'].includes(group.final_grade)
+                                  ? 'bg-green-100 text-green-800'
+                                  : group.final_grade === 'O'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-red-100 text-red-800'
+                              }`}>
+                                {group.final_grade}
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      })
                     })()}
                   </tbody>
                 </table>

@@ -6,18 +6,15 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/school-system/backend/internal/services"
-	"gorm.io/gorm"
 )
 
 type SchoolUserHandler struct {
-	db                    *gorm.DB
 	userAssignmentService *services.UserAssignmentService
 }
 
-func NewSchoolUserHandler(db *gorm.DB) *SchoolUserHandler {
+func NewSchoolUserHandler(userAssignmentService *services.UserAssignmentService) *SchoolUserHandler {
 	return &SchoolUserHandler{
-		db:                    db,
-		userAssignmentService: services.NewUserAssignmentService(db),
+		userAssignmentService: userAssignmentService,
 	}
 }
 

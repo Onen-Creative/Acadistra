@@ -1,32 +1,27 @@
 package handlers
 
 import (
-	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/school-system/backend/internal/models"
 	"github.com/school-system/backend/internal/services"
-	"gorm.io/gorm"
 )
 
 type PaymentHandler struct {
-	db                 *gorm.DB
-	mobileMoneyService *services.MobileMoneyService
+	mobileMoneyService  *services.MobileMoneyService
 	notificationService *services.NotificationService
+	paymentService      *services.PaymentService
 }
 
-func NewPaymentHandler(db *gorm.DB, mms *services.MobileMoneyService, ns *services.NotificationService) *PaymentHandler {
+func NewPaymentHandler(mms *services.MobileMoneyService, ns *services.NotificationService, ps *services.PaymentService) *PaymentHandler {
 	return &PaymentHandler{
-		db:                 db,
-		mobileMoneyService: mms,
+		mobileMoneyService:  mms,
 		notificationService: ns,
+		paymentService:      ps,
 	}
 }
 
-// InitiateMobileMoneyPayment initiates a mobile money payment
 func (h *PaymentHandler) InitiateMobileMoneyPayment(c *gin.Context) {
 	var req struct {
 		StudentFeesID string  `json:"student_fees_id" binding:"required"`
@@ -43,76 +38,30 @@ func (h *PaymentHandler) InitiateMobileMoneyPayment(c *gin.Context) {
 
 	schoolID := c.GetString("tenant_school_id")
 
-	// Validate phone number
+	// Validate and normalize phone
 	if !h.mobileMoneyService.ValidatePhoneNumber(req.PhoneNumber) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid phone number format"})
 		return
 	}
-
-	// Normalize phone number
 	req.PhoneNumber = h.mobileMoneyService.NormalizePhoneNumber(req.PhoneNumber)
 
-	// Get student fees record
-	var fees models.StudentFees
-	if err := h.db.Where("id = ? AND school_id = ?", req.StudentFeesID, schoolID).First(&fees).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Fees record not found"})
+	// Initiate payment
+	payment, paymentReq, err := h.paymentService.InitiatePayment(schoolID, req.StudentFeesID, req.Amount, req.PhoneNumber, req.Network, req.Email)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Validate amount
-	if req.Amount > fees.Outstanding {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Amount exceeds outstanding balance"})
-		return
-	}
-
-	// Get student details
-	var student models.Student
-	if err := h.db.First(&student, fees.StudentID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Student not found"})
-		return
-	}
-
-	// Generate unique transaction reference
-	txRef := fmt.Sprintf("FEES_%s_%d", fees.ID.String()[:8], time.Now().Unix())
-
-	// Initiate mobile money payment
-	paymentReq := services.InitiatePaymentRequest{
-		Amount:      req.Amount,
-		Currency:    "UGX",
-		PhoneNumber: req.PhoneNumber,
-		Email:       req.Email,
-		TxRef:       txRef,
-		Network:     req.Network,
-		FullName:    fmt.Sprintf("%s %s", student.FirstName, student.LastName),
-		RedirectURL: fmt.Sprintf("https://yourschool.com/payment/callback?ref=%s", txRef),
-		Meta: map[string]interface{}{
-			"student_id":      student.ID.String(),
-			"student_fees_id": fees.ID.String(),
-			"term":            fees.Term,
-			"year":            fees.Year,
-		},
-	}
-
-	response, err := h.mobileMoneyService.InitiateMobileMoneyPayment(uuid.MustParse(schoolID), paymentReq)
+	// Call mobile money service
+	response, err := h.mobileMoneyService.InitiateMobileMoneyPayment(uuid.MustParse(schoolID), *paymentReq)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initiate payment: " + err.Error()})
 		return
 	}
 
-	// Create payment record
-	payment := models.MobileMoneyPayment{
-		StudentFeesID:  fees.ID,
-		SchoolID:       uuid.MustParse(schoolID),
-		Amount:         req.Amount,
-		PhoneNumber:    req.PhoneNumber,
-		Provider:       req.Network,
-		TransactionRef: txRef,
-		ExternalRef:    response.Data.TransactionID,
-		Status:         "pending",
-		InitiatedAt:    time.Now(),
-	}
-
-	if err := h.db.Create(&payment).Error; err != nil {
+	// Save payment record
+	payment.ExternalRef = response.Data.TransactionID
+	if err := h.paymentService.CreatePayment(payment); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create payment record"})
 		return
 	}
@@ -122,102 +71,52 @@ func (h *PaymentHandler) InitiateMobileMoneyPayment(c *gin.Context) {
 		"payment_link":   response.Data.Link,
 		"transaction_id": response.Data.TransactionID,
 		"payment_id":     payment.ID,
-		"tx_ref":         txRef,
+		"tx_ref":         payment.TransactionRef,
 	})
 }
 
-// VerifyPayment verifies a mobile money payment
 func (h *PaymentHandler) VerifyPayment(c *gin.Context) {
 	paymentID := c.Param("id")
 	schoolID := c.GetString("tenant_school_id")
 
-	var payment models.MobileMoneyPayment
-	if err := h.db.Where("id = ? AND school_id = ?", paymentID, schoolID).First(&payment).Error; err != nil {
+	payment, err := h.paymentService.GetPaymentByIDWithDetails(paymentID, schoolID)
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Payment not found"})
 		return
 	}
 
-	// Verify with Flutterwave
+	// Verify with provider
 	result, err := h.mobileMoneyService.VerifyTransaction(payment.SchoolID, payment.ExternalRef)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Verification failed: " + err.Error()})
 		return
 	}
 
-	// Update payment status
+	// Update status
 	payment.Status = result.Data.Status
 	switch result.Data.Status {
 	case "successful":
-		now := time.Now()
-		payment.CompletedAt = &now
-		h.db.Save(&payment)
-
-		// Update student fees
-		var fees models.StudentFees
-		h.db.First(&fees, payment.StudentFeesID)
-		fees.AmountPaid += payment.Amount
-		fees.Outstanding = fees.TotalFees - fees.AmountPaid
-		h.db.Save(&fees)
-
-		// Create fees payment record
-		feesPayment := models.FeesPayment{
-			StudentFeesID:  fees.ID,
-			Amount:         payment.Amount,
-			PaymentMethod:  "Mobile Money - " + payment.Provider,
-			PaymentDate:    time.Now(),
-			RecordedBy:     payment.SchoolID,
+		if err := h.paymentService.ProcessSuccessfulPayment(payment); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process payment"})
+			return
 		}
-		h.db.Create(&feesPayment)
 
-		// Get student and guardian info
-		var student models.Student
-		h.db.First(&student, fees.StudentID)
+		// Get updated fees and send notification
+		fees, _ := h.paymentService.GetStudentFees(payment.StudentFeesID.String(), schoolID)
+		student, _ := h.paymentService.GetStudent(fees.StudentID)
+		guardian, _ := h.paymentService.GetGuardianByStudent(student.ID)
+		h.notificationService.SendPaymentConfirmation(guardian.ID, payment.SchoolID, student.FirstName+" "+student.LastName, payment.Amount, fees.Outstanding)
 
-		var guardian models.Guardian
-		h.db.Where("student_id = ?", student.ID).First(&guardian)
-
-		studentName := fmt.Sprintf("%s %s", student.FirstName, student.LastName)
-
-		// Create finance income record
-		income := models.Income{
-			SchoolID:    payment.SchoolID,
-			Category:    "School Fees",
-			Source:      fmt.Sprintf("Mobile Money - %s", payment.Provider),
-			Amount:      payment.Amount,
-			Description: fmt.Sprintf("Fees payment for %s (Term %s %d) via %s", studentName, fees.Term, fees.Year, payment.Provider),
-			Date:        time.Now(),
-			Term:        fees.Term,
-			Year:        fees.Year,
-			ReceiptNo:   payment.TransactionRef,
-			ReceivedBy:  payment.SchoolID,
-		}
-		h.db.Create(&income)
-
-		// Send notifications
-		h.notificationService.SendPaymentConfirmation(guardian.ID, payment.SchoolID, studentName, payment.Amount, fees.Outstanding)
-
-		c.JSON(http.StatusOK, gin.H{
-			"status":  "success",
-			"message": "Payment verified and confirmed",
-			"payment": payment,
-			"fees":    fees,
-		})
+		c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Payment verified and confirmed", "payment": payment, "fees": fees})
 	case "failed":
 		payment.ErrorMessage = "Payment failed"
-		h.db.Save(&payment)
-		c.JSON(http.StatusOK, gin.H{
-			"status":  "failed",
-			"message": "Payment verification failed",
-		})
+		h.paymentService.UpdatePaymentStatus(payment)
+		c.JSON(http.StatusOK, gin.H{"status": "failed", "message": "Payment verification failed"})
 	default:
-		c.JSON(http.StatusOK, gin.H{
-			"status":  payment.Status,
-			"message": "Payment is " + payment.Status,
-		})
+		c.JSON(http.StatusOK, gin.H{"status": payment.Status, "message": "Payment is " + payment.Status})
 	}
 }
 
-// WebhookCallback handles payment webhook callbacks from Flutterwave
 func (h *PaymentHandler) WebhookCallback(c *gin.Context) {
 	var payload map[string]interface{}
 	if err := c.ShouldBindJSON(&payload); err != nil {
@@ -225,29 +124,12 @@ func (h *PaymentHandler) WebhookCallback(c *gin.Context) {
 		return
 	}
 
-	// Log webhook
-	webhookLog := models.PaymentWebhookLog{
-		Provider: "flutterwave",
-		Payload:  models.JSONB(payload),
-	}
+	event, _ := payload["event"].(string)
+	webhookLog, _ := h.paymentService.LogWebhook("flutterwave", event, "", "", payload)
 
-	if event, ok := payload["event"].(string); ok {
-		webhookLog.Event = event
-	}
-
-	h.db.Create(&webhookLog)
-
-	// Validate webhook signature
-	signature := c.GetHeader("verif-hash")
-	if signature == "" {
+	// Validate signature
+	if c.GetHeader("verif-hash") == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing signature"})
-		return
-	}
-
-	// Process webhook based on event type
-	event, ok := payload["event"].(string)
-	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing event type"})
 		return
 	}
 
@@ -260,89 +142,41 @@ func (h *PaymentHandler) WebhookCallback(c *gin.Context) {
 
 		txRef, _ := data["tx_ref"].(string)
 		status, _ := data["status"].(string)
-
 		webhookLog.TransactionRef = txRef
 
-		// Find payment by transaction reference
-		var payment models.MobileMoneyPayment
-		if err := h.db.Where("transaction_ref = ?", txRef).First(&payment).Error; err != nil {
+		payment, err := h.paymentService.GetPaymentByTxRef(txRef)
+		if err != nil {
 			webhookLog.ErrorMessage = "Payment not found"
-			h.db.Save(&webhookLog)
+			h.paymentService.UpdatePaymentStatus(payment)
 			c.JSON(http.StatusNotFound, gin.H{"error": "Payment not found"})
 			return
 		}
 
-		// Update payment status
 		payment.Status = status
-
 		if status == "successful" {
-			now := time.Now()
-			payment.CompletedAt = &now
-
-			// Update student fees
-			var fees models.StudentFees
-			h.db.First(&fees, payment.StudentFeesID)
-			fees.AmountPaid += payment.Amount
-			fees.Outstanding = fees.TotalFees - fees.AmountPaid
-			h.db.Save(&fees)
-
-			// Create fees payment record
-			feesPayment := models.FeesPayment{
-				StudentFeesID:  fees.ID,
-				Amount:         payment.Amount,
-				PaymentMethod:  "Mobile Money - " + payment.Provider,
-				PaymentDate:    time.Now(),
-				RecordedBy:     payment.SchoolID,
-			}
-			h.db.Create(&feesPayment)
-
-			// Get student info
-			var student models.Student
-			h.db.First(&student, fees.StudentID)
-
-			var guardian models.Guardian
-			h.db.Where("student_id = ?", student.ID).First(&guardian)
-
-			studentName := fmt.Sprintf("%s %s", student.FirstName, student.LastName)
-
-			// Create finance income record
-			income := models.Income{
-				SchoolID:    payment.SchoolID,
-				Category:    "School Fees",
-				Source:      fmt.Sprintf("Mobile Money - %s", payment.Provider),
-				Amount:      payment.Amount,
-				Description: fmt.Sprintf("Fees payment for %s (Term %s %d) via %s", studentName, fees.Term, fees.Year, payment.Provider),
-				Date:        time.Now(),
-				Term:        fees.Term,
-				Year:        fees.Year,
-				ReceiptNo:   payment.TransactionRef,
-				ReceivedBy:  payment.SchoolID,
-			}
-			h.db.Create(&income)
-
-			// Send notifications
-			h.notificationService.SendPaymentConfirmation(guardian.ID, payment.SchoolID, studentName, payment.Amount, fees.Outstanding)
+			h.paymentService.ProcessSuccessfulPayment(payment)
+			
+			// Send notification
+			fees, _ := h.paymentService.GetStudentFees(payment.StudentFeesID.String(), payment.SchoolID.String())
+			student, _ := h.paymentService.GetStudent(fees.StudentID)
+			guardian, _ := h.paymentService.GetGuardianByStudent(student.ID)
+			h.notificationService.SendPaymentConfirmation(guardian.ID, payment.SchoolID, student.FirstName+" "+student.LastName, payment.Amount, fees.Outstanding)
+		} else {
+			h.paymentService.UpdatePaymentStatus(payment)
 		}
 
-		h.db.Save(&payment)
-		webhookLog.Processed = true
-		now := time.Now()
-		webhookLog.ProcessedAt = &now
-		h.db.Save(&webhookLog)
+		h.paymentService.MarkWebhookProcessed(webhookLog)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "received"})
 }
 
-// GetPaymentHistory returns payment history for a student
 func (h *PaymentHandler) GetPaymentHistory(c *gin.Context) {
 	studentID := c.Param("student_id")
 	schoolID := c.GetString("tenant_school_id")
 
-	var payments []models.MobileMoneyPayment
-	if err := h.db.Where("student_id = ? AND school_id = ?", studentID, schoolID).
-		Order("created_at DESC").
-		Find(&payments).Error; err != nil {
+	payments, err := h.paymentService.GetPaymentHistory(studentID, schoolID)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch payments"})
 		return
 	}
@@ -350,44 +184,14 @@ func (h *PaymentHandler) GetPaymentHistory(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"payments": payments})
 }
 
-// GetPaymentStats returns payment statistics
 func (h *PaymentHandler) GetPaymentStats(c *gin.Context) {
 	schoolID := c.GetString("tenant_school_id")
 
-	var stats struct {
-		TotalPayments    int64   `json:"total_payments"`
-		SuccessfulCount  int64   `json:"successful_count"`
-		PendingCount     int64   `json:"pending_count"`
-		FailedCount      int64   `json:"failed_count"`
-		TotalAmount      float64 `json:"total_amount"`
-		SuccessfulAmount float64 `json:"successful_amount"`
+	stats, err := h.paymentService.GetPaymentStats(schoolID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch stats"})
+		return
 	}
-
-	h.db.Model(&models.MobileMoneyPayment{}).
-		Where("school_id = ?", schoolID).
-		Count(&stats.TotalPayments)
-
-	h.db.Model(&models.MobileMoneyPayment{}).
-		Where("school_id = ? AND status = 'successful'", schoolID).
-		Count(&stats.SuccessfulCount)
-
-	h.db.Model(&models.MobileMoneyPayment{}).
-		Where("school_id = ? AND status = 'pending'", schoolID).
-		Count(&stats.PendingCount)
-
-	h.db.Model(&models.MobileMoneyPayment{}).
-		Where("school_id = ? AND status = 'failed'", schoolID).
-		Count(&stats.FailedCount)
-
-	h.db.Model(&models.MobileMoneyPayment{}).
-		Select("COALESCE(SUM(amount), 0)").
-		Where("school_id = ?", schoolID).
-		Scan(&stats.TotalAmount)
-
-	h.db.Model(&models.MobileMoneyPayment{}).
-		Select("COALESCE(SUM(amount), 0)").
-		Where("school_id = ? AND status = 'successful'", schoolID).
-		Scan(&stats.SuccessfulAmount)
 
 	c.JSON(http.StatusOK, stats)
 }
