@@ -23,9 +23,23 @@ export default function LandingPage() {
   const [activeSection, setActiveSection] = useState('home')
 
   useEffect(() => {
+    // Only redirect if user is actually logged in with valid token
     const user = localStorage.getItem('user')
-    if (user) {
-      router.push('/dashboard')
+    const token = localStorage.getItem('access_token')
+    
+    if (user && token) {
+      // Verify token is still valid before redirecting
+      try {
+        const userData = JSON.parse(user)
+        if (userData && userData.id) {
+          router.push('/dashboard')
+          return // Exit early to prevent loading landing page
+        }
+      } catch (e) {
+        // Invalid user data, clear and stay on landing page
+        localStorage.removeItem('user')
+        localStorage.removeItem('access_token')
+      }
     }
     
     // Fetch schools
