@@ -77,14 +77,6 @@ func newLessonService(deps *Dependencies) *services.LessonService {
 	)
 }
 
-func newTeacherService(deps *Dependencies) *services.TeacherService {
-	return services.NewTeacherService(
-		repositories.NewTeacherRepository(deps.DB),
-		deps.DB,
-		deps.AuthService,
-	)
-}
-
 func newParentService(deps *Dependencies) *services.ParentService {
 	return services.NewParentService(
 		repositories.NewParentRepository(deps.DB),
@@ -165,10 +157,6 @@ func newClinicService(deps *Dependencies) *services.ClinicService {
 	return services.NewClinicService(deps.DB, deps.EmailService)
 }
 
-func newPayrollService(deps *Dependencies) *services.PayrollService {
-	return services.NewPayrollService(repositories.NewPayrollRepository(deps.DB), deps.DB)
-}
-
 func newBulkMarksImportService(deps *Dependencies) *services.BulkMarksImportService {
 	// Initialize ResultService for grade calculation
 	resultRepo := repositories.NewResultRepository(deps.DB)
@@ -182,10 +170,6 @@ func newBulkMarksImportService(deps *Dependencies) *services.BulkMarksImportServ
 
 func newBulkImportXLSXService(deps *Dependencies) *services.BulkImportXLSXService {
 	return services.NewBulkImportXLSXService(repositories.NewBulkImportXLSXRepository(deps.DB), deps.DB)
-}
-
-func newMarksImportService(deps *Dependencies) *services.MarksImportService {
-	return services.NewMarksImportService(repositories.NewMarksImportRepository(deps.DB))
 }
 
 func newStudentExportService(deps *Dependencies) *services.StudentExportService {
@@ -224,20 +208,12 @@ func newIntegrationActivityService(deps *Dependencies) *services.IntegrationActi
 	return services.NewIntegrationActivityService(repositories.NewIntegrationActivityRepository(deps.DB))
 }
 
-func newPaymentConfigService(deps *Dependencies) *services.PaymentConfigService {
-	return services.NewPaymentConfigService(repositories.NewPaymentConfigRepository(deps.DB))
-}
-
 func newSettingsService(deps *Dependencies) *services.SettingsService {
 	return services.NewSettingsService(repositories.NewSettingsRepository(deps.DB))
 }
 
 func newSystemReportsService(deps *Dependencies) *services.SystemReportsService {
 	return services.NewSystemReportsService(repositories.NewSystemReportsRepository(deps.DB))
-}
-
-func newAnalyticsService(deps *Dependencies) *services.AnalyticsService {
-	return services.NewAnalyticsService(deps.DB)
 }
 
 // Phase 3 refactored services

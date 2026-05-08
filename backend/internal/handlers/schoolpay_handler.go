@@ -44,9 +44,14 @@ func (h *SchoolPayHandler) HandleWebhook(c *gin.Context) {
 
 // SyncTransactions manually syncs transactions for a date range
 func (h *SchoolPayHandler) SyncTransactions(c *gin.Context) {
-	schoolID, exists := c.Get("school_id")
-	if !exists {
+	schoolIDStr := c.GetString("tenant_school_id")
+	if schoolIDStr == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "School ID required"})
+		return
+	}
+	schoolID, err := uuid.Parse(schoolIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid school ID"})
 		return
 	}
 
@@ -74,12 +79,12 @@ func (h *SchoolPayHandler) SyncTransactions(c *gin.Context) {
 			return
 		}
 
-		if err := h.service.SyncTransactionsForRange(schoolID.(uuid.UUID), fromDate, toDate); err != nil {
+		if err := h.service.SyncTransactionsForRange(schoolID, fromDate, toDate); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 	} else {
-		if err := h.service.SyncTransactionsForDate(schoolID.(uuid.UUID), fromDate); err != nil {
+		if err := h.service.SyncTransactionsForDate(schoolID, fromDate); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -90,13 +95,18 @@ func (h *SchoolPayHandler) SyncTransactions(c *gin.Context) {
 
 // ProcessTransactions processes unprocessed transactions
 func (h *SchoolPayHandler) ProcessTransactions(c *gin.Context) {
-	schoolID, exists := c.Get("school_id")
-	if !exists {
+	schoolIDStr := c.GetString("tenant_school_id")
+	if schoolIDStr == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "School ID required"})
 		return
 	}
+	schoolID, err := uuid.Parse(schoolIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid school ID"})
+		return
+	}
 
-	if err := h.service.ProcessUnprocessedTransactions(schoolID.(uuid.UUID)); err != nil {
+	if err := h.service.ProcessUnprocessedTransactions(schoolID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -106,14 +116,14 @@ func (h *SchoolPayHandler) ProcessTransactions(c *gin.Context) {
 
 // GetTransactions retrieves SchoolPay transactions
 func (h *SchoolPayHandler) GetTransactions(c *gin.Context) {
-	schoolID, exists := c.Get("school_id")
-	if !exists {
+	schoolIDStr := c.GetString("tenant_school_id")
+	if schoolIDStr == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "School ID required"})
 		return
 	}
 
 	var transactions []models.SchoolPayTransaction
-	query := h.service.DB().Where("school_id = ?", schoolID)
+	query := h.service.DB().Where("school_id = ?", schoolIDStr)
 
 	// Filters
 	if status := c.Query("processed"); status != "" {
@@ -139,14 +149,14 @@ func (h *SchoolPayHandler) GetTransactions(c *gin.Context) {
 
 // GetConfig retrieves SchoolPay configuration
 func (h *SchoolPayHandler) GetConfig(c *gin.Context) {
-	schoolID, exists := c.Get("school_id")
-	if !exists {
+	schoolIDStr := c.GetString("tenant_school_id")
+	if schoolIDStr == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "School ID required"})
 		return
 	}
 
 	var config models.SchoolPayConfig
-	if err := h.service.DB().Where("school_id = ?", schoolID).First(&config).Error; err != nil {
+	if err := h.service.DB().Where("school_id = ?", schoolIDStr).First(&config).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Configuration not found"})
 		return
 	}
@@ -156,9 +166,14 @@ func (h *SchoolPayHandler) GetConfig(c *gin.Context) {
 
 // UpdateConfig updates SchoolPay configuration
 func (h *SchoolPayHandler) UpdateConfig(c *gin.Context) {
-	schoolID, exists := c.Get("school_id")
-	if !exists {
+	schoolIDStr := c.GetString("tenant_school_id")
+	if schoolIDStr == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "School ID required"})
+		return
+	}
+	schoolID, err := uuid.Parse(schoolIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid school ID"})
 		return
 	}
 
@@ -179,7 +194,7 @@ func (h *SchoolPayHandler) UpdateConfig(c *gin.Context) {
 	if err := h.service.DB().Where("school_id = ?", schoolID).First(&config).Error; err != nil {
 		// Create new config
 		config = models.SchoolPayConfig{
-			SchoolID:       schoolID.(uuid.UUID),
+			SchoolID:       schoolID,
 			SchoolCode:     req.SchoolCode,
 			APIPassword:    req.APIPassword,
 			WebhookURL:     req.WebhookURL,

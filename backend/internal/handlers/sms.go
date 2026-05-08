@@ -41,7 +41,11 @@ func (h *SMSHandler) SendSMS(c *gin.Context) {
 		return
 	}
 
-	schoolID := c.GetString("school_id")
+	schoolID := c.GetString("tenant_school_id")
+	if schoolID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "School ID required"})
+		return
+	}
 	userID := c.GetString("user_id")
 
 	var recipientID *uuid.UUID
@@ -91,7 +95,11 @@ func (h *SMSHandler) SendBulkSMS(c *gin.Context) {
 		return
 	}
 
-	schoolID := c.GetString("school_id")
+	schoolID := c.GetString("tenant_school_id")
+	if schoolID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "School ID required"})
+		return
+	}
 	userID := c.GetString("user_id")
 
 	var templateID *uuid.UUID
@@ -136,7 +144,11 @@ func (h *SMSHandler) SendBulkSMS(c *gin.Context) {
 
 // GetSMSQueue lists SMS queue
 func (h *SMSHandler) GetSMSQueue(c *gin.Context) {
-	schoolID := c.GetString("school_id")
+	schoolID := c.GetString("tenant_school_id")
+	if schoolID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "School ID required"})
+		return
+	}
 	status := c.Query("status")
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
 
@@ -151,7 +163,11 @@ func (h *SMSHandler) GetSMSQueue(c *gin.Context) {
 
 // GetSMSBatches lists SMS batches
 func (h *SMSHandler) GetSMSBatches(c *gin.Context) {
-	schoolID := c.GetString("school_id")
+	schoolID := c.GetString("tenant_school_id")
+	if schoolID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "School ID required"})
+		return
+	}
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 
 	batches, err := h.smsService.GetBatches(uuid.MustParse(schoolID), limit)
@@ -165,7 +181,11 @@ func (h *SMSHandler) GetSMSBatches(c *gin.Context) {
 
 // GetSMSLogs lists SMS logs
 func (h *SMSHandler) GetSMSLogs(c *gin.Context) {
-	schoolID := c.GetString("school_id")
+	schoolID := c.GetString("tenant_school_id")
+	if schoolID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "School ID required"})
+		return
+	}
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
 
 	logs, err := h.smsService.GetLogs(uuid.MustParse(schoolID), limit)
@@ -179,7 +199,11 @@ func (h *SMSHandler) GetSMSLogs(c *gin.Context) {
 
 // GetSMSStats gets SMS statistics
 func (h *SMSHandler) GetSMSStats(c *gin.Context) {
-	schoolID := c.GetString("school_id")
+	schoolID := c.GetString("tenant_school_id")
+	if schoolID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "School ID required"})
+		return
+	}
 
 	stats, err := h.smsService.GetStats(uuid.MustParse(schoolID))
 	if err != nil {
@@ -204,7 +228,11 @@ func (h *SMSHandler) CreateTemplate(c *gin.Context) {
 		return
 	}
 
-	schoolID := c.GetString("school_id")
+	schoolID := c.GetString("tenant_school_id")
+	if schoolID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "School ID required"})
+		return
+	}
 	sid, _ := uuid.Parse(schoolID)
 
 	template := &models.SMSTemplate{
@@ -226,7 +254,11 @@ func (h *SMSHandler) CreateTemplate(c *gin.Context) {
 
 // GetTemplates lists SMS templates
 func (h *SMSHandler) GetTemplates(c *gin.Context) {
-	schoolID := c.GetString("school_id")
+	schoolID := c.GetString("tenant_school_id")
+	if schoolID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "School ID required"})
+		return
+	}
 	sid, _ := uuid.Parse(schoolID)
 
 	templates, err := h.smsService.GetTemplates(&sid)
@@ -253,7 +285,11 @@ func (h *SMSHandler) ConfigureProvider(c *gin.Context) {
 		return
 	}
 
-	schoolID := c.GetString("school_id")
+	schoolID := c.GetString("tenant_school_id")
+	if schoolID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "School ID required"})
+		return
+	}
 
 	provider := &models.SMSProvider{
 		SchoolID:  uuid.MustParse(schoolID),
@@ -275,7 +311,11 @@ func (h *SMSHandler) ConfigureProvider(c *gin.Context) {
 
 // GetProvider gets SMS provider config
 func (h *SMSHandler) GetProvider(c *gin.Context) {
-	schoolID := c.GetString("school_id")
+	schoolID := c.GetString("tenant_school_id")
+	if schoolID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "School ID required"})
+		return
+	}
 
 	provider, err := h.smsService.GetProvider(uuid.MustParse(schoolID))
 	if err != nil {
