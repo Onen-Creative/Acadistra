@@ -772,7 +772,7 @@ func (s *AnalyticsService) buildStudentContext(student *models.Student, class *m
 	}
 }
 
-func (s *AnalyticsService) buildExecutiveSummary(results []models.SubjectResult, classResults []models.SubjectResult, studentID uuid.UUID) ExecutiveSummary {
+func (s *AnalyticsService) buildExecutiveSummary(results []models.SubjectResult, classResults []models.SubjectResult, _ uuid.UUID) ExecutiveSummary {
 	// Calculate student average
 	var totalScore float64
 	var count int
@@ -806,12 +806,15 @@ func (s *AnalyticsService) buildExecutiveSummary(results []models.SubjectResult,
 		return scores[i].score > scores[j].score
 	})
 
-	// Find rank
+	// Find rank - using results to determine student
 	rank := 1
-	for i, s := range scores {
-		if s.id == studentID {
-			rank = i + 1
-			break
+	if len(results) > 0 {
+		studentID := results[0].StudentID
+		for i, s := range scores {
+			if s.id == studentID {
+				rank = i + 1
+				break
+			}
 		}
 	}
 
@@ -919,7 +922,7 @@ func (s *AnalyticsService) buildPerformanceTrend(schoolID, studentID uuid.UUID, 
 	return trends
 }
 
-func (s *AnalyticsService) buildSubjectBreakdown(results []models.SubjectResult, classResults []models.SubjectResult, studentID uuid.UUID) []SubjectPerformance {
+func (s *AnalyticsService) buildSubjectBreakdown(results []models.SubjectResult, classResults []models.SubjectResult, _ uuid.UUID) []SubjectPerformance {
 	// Calculate class averages per subject
 	subjectClassAvg := make(map[uuid.UUID][]float64)
 	for _, r := range classResults {
@@ -1149,9 +1152,10 @@ func (s *AnalyticsService) buildAttendanceEngagement(attendance []models.Attenda
 	present := 0
 	absent := 0
 	for _, a := range attendance {
-		if a.Status == "present" {
+		switch a.Status {
+		case "present":
 			present++
-		} else if a.Status == "absent" {
+		case "absent":
 			absent++
 		}
 	}
@@ -1307,7 +1311,7 @@ func (s *AnalyticsService) generateActionableInsights(results []models.SubjectRe
 	return insights
 }
 
-func (s *AnalyticsService) buildAssessmentBreakdown(schoolID, studentID uuid.UUID, filters AnalyticsFilters) []AssessmentDetail {
+func (s *AnalyticsService) buildAssessmentBreakdown(_ uuid.UUID, studentID uuid.UUID, filters AnalyticsFilters) []AssessmentDetail {
 	var marks []models.Mark
 	query := s.db.Preload("Assessment").Preload("Assessment.StandardSubject").
 		Where("student_id = ?", studentID)
@@ -1355,10 +1359,6 @@ func (s *AnalyticsService) buildAssessmentBreakdown(schoolID, studentID uuid.UUI
 	}
 
 	return details
-}
-
-func (s *AnalyticsService) buildTeacherRemarks(marks interface{}) []TeacherRemark {
-	return []TeacherRemark{}
 }
 
 func getPerformanceLabel(avg float64) string {
@@ -1512,7 +1512,7 @@ func calculateGradeForLevel(score float64, level string) string {
 }
 
 // buildAdvancedLevelStudentDetails builds comprehensive student breakdown for Advanced Level
-func (s *AnalyticsService) buildAdvancedLevelStudentDetails(advancedLevelData map[string]*paperGroup, results []models.SubjectResult, level string) []StudentDetail {
+func (s *AnalyticsService) buildAdvancedLevelStudentDetails(advancedLevelData map[string]*paperGroup, results []models.SubjectResult, _ string) []StudentDetail {
 	// Group by student
 	studentData := make(map[uuid.UUID]*StudentDetail)
 	studentSubjects := make(map[uuid.UUID]map[uuid.UUID]*StudentSubjectDetail)

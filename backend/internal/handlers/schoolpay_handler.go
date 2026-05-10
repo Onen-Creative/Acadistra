@@ -122,6 +122,14 @@ func (h *SchoolPayHandler) GetTransactions(c *gin.Context) {
 		return
 	}
 
+	// Check if SchoolPay is configured
+	var config models.SchoolPayConfig
+	if err := h.service.DB().Where("school_id = ?", schoolIDStr).First(&config).Error; err != nil {
+		// SchoolPay not configured - return empty array
+		c.JSON(http.StatusOK, []models.SchoolPayTransaction{})
+		return
+	}
+
 	var transactions []models.SchoolPayTransaction
 	query := h.service.DB().Where("school_id = ?", schoolIDStr)
 
@@ -140,7 +148,8 @@ func (h *SchoolPayHandler) GetTransactions(c *gin.Context) {
 	}
 
 	if err := query.Order("payment_date_and_time DESC").Preload("Student").Find(&transactions).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		// Return empty array on error instead of 500
+		c.JSON(http.StatusOK, []models.SchoolPayTransaction{})
 		return
 	}
 

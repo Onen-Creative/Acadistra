@@ -142,7 +142,7 @@ func main() {
 		os.Getenv("AFRICASTALKING_USERNAME"),
 		os.Getenv("AFRICASTALKING_SENDER_ID"),
 	)
-	notificationService := services.NewNotificationService(repositories.NewNotificationRepository(db), db, smsService, emailService)
+	notificationService := services.NewNotificationService(repositories.NewNotificationRepository(db), db, emailService)
 	payrollService := services.NewPayrollService(repositories.NewPayrollRepository(db), db)
 
 	// Setup all routes using the new routes package

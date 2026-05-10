@@ -59,6 +59,9 @@ func setupProtectedRoutes(v1 *gin.RouterGroup, deps *Dependencies) {
 	// Teacher/DOS routes
 	setupTeacherRoutes(protected, deps)
 
+	// SMS routes (School Admin and Bursar)
+	setupSMSRoutes(protected, deps)
+
 	// Bursar routes
 	setupBursarRoutes(protected, deps)
 
@@ -314,19 +317,6 @@ func setupSchoolAdminRoutes(protected *gin.RouterGroup, deps *Dependencies) {
 	// Calendar management
 	schoolAdmin.POST("/calendar/holidays", attendanceHandler.AddHoliday)
 	schoolAdmin.DELETE("/calendar/holidays/:id", attendanceHandler.DeleteHoliday)
-
-	// SMS management
-	smsHandler := handlers.NewSMSHandler(deps.DB)
-	schoolAdmin.POST("/sms/send", smsHandler.SendSMS)
-	schoolAdmin.POST("/sms/bulk", smsHandler.SendBulkSMS)
-	schoolAdmin.GET("/sms/queue", smsHandler.GetSMSQueue)
-	schoolAdmin.GET("/sms/batches", smsHandler.GetSMSBatches)
-	schoolAdmin.GET("/sms/logs", smsHandler.GetSMSLogs)
-	schoolAdmin.GET("/sms/stats", smsHandler.GetSMSStats)
-	schoolAdmin.POST("/sms/templates", smsHandler.CreateTemplate)
-	schoolAdmin.GET("/sms/templates", smsHandler.GetTemplates)
-	schoolAdmin.POST("/sms/provider", smsHandler.ConfigureProvider)
-	schoolAdmin.GET("/sms/provider", smsHandler.GetProvider)
 
 	// Analytics routes
 	analyticsService := services.NewAnalyticsService(deps.DB)

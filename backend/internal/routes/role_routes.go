@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -8,6 +9,41 @@ import (
 	"github.com/school-system/backend/internal/middleware"
 	"github.com/school-system/backend/internal/services"
 )
+
+func setupSMSRoutes(protected *gin.RouterGroup, deps *Dependencies) {
+	sms := protected.Group("/sms")
+	sms.Use(func(c *gin.Context) {
+		log.Printf("[SMS Route] Method: %s, Path: %s, User Role: %s", c.Request.Method, c.Request.URL.Path, c.GetString("user_role"))
+		userRole := c.GetString("user_role")
+		allowedRoles := []string{"school_admin", "bursar", "system_admin"}
+		allowed := false
+		for _, role := range allowedRoles {
+			if userRole == role {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			log.Printf("[SMS Route] Access denied for role: %s", userRole)
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			c.Abort()
+			return
+		}
+		c.Next()
+	})
+
+	smsHandler := handlers.NewSMSHandler(deps.DB)
+	sms.POST("/send", smsHandler.SendSMS)
+	sms.POST("/bulk", smsHandler.SendBulkSMS)
+	sms.GET("/queue", smsHandler.GetSMSQueue)
+	sms.GET("/batches", smsHandler.GetSMSBatches)
+	sms.GET("/logs", smsHandler.GetSMSLogs)
+	sms.GET("/stats", smsHandler.GetSMSStats)
+	sms.POST("/templates", smsHandler.CreateTemplate)
+	sms.GET("/templates", smsHandler.GetTemplates)
+	sms.POST("/provider", smsHandler.ConfigureProvider)
+	sms.GET("/provider", smsHandler.GetProvider)
+}
 
 func setupSharedRoutes(protected *gin.RouterGroup, deps *Dependencies) {
 	// Shared routes for school_admin, teacher, librarian, nurse, bursar, dos, director_of_studies, and parent

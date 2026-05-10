@@ -268,7 +268,7 @@ func (s *BulkExamMarksImportService) GenerateTemplate(classID, schoolID string) 
 }
 
 // recalculateAdvancedLevelGrades recalculates all grades for S5/S6 students after bulk import
-func (s *BulkExamMarksImportService) recalculateAdvancedLevelGrades(schoolID, classID, subjectID, term string, year int, examType, level string) {
+func (s *BulkExamMarksImportService) recalculateAdvancedLevelGrades(schoolID, classID, subjectID, term string, year int, _ string, level string) {
 	// Get all unique students who have marks for this subject/term/year
 	var studentIDs []string
 	s.repo.GetDB().Table("subject_results").

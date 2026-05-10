@@ -112,7 +112,7 @@ func (s *SystemMonitoringService) RecordSystemMetric() error {
 	var avgResponseTime float64
 	s.db.Model(&models.APIRequestLog{}).
 		Where("timestamp > ?", time.Now().Add(-5*time.Minute)).
-		Select("AVG(response_time)").
+		Select("COALESCE(AVG(response_time), 0)").
 		Scan(&avgResponseTime)
 	
 	// Calculate error rate
@@ -181,7 +181,7 @@ func (s *SystemMonitoringService) GenerateDailyReport(date time.Time) error {
 		Count(&failedRequests)
 	s.db.Model(&models.APIRequestLog{}).
 		Where("timestamp >= ? AND timestamp < ?", startOfDay, endOfDay).
-		Select("AVG(response_time)").
+		Select("COALESCE(AVG(response_time), 0)").
 		Scan(&avgResponseTime)
 	
 	// Slowest endpoint
@@ -384,7 +384,7 @@ func (s *SystemMonitoringService) GetSystemStats() (map[string]interface{}, erro
 		Count(&errorsLastHour)
 	s.db.Model(&models.APIRequestLog{}).
 		Where("timestamp > ?", time.Now().Add(-1*time.Hour)).
-		Select("AVG(response_time)").
+		Select("COALESCE(AVG(response_time), 0)").
 		Scan(&avgResponseTime)
 
 	errorRate := 0.0

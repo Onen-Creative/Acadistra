@@ -157,6 +157,20 @@ type Guardian struct {
 	NationalID       string    `gorm:"type:varchar(50)" json:"national_id"`
 	Student          *Student  `gorm:"foreignKey:StudentID" json:"student,omitempty"`
 	School           *School   `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
+	StaffLinks       []GuardianStaff `gorm:"foreignKey:GuardianID" json:"staff_links,omitempty"`
+}
+
+// GuardianStaff links guardians to staff members (e.g., parent who is also a teacher)
+type GuardianStaff struct {
+	BaseModel
+	GuardianID       uuid.UUID `gorm:"type:char(36);not null;index" json:"guardian_id"`
+	StaffID          uuid.UUID `gorm:"type:char(36);not null;index" json:"staff_id"`
+	SchoolID         uuid.UUID `gorm:"type:char(36);not null;index" json:"school_id"`
+	Relationship     string    `gorm:"type:varchar(100);not null;default:'Parent'" json:"relationship"` // Parent, Spouse, Sibling, etc.
+	IsPrimaryContact bool      `gorm:"default:false" json:"is_primary_contact"`
+	Guardian         *Guardian `gorm:"foreignKey:GuardianID" json:"guardian,omitempty"`
+	Staff            *Staff    `gorm:"foreignKey:StaffID" json:"staff,omitempty"`
+	School           *School   `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
 }
 
 // Enrollment links students to classes

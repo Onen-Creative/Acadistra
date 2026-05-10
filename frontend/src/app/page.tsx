@@ -23,7 +23,6 @@ import {
   Clock,
   Award,
   Building2,
-  ChevronRight,
   Menu,
   X,
   Sparkles,
@@ -46,25 +45,6 @@ export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
-    // Only redirect if user is actually logged in with valid token
-    const user = localStorage.getItem("user");
-    const token = localStorage.getItem("access_token");
-
-    if (user && token) {
-      // Verify token is still valid before redirecting
-      try {
-        const userData = JSON.parse(user);
-        if (userData && userData.id) {
-          router.push("/dashboard");
-          return; // Exit early to prevent loading landing page
-        }
-      } catch (e) {
-        // Invalid user data, clear and stay on landing page
-        localStorage.removeItem("user");
-        localStorage.removeItem("access_token");
-      }
-    }
-
     // Fetch schools
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
     fetch(`${apiUrl}/api/public/schools`)
@@ -102,163 +82,217 @@ export default function LandingPage() {
       icon: <Users className="w-6 h-6" />,
       title: "Multi-Section Support",
       description: "ECCE, P1-P7, S1-S6 with standardized curriculum subjects",
+      category: "Academic",
     },
     {
       icon: <Shield className="w-6 h-6" />,
       title: "Role-Based Access",
       description: "Admin, Teacher, Bursar, Librarian, Nurse, Parent portals",
+      category: "Security",
     },
     {
       icon: <FileText className="w-6 h-6" />,
       title: "UNEB & NCDC Grading",
       description: "Automated grading engines with PDF report generation",
+      category: "Academic",
     },
     {
       icon: <DollarSign className="w-6 h-6" />,
       title: "Finance Management",
       description:
         "Fees tracking, payroll, budgets, requisitions & expenditure",
+      category: "Finance",
     },
     {
       icon: <CreditCard className="w-6 h-6" />,
       title: "SchoolPay Integration",
       description: "Real-time mobile money payments via SchoolPay Uganda",
+      category: "Finance",
     },
     {
       icon: <MessageSquare className="w-6 h-6" />,
       title: "SMS Management",
       description: "Automated fees reminders & attendance alerts",
+      category: "Communication",
     },
     {
       icon: <Calendar className="w-6 h-6" />,
       title: "Attendance Tracking",
       description: "Daily attendance with holidays & term dates management",
+      category: "Academic",
     },
     {
       icon: <BookOpen className="w-6 h-6" />,
       title: "Library Management",
       description: "Book cataloging, issues, returns & inventory tracking",
+      category: "Operations",
     },
     {
       icon: <Heart className="w-6 h-6" />,
       title: "Clinic Management",
       description: "Health profiles, medical records & clinic visits",
+      category: "Operations",
     },
     {
       icon: <Briefcase className="w-6 h-6" />,
       title: "Payroll System",
       description: "Salary structures, monthly processing & payment tracking",
+      category: "Finance",
     },
     {
       icon: <TrendingUp className="w-6 h-6" />,
       title: "Analytics Dashboard",
       description: "Real-time insights on performance, fees & attendance",
+      category: "Analytics",
     },
     {
       icon: <Cloud className="w-6 h-6" />,
       title: "Offline-First",
       description: "Marks entry works offline, syncs when online",
+      category: "Technology",
     },
     {
       icon: <Award className="w-6 h-6" />,
       title: "Parent Portal",
       description: "View children's progress, fees, attendance & reports",
+      category: "Communication",
     },
     {
       icon: <BarChart3 className="w-6 h-6" />,
       title: "Performance Analytics",
       description: "Class rankings, subject analysis & trend reports",
+      category: "Analytics",
     },
     {
       icon: <Clock className="w-6 h-6" />,
       title: "Audit Logging",
       description: "Complete activity tracking for security & compliance",
+      category: "Security",
     },
     {
       icon: <Building2 className="w-6 h-6" />,
-      title: "Multi-Tenant",
-      description: "Secure data isolation with subdomain routing",
+      title: "Staff Management",
+      description:
+        "Complete staff management with attendance and leave tracking",
+      category: "Operation",
     },
   ];
 
+  const stats = [
+    { value: "5000+", label: "Students Managed" },
+    { value: "300+", label: "Active Teachers" },
+    { value: "99.9%", label: "Uptime" },
+    { value: "24/7", label: "Support" },
+  ];
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+    <div className="min-h-screen bg-white">
       <style jsx global>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@700;800;900&display=swap');
-        
+        @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&display=swap");
+
         * {
-          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+          font-family:
+            "Inter",
+            -apple-system,
+            BlinkMacSystemFont,
+            sans-serif;
         }
-        
-        h1, h2, h3 {
-          font-family: 'Playfair Display', serif;
+
+        h1,
+        h2,
+        h3 {
+          font-family: "Space Grotesk", sans-serif;
+          letter-spacing: -0.02em;
         }
-        
+
         @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-20px); }
+          0%,
+          100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-10px);
+          }
         }
-        
-        @keyframes slide {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
+
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
-        
-        @keyframes gradient {
-          0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
+
+        @keyframes scroll {
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(-50%);
+          }
         }
-        
-        @keyframes shimmer {
-          0% { background-position: -1000px 0; }
-          100% { background-position: 1000px 0; }
-        }
-        
+
         .animate-float {
-          animation: float 6s ease-in-out infinite;
+          animation: float 3s ease-in-out infinite;
         }
-        
-        .animate-slide {
-          animation: slide 30s linear infinite;
+
+        .slide-in {
+          animation: slideIn 0.6s ease-out forwards;
         }
-        
-        .animate-gradient {
-          background-size: 200% 200%;
-          animation: gradient 8s ease infinite;
+
+        .animate-scroll {
+          animation: scroll 30s linear infinite;
         }
-        
-        .glass-effect {
-          background: rgba(255, 255, 255, 0.7);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          border: 1px solid rgba(255, 255, 255, 0.3);
+
+        .animate-scroll:hover {
+          animation-play-state: paused;
         }
-        
-        .text-gradient {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
+
+        @keyframes scroll-desktop {
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(-50%);
+          }
         }
-        
+
+        .animate-scroll-desktop {
+          animation: scroll-desktop 60s linear infinite;
+        }
+
+        .animate-scroll-desktop:hover {
+          animation-play-state: paused;
+        }
+
         .hover-lift {
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        
+
         .hover-lift:hover {
-          transform: translateY(-8px);
-          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+          transform: translateY(-4px);
         }
-        
-        .shimmer {
-          background: linear-gradient(
-            90deg,
-            rgba(255, 255, 255, 0) 0%,
-            rgba(255, 255, 255, 0.8) 50%,
-            rgba(255, 255, 255, 0) 100%
-          );
-          background-size: 1000px 100%;
-          animation: shimmer 3s infinite;
+
+        .gradient-border {
+          position: relative;
+          background: white;
+        }
+
+        .gradient-border::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          border-radius: inherit;
+          padding: 2px;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          -webkit-mask:
+            linear-gradient(#fff 0 0) content-box,
+            linear-gradient(#fff 0 0);
+          -webkit-mask-composite: xor;
+          mask-composite: exclude;
         }
       `}</style>
       {/* WhatsApp Floating Button */}
@@ -280,19 +314,20 @@ export default function LandingPage() {
       </a>
 
       {/* Navigation */}
-      <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${
-        scrolled ? 'bg-white/95 backdrop-blur-md shadow-lg' : 'bg-white/80 backdrop-blur-sm'
-      }`}>
+      <nav className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-xl border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
-            <div className="flex items-center space-x-3 group cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+            <div
+              className="flex items-center space-x-3 cursor-pointer"
+              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            >
               <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-amber-600 to-yellow-600 rounded-2xl blur-lg opacity-50 group-hover:opacity-75 transition-opacity"></div>
-                <div className="relative bg-gradient-to-r from-amber-600 to-yellow-600 p-2.5 rounded-2xl">
+                <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl blur-lg opacity-30"></div>
+                <div className="relative bg-gradient-to-r from-indigo-600 to-purple-600 p-2.5 rounded-xl">
                   <GraduationCap className="w-7 h-7 text-white" />
                 </div>
               </div>
-              <span className="text-2xl font-bold bg-gradient-to-r from-amber-600 to-yellow-600 bg-clip-text text-transparent">
+              <span className="text-2xl font-bold text-gray-900">
                 Acadistra
               </span>
             </div>
@@ -301,52 +336,61 @@ export default function LandingPage() {
             <div className="hidden md:flex items-center space-x-8">
               <a
                 href="#home"
-                className={`text-sm font-medium transition-all ${
-                  activeSection === "home" 
-                    ? "text-amber-600 font-semibold" 
-                    : "text-gray-700 hover:text-amber-600"
+                className={`font-medium transition-colors ${
+                  activeSection === "home"
+                    ? "text-indigo-600"
+                    : "text-gray-600 hover:text-indigo-600"
                 }`}
               >
                 Home
               </a>
               <a
                 href="#features"
-                className={`text-sm font-medium transition-all ${
-                  activeSection === "features" 
-                    ? "text-amber-600 font-semibold" 
-                    : "text-gray-700 hover:text-amber-600"
+                className={`font-medium transition-colors ${
+                  activeSection === "features"
+                    ? "text-indigo-600"
+                    : "text-gray-600 hover:text-indigo-600"
                 }`}
               >
                 Features
               </a>
               <a
+                href="#schools"
+                className={`font-medium transition-colors ${
+                  activeSection === "schools"
+                    ? "text-indigo-600"
+                    : "text-gray-600 hover:text-indigo-600"
+                }`}
+              >
+                Schools
+              </a>
+              <a
                 href="#contact"
-                className={`text-sm font-medium transition-all ${
-                  activeSection === "contact" 
-                    ? "text-amber-600 font-semibold" 
-                    : "text-gray-700 hover:text-amber-600"
+                className={`font-medium transition-colors ${
+                  activeSection === "contact"
+                    ? "text-indigo-600"
+                    : "text-gray-600 hover:text-indigo-600"
                 }`}
               >
                 Contact
               </a>
               <button
                 onClick={() => router.push("/login")}
-                className="relative group overflow-hidden bg-gradient-to-r from-amber-600 to-yellow-600 text-white px-6 py-2.5 rounded-full font-medium transition-all hover:shadow-lg hover:shadow-amber-500/50"
+                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 py-2.5 rounded-xl font-semibold transition-all shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40"
               >
-                <span className="relative z-10">Login</span>
-                <div className="absolute inset-0 bg-gradient-to-r from-yellow-600 to-amber-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                Login
               </button>
             </div>
 
             {/* Mobile Menu Button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-xl hover:bg-gray-100 transition-colors"
+              className="md:hidden p-2 rounded-xl hover:bg-gray-100"
             >
               {mobileMenuOpen ? (
-                <X className="w-6 h-6 text-gray-700" />
+                <X className="w-6 h-6" />
               ) : (
-                <Menu className="w-6 h-6 text-gray-700" />
+                <Menu className="w-6 h-6" />
               )}
             </button>
           </div>
@@ -354,14 +398,14 @@ export default function LandingPage() {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden bg-white/95 backdrop-blur-md border-t border-gray-200">
+          <div className="md:hidden bg-white border-t border-gray-100">
             <div className="px-4 py-6 space-y-4">
               <a
                 href="#home"
-                className={`block text-base font-medium transition-all ${
-                  activeSection === "home" 
-                    ? "text-amber-600 font-semibold" 
-                    : "text-gray-700 hover:text-amber-600"
+                className={`block font-medium ${
+                  activeSection === "home"
+                    ? "text-indigo-600"
+                    : "text-gray-600 hover:text-indigo-600"
                 }`}
                 onClick={() => setMobileMenuOpen(false)}
               >
@@ -369,21 +413,32 @@ export default function LandingPage() {
               </a>
               <a
                 href="#features"
-                className={`block text-base font-medium transition-all ${
-                  activeSection === "features" 
-                    ? "text-amber-600 font-semibold" 
-                    : "text-gray-700 hover:text-amber-600"
+                className={`block font-medium ${
+                  activeSection === "features"
+                    ? "text-indigo-600"
+                    : "text-gray-600 hover:text-indigo-600"
                 }`}
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Features
               </a>
               <a
+                href="#schools"
+                className={`block font-medium ${
+                  activeSection === "schools"
+                    ? "text-indigo-600"
+                    : "text-gray-600 hover:text-indigo-600"
+                }`}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Schools
+              </a>
+              <a
                 href="#contact"
-                className={`block text-base font-medium transition-all ${
-                  activeSection === "contact" 
-                    ? "text-amber-600 font-semibold" 
-                    : "text-gray-700 hover:text-amber-600"
+                className={`block font-medium ${
+                  activeSection === "contact"
+                    ? "text-indigo-600"
+                    : "text-gray-600 hover:text-indigo-600"
                 }`}
                 onClick={() => setMobileMenuOpen(false)}
               >
@@ -391,7 +446,7 @@ export default function LandingPage() {
               </a>
               <button
                 onClick={() => router.push("/login")}
-                className="w-full bg-gradient-to-r from-amber-600 to-yellow-600 text-white px-6 py-3 rounded-full font-medium transition-all hover:shadow-lg"
+                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl font-semibold"
               >
                 Login
               </button>
@@ -403,124 +458,138 @@ export default function LandingPage() {
       {/* Hero Section */}
       <section
         id="home"
-        className="relative pt-32 sm:pt-40 pb-20 sm:pb-32 px-4 sm:px-6 lg:px-8 overflow-hidden bg-gradient-to-br from-amber-50 via-yellow-50 to-lime-50"
+        className="relative pt-32 pb-24 px-4 sm:px-6 lg:px-8 overflow-hidden"
       >
-        {/* Animated Background Elements */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-20 left-10 w-96 h-96 bg-amber-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-float"></div>
-          <div className="absolute top-40 right-10 w-96 h-96 bg-yellow-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-float" style={{ animationDelay: '2s' }}></div>
-          <div className="absolute -bottom-20 left-1/2 w-96 h-96 bg-lime-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-float" style={{ animationDelay: '4s' }}></div>
-        </div>
+        {/* Gradient Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 via-white to-purple-50"></div>
 
-        {/* Subtle Pattern Overlay */}
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, #d97706 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
-        </div>
+        {/* Animated Orbs */}
+        <div className="absolute top-20 left-10 w-72 h-72 bg-indigo-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-float"></div>
+        <div
+          className="absolute top-40 right-10 w-72 h-72 bg-purple-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-float"
+          style={{ animationDelay: "2s" }}
+        ></div>
+        <div
+          className="absolute -bottom-20 left-1/2 w-72 h-72 bg-pink-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-float"
+          style={{ animationDelay: "4s" }}
+        ></div>
 
-        <div className="max-w-7xl mx-auto text-center relative z-10">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-amber-200 shadow-sm mb-8 hover-lift">
-            <Sparkles className="w-4 h-4 text-amber-600" />
-            <span className="text-sm font-medium text-gray-800">Trusted by Schools Across Uganda</span>
-            <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-          </div>
-
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-gray-900 mb-6 leading-tight">
-            Transform Your School
-            <br />
-            <span className="bg-gradient-to-r from-amber-600 via-yellow-600 to-lime-600 bg-clip-text text-transparent">Into a Digital Powerhouse</span>
-          </h1>
-          
-          <p className="text-xl sm:text-2xl text-gray-700 mb-12 max-w-3xl mx-auto font-light leading-relaxed">
-            The complete school management platform for <span className="font-semibold text-amber-700">Nursery → S6</span>. Real-time payments, automated alerts, and seamless operations—all in one place.
-          </p>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
-            <a
-              href="#contact"
-              className="group relative w-full sm:w-auto overflow-hidden bg-gradient-to-r from-amber-600 to-yellow-600 text-white px-8 py-4 rounded-full text-lg font-semibold transition-all hover:shadow-2xl hover:shadow-amber-500/50 hover:scale-105"
-            >
-              <span className="relative z-10 flex items-center justify-center gap-2">
-                Request a Demo
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+        <div className="max-w-7xl mx-auto relative z-10">
+          <div className="text-center max-w-4xl mx-auto">
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-indigo-100 shadow-sm mb-8 slide-in">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-sm font-semibold text-gray-700">
+                Trusted by Schools Across Uganda
               </span>
-              <div className="absolute inset-0 bg-gradient-to-r from-yellow-600 to-amber-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            </a>
-            <button
-              onClick={() => router.push("/login")}
-              className="w-full sm:w-auto bg-white border-2 border-gray-300 text-gray-800 px-8 py-4 rounded-full text-lg font-semibold transition-all hover:border-amber-400 hover:shadow-lg hover:scale-105"
-            >
-              Login to Dashboard
-            </button>
-          </div>
+            </div>
 
-          {/* Trust Badges */}
-          <div className="flex flex-wrap justify-center items-center gap-6 sm:gap-8">
-            {[
-              { icon: Shield, text: 'UNEB & NCDC Compliant', color: 'text-emerald-600' },
-              { icon: Zap, text: 'Real-time Sync', color: 'text-amber-600' },
-              { icon: CheckCircle, text: 'Secure & Reliable', color: 'text-teal-600' },
-              { icon: Award, text: '24/7 Support', color: 'text-indigo-600' },
-            ].map((badge, index) => {
-              const Icon = badge.icon;
-              return (
-                <div key={index} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-full hover-lift hover:shadow-md transition-all">
-                  <Icon className={`w-5 h-5 ${badge.color}`} />
-                  <span className="text-sm font-semibold text-gray-800">{badge.text}</span>
+            <h1
+              className="text-5xl sm:text-6xl lg:text-7xl font-bold text-gray-900 mb-6 leading-tight slide-in"
+              style={{ animationDelay: "0.1s" }}
+            >
+              Transform Your School
+              <br />
+              <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+                Into a Digital Powerhouse
+              </span>
+            </h1>
+
+            <p
+              className="text-xl sm:text-2xl text-gray-600 mb-12 max-w-3xl mx-auto leading-relaxed slide-in"
+              style={{ animationDelay: "0.2s" }}
+            >
+              Complete school management solution for{" "}
+              <span className="font-semibold text-indigo-600">
+                Nursery → S6
+              </span>
+              . Streamline operations, boost efficiency, and empower education.
+            </p>
+
+            <div
+              className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16 slide-in"
+              style={{ animationDelay: "0.3s" }}
+            >
+              <button
+                onClick={() => router.push("/login")}
+                className="group relative w-full sm:w-auto overflow-hidden bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-all hover:shadow-2xl hover:shadow-indigo-500/50 hover:scale-105"
+              >
+                <span className="relative z-10 flex items-center justify-center gap-2">
+                  Login Now
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </span>
+              </button>
+              <a
+                href="#contact"
+                className="w-full sm:w-auto bg-white border-2 border-gray-200 text-gray-800 px-8 py-4 rounded-xl text-lg font-semibold transition-all hover:border-indigo-300 hover:shadow-lg hover:scale-105"
+              >
+                Schedule Demo
+              </a>
+            </div>
+
+            {/* Stats Bar */}
+            <div
+              className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 slide-in"
+              style={{ animationDelay: "0.4s" }}
+            >
+              {stats.map((stat, index) => (
+                <div key={index} className="relative group">
+                  <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl opacity-0 group-hover:opacity-10 transition-opacity"></div>
+                  <div className="relative bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 hover-lift shadow-sm">
+                    <div className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-1 sm:mb-2">
+                      {stat.value}
+                    </div>
+                    <div className="text-xs sm:text-sm text-gray-600 font-medium">
+                      {stat.label}
+                    </div>
+                  </div>
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section
-        id="features"
-        className="py-20 sm:py-32 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-slate-50 via-gray-50 to-stone-50 relative overflow-hidden"
-      >
-        {/* Animated Background Elements */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-20 left-10 w-96 h-96 bg-amber-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-float"></div>
-          <div className="absolute bottom-20 right-10 w-96 h-96 bg-yellow-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-float" style={{ animationDelay: '3s' }}></div>
-        </div>
-
-        {/* Subtle Pattern Overlay */}
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, #78716c 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
-        </div>
-
-        <div className="max-w-7xl mx-auto relative z-10">
-          <div className="text-center mb-16 sm:mb-20">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-amber-200 shadow-sm mb-6">
-              <Sparkles className="w-4 h-4 text-amber-600" />
-              <span className="text-sm font-medium text-gray-800">Comprehensive Features</span>
+      <section id="features" className="py-24 px-4 sm:px-6 lg:px-8 bg-white">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-50 border border-indigo-100 mb-6">
+              <Sparkles className="w-4 h-4 text-indigo-600" />
+              <span className="text-sm font-semibold text-indigo-600">
+                Comprehensive Features
+              </span>
             </div>
             <h2 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-6">
-              Everything You Need to
+              Everything Your School Needs
               <br />
-              <span className="bg-gradient-to-r from-amber-600 to-yellow-600 bg-clip-text text-transparent">Run Your School</span>
+              <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                In One Platform
+              </span>
             </h2>
-            <p className="text-lg sm:text-xl text-gray-700 max-w-2xl mx-auto font-light">
-              Designed specifically for Ugandan schools, from nursery to senior six.
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              From student enrollment to exam results, manage every aspect
+              efficiently.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {features.map((feature, index) => (
               <div
                 key={index}
-                className="group relative p-8 bg-white rounded-3xl border border-gray-200 hover-lift hover:border-amber-300 hover:shadow-xl transition-all"
-                style={{ animationDelay: `${index * 0.1}s` }}
+                className="group relative bg-gradient-to-br from-white to-gray-50 rounded-2xl p-8 border border-gray-100 hover-lift hover:shadow-xl hover:border-indigo-100 transition-all"
               >
+                <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/5 to-purple-600/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div className="relative">
-                  <div className="w-14 h-14 bg-gradient-to-br from-amber-500 to-yellow-600 rounded-2xl flex items-center justify-center text-white mb-6 group-hover:scale-110 transition-transform shadow-lg">
+                  <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-indigo-500/30">
                     {feature.icon}
                   </div>
                   <h3 className="text-lg font-bold text-gray-900 mb-3">
                     {feature.title}
                   </h3>
-                  <p className="text-gray-600 text-sm leading-relaxed">{feature.description}</p>
+                  <p className="text-gray-600 text-sm leading-relaxed">
+                    {feature.description}
+                  </p>
                 </div>
               </div>
             ))}
@@ -531,128 +600,119 @@ export default function LandingPage() {
       {/* Schools Section */}
       <section
         id="schools"
-        className="py-20 sm:py-32 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-teal-50 via-emerald-50 to-green-50 relative overflow-hidden"
+        className="py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-gray-50 to-white overflow-hidden"
       >
-        {/* Animated Background Elements */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-20 left-20 w-96 h-96 bg-teal-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-float"></div>
-          <div className="absolute bottom-20 right-20 w-96 h-96 bg-emerald-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-float" style={{ animationDelay: '2s' }}></div>
-        </div>
-
-        {/* Subtle Pattern Overlay */}
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, #14b8a6 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
-        </div>
-
-        <div className="max-w-7xl mx-auto relative z-10">
-          <div className="text-center mb-16 sm:mb-20">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-teal-200 shadow-sm mb-6">
-              <Building2 className="w-4 h-4 text-teal-600" />
-              <span className="text-sm font-medium text-gray-800">Trusted Partners</span>
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-50 border border-indigo-100 mb-6">
+              <Building2 className="w-4 h-4 text-indigo-600" />
+              <span className="text-sm font-semibold text-indigo-600">
+                Trusted Partners
+              </span>
             </div>
             <h2 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-6">
-              Trusted by Schools
+              Join Leading Schools
               <br />
-              <span className="bg-gradient-to-r from-teal-600 to-emerald-600 bg-clip-text text-transparent">Across Uganda</span>
+              <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                Using Acadistra
+              </span>
             </h2>
-            <p className="text-lg sm:text-xl text-gray-700 max-w-2xl mx-auto font-light">
-              Join growing institutions already using Acadistra to modernize their school management.
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              Trusted by educational institutions modernizing their school
+              management.
             </p>
           </div>
 
-          <div className="hidden sm:grid sm:grid-cols-3 lg:grid-cols-4 gap-8">
-            {schools.length > 0 ? (
-              schools.map((school) => (
-                <div
-                  key={school.id}
-                  className="group relative bg-white border border-gray-200 p-8 rounded-3xl hover-lift hover:border-teal-300 hover:shadow-xl transition-all"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-br from-teal-50 to-emerald-50 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                  <div className="relative w-28 h-28 mx-auto">
-                    <img
-                      src={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}${school.logo_url}`}
-                      alt="School logo"
-                      className="w-full h-full object-contain transition-all duration-500"
-                      onError={(e) => {
-                        e.currentTarget.src =
-                          'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="112" height="112" viewBox="0 0 24 24" fill="none" stroke="%2314b8a6" stroke-width="2"%3E%3Cpath d="M22 10v6M2 10l10-5 10 5-10 5z"%3E%3C/path%3E%3Cpath d="M6 12v5c3 3 9 3 12 0v-5"%3E%3C/path%3E%3C/svg%3E';
-                      }}
-                    />
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="col-span-full text-center py-12">
-                <div className="inline-flex items-center gap-2 text-gray-600">
-                  <div className="w-6 h-6 border-2 border-gray-300 border-t-teal-600 rounded-full animate-spin"></div>
-                  <span>Loading schools...</span>
+          {schools.length > 0 ? (
+            <>
+              {/* Desktop Slider */}
+              <div className="hidden md:block relative overflow-hidden">
+                <div className="flex gap-6 animate-scroll-desktop">
+                  {[...schools, ...schools, ...schools, ...schools].map(
+                    (school, index) => (
+                      <div
+                        key={`${school.id}-${index}`}
+                        className="flex-shrink-0 group relative bg-white border border-gray-100 p-6 rounded-2xl hover-lift hover:shadow-lg hover:border-indigo-100 transition-all"
+                        style={{ width: "180px" }}
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <div className="relative w-20 h-20 mx-auto">
+                          <img
+                            src={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}${school.logo_url}`}
+                            alt={school.name}
+                            className="w-full h-full object-contain"
+                            onError={(e) => {
+                              e.currentTarget.src =
+                                'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="%236366f1" stroke-width="2"%3E%3Cpath d="M22 10v6M2 10l10-5 10 5-10 5z"%3E%3C/path%3E%3Cpath d="M6 12v5c3 3 9 3 12 0v-5"%3E%3C/path%3E%3C/svg%3E';
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ),
+                  )}
                 </div>
               </div>
-            )}
-          </div>
 
-          {/* Mobile Slider */}
-          <div className="sm:hidden relative overflow-hidden py-8">
-            <div
-              className="flex animate-slide gap-6"
-              style={{ width: "max-content" }}
-            >
-              {schools.length > 0 ? (
-                [...schools, ...schools, ...schools].map((school, index) => (
-                  <div
-                    key={`${school.id}-${index}`}
-                    className="flex-shrink-0 bg-white border border-gray-200 p-6 rounded-3xl shadow-sm"
-                    style={{ width: "180px" }}
-                  >
-                    <div className="w-24 h-24 mx-auto relative">
-                      <img
-                        src={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}${school.logo_url}`}
-                        alt="School logo"
-                        className="w-full h-full object-contain"
-                        onError={(e) => {
-                          e.currentTarget.src =
-                            'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 24 24" fill="none" stroke="%2314b8a6" stroke-width="2"%3E%3Cpath d="M22 10v6M2 10l10-5 10 5-10 5z"%3E%3C/path%3E%3Cpath d="M6 12v5c3 3 9 3 12 0v-5"%3E%3C/path%3E%3C/svg%3E';
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="w-full text-center py-8 text-gray-600">
-                  Loading schools...
+              {/* Mobile Slider */}
+              <div className="md:hidden relative overflow-hidden">
+                <div
+                  className="flex gap-4 animate-scroll"
+                  style={{ width: "max-content" }}
+                >
+                  {[...schools, ...schools, ...schools, ...schools].map(
+                    (school, index) => (
+                      <div
+                        key={`${school.id}-${index}`}
+                        className="flex-shrink-0 bg-white border border-gray-100 p-4 rounded-2xl shadow-sm"
+                        style={{ width: "140px" }}
+                      >
+                        <div className="w-16 h-16 mx-auto">
+                          <img
+                            src={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}${school.logo_url}`}
+                            alt={school.name}
+                            className="w-full h-full object-contain"
+                            onError={(e) => {
+                              e.currentTarget.src =
+                                'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="%236366f1" stroke-width="2"%3E%3Cpath d="M22 10v6M2 10l10-5 10 5-10 5z"%3E%3C/path%3E%3Cpath d="M6 12v5c3 3 9 3 12 0v-5"%3E%3C/path%3E%3C/svg%3E';
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ),
+                  )}
                 </div>
-              )}
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-12">
+              <div className="inline-flex items-center gap-2 text-gray-600">
+                <div className="w-6 h-6 border-2 border-gray-300 border-t-indigo-600 rounded-full animate-spin"></div>
+                <span>Loading schools...</span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </section>
 
       {/* Tech Stack Section */}
-      <section className="py-20 sm:py-32 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 relative overflow-hidden">
-        {/* Animated Background Elements */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-40 right-20 w-96 h-96 bg-indigo-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-float" style={{ animationDelay: '1s' }}></div>
-          <div className="absolute bottom-40 left-20 w-96 h-96 bg-purple-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-float" style={{ animationDelay: '4s' }}></div>
-        </div>
-
-        {/* Subtle Pattern Overlay */}
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, #6366f1 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
-        </div>
-
-        <div className="max-w-7xl mx-auto relative z-10">
+      <section className="py-24 px-4 sm:px-6 lg:px-8 bg-white">
+        <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-indigo-200 shadow-sm mb-6">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-50 border border-indigo-100 mb-6">
               <Zap className="w-4 h-4 text-indigo-600" />
-              <span className="text-sm font-medium text-gray-800">Enterprise Technology</span>
+              <span className="text-sm font-semibold text-indigo-600">
+                Enterprise Technology
+              </span>
             </div>
             <h2 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-6">
-              Professional Technology
+              Built with Modern
               <br />
-              <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">for Schools</span>
+              <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                Enterprise Technology
+              </span>
             </h2>
-            <p className="text-lg sm:text-xl text-gray-700 max-w-2xl mx-auto font-light">
-              Built with modern, reliable infrastructure designed for educational institutions.
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              Reliable infrastructure designed for educational institutions.
             </p>
           </div>
 
@@ -660,28 +720,37 @@ export default function LandingPage() {
             {[
               {
                 icon: Smartphone,
-                title: 'Mobile-First & Offline-Ready',
-                description: 'Works on any device. Marks entry continues offline and syncs automatically when online',
-                gradient: 'from-cyan-500 to-teal-500',
+                title: "Mobile-First & Offline-Ready",
+                description:
+                  "Works on any device. Marks entry continues offline and syncs automatically when online",
+                gradient: "from-cyan-500 to-teal-500",
               },
               {
                 icon: Shield,
-                title: 'Enterprise-Grade Security',
-                description: 'Argon2 encryption, JWT authentication, role-based access, and complete audit trails',
-                gradient: 'from-emerald-500 to-green-500',
+                title: "Enterprise-Grade Security",
+                description:
+                  "Argon2 encryption, JWT authentication, role-based access, and complete audit trails",
+                gradient: "from-emerald-500 to-green-500",
               },
               {
                 icon: Cloud,
-                title: 'Cloud-Based & Scalable',
-                description: 'Access anywhere, anytime. Automated daily backups and reliable uptime',
-                gradient: 'from-indigo-500 to-purple-500',
+                title: "Cloud-Based & Scalable",
+                description:
+                  "Access anywhere, anytime. Automated daily backups and reliable uptime",
+                gradient: "from-indigo-500 to-purple-500",
               },
             ].map((item, index) => {
               const Icon = item.icon;
               return (
-                <div key={index} className="group relative p-8 bg-white rounded-3xl border border-gray-200 hover-lift hover:border-indigo-300 hover:shadow-xl transition-all">
+                <div
+                  key={index}
+                  className="group relative bg-gradient-to-br from-white to-gray-50 rounded-2xl p-8 border border-gray-100 hover-lift hover:shadow-xl hover:border-indigo-100 transition-all"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/5 to-purple-600/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
                   <div className="relative">
-                    <div className={`w-16 h-16 bg-gradient-to-br ${item.gradient} rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform shadow-lg`}>
+                    <div
+                      className={`w-16 h-16 bg-gradient-to-br ${item.gradient} rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform shadow-lg`}
+                    >
                       <Icon className="w-8 h-8 text-white" />
                     </div>
                     <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">
@@ -701,35 +770,32 @@ export default function LandingPage() {
       {/* CTA Section */}
       <section
         id="contact"
-        className="relative py-20 sm:py-32 px-4 sm:px-6 lg:px-8 overflow-hidden bg-gradient-to-br from-slate-800 via-gray-800 to-zinc-800"
+        className="relative py-24 px-4 sm:px-6 lg:px-8 overflow-hidden bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600"
       >
-        {/* Subtle Background Pattern */}
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
-        </div>
-
-        {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-amber-600/10 via-yellow-600/10 to-lime-600/10"></div>
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRjMC0yLjIxLTEuNzktNC00LTRzLTQgMS43OS00IDQgMS43OSA0IDQgNCA0LTEuNzkgNC00em0wLTEwYzAtMi4yMS0xLjc5LTQtNC00cy00IDEuNzktNCA0IDEuNzkgNCA0IDQgNC0xLjc5IDQtNHptMC0xMGMwLTIuMjEtMS43OS00LTQtNHMtNCAxLjc5LTQgNCAxLjc5IDQgNCA0IDQtMS43OSA0LTR6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-10"></div>
 
         <div className="max-w-4xl mx-auto text-center relative z-10">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm mb-8">
-            <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-            <span className="text-sm font-medium text-white">Get Started Today</span>
+            <Star className="w-4 h-4 text-white" />
+            <span className="text-sm font-semibold text-white">
+              Get Started Today
+            </span>
           </div>
 
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6">
             Ready to Transform Your
             <br />
-            School Operations?
+            School Management?
           </h2>
-          <p className="text-xl sm:text-2xl text-gray-300 mb-12 font-light">
-            Join leading schools using Acadistra. Get a personalized demo and see the difference.
+          <p className="text-xl text-indigo-100 mb-12">
+            Join leading schools using Acadistra. Schedule a demo and see how we
+            can help.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
             <a
               href="mailto:admin@acadistra.com"
-              className="group w-full sm:w-auto bg-white text-gray-900 hover:bg-gray-50 px-8 py-4 rounded-full text-lg font-semibold transition-all hover:shadow-2xl hover:scale-105 flex items-center justify-center gap-2"
+              className="group w-full sm:w-auto bg-white text-indigo-600 hover:bg-gray-50 px-8 py-4 rounded-xl text-lg font-semibold transition-all hover:shadow-2xl hover:scale-105 flex items-center justify-center gap-2"
             >
               <Send className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               Email Us
@@ -738,81 +804,81 @@ export default function LandingPage() {
               href="https://wa.me/256784828791"
               target="_blank"
               rel="noopener noreferrer"
-              className="group w-full sm:w-auto bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-8 py-4 rounded-full text-lg font-semibold transition-all hover:shadow-2xl hover:scale-105 flex items-center justify-center gap-2"
+              className="group w-full sm:w-auto bg-green-500 hover:bg-green-600 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-all hover:shadow-2xl hover:scale-105 flex items-center justify-center gap-2"
             >
               <MessageSquare className="w-5 h-5 group-hover:scale-110 transition-transform" />
               WhatsApp Us
             </a>
           </div>
 
-          <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-3xl p-8">
-            <p className="text-lg font-semibold text-white mb-6">Contact Information</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-gray-300">
-              <div className="flex items-center justify-center gap-3">
-                <div className="w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center">
-                  <Send className="w-5 h-5 text-amber-400" />
-                </div>
-                <div className="text-left">
-                  <p className="text-xs text-gray-400">Email</p>
-                  <p className="text-sm font-medium text-white">admin@acadistra.com</p>
-                </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
+              <div className="flex items-center gap-3 mb-2">
+                <Send className="w-5 h-5 text-indigo-200" />
+                <span className="text-indigo-100 font-semibold">Email</span>
               </div>
-              <div className="flex items-center justify-center gap-3">
-                <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center">
-                  <MessageSquare className="w-5 h-5 text-green-400" />
-                </div>
-                <div className="text-left">
-                  <p className="text-xs text-gray-400">WhatsApp</p>
-                  <p className="text-sm font-medium text-white">+256 784 828 791</p>
-                </div>
-              </div>
+              <p className="text-white text-sm">admin@acadistra.com</p>
             </div>
-            <div className="flex items-center justify-center gap-2 mt-6 pt-6 border-t border-white/10">
-              <Zap className="w-4 h-4 text-amber-400" />
-              <span className="text-sm text-gray-400">Quick response during business hours</span>
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
+              <div className="flex items-center gap-3 mb-2">
+                <MessageSquare className="w-5 h-5 text-indigo-200" />
+                <span className="text-indigo-100 font-semibold">WhatsApp</span>
+              </div>
+              <p className="text-white text-sm">+256 784 828 791</p>
             </div>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-slate-900 text-gray-400 py-16 px-4 sm:px-6 lg:px-8">
+      <footer className="bg-gray-900 text-gray-400 py-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
             <div>
               <div className="flex items-center space-x-3 mb-6">
                 <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-r from-amber-600 to-yellow-600 rounded-xl blur-md opacity-50"></div>
-                  <div className="relative bg-gradient-to-r from-amber-600 to-yellow-600 p-2 rounded-xl">
+                  <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl blur-md opacity-50"></div>
+                  <div className="relative bg-gradient-to-r from-indigo-600 to-purple-600 p-2 rounded-xl">
                     <GraduationCap className="w-6 h-6 text-white" />
                   </div>
                 </div>
                 <span className="text-xl font-bold text-white">Acadistra</span>
               </div>
-              <p className="text-sm leading-relaxed">
-                Complete school management system for Ugandan schools (Nursery → S6)
+              <p className="text-sm leading-relaxed mb-4">
+                Complete school management system for Ugandan schools (Nursery →
+                S6)
               </p>
+              <div className="flex items-center gap-2 text-sm">
+                <CheckCircle className="w-4 h-4 text-green-500" />
+                <span>UNEB & NCDC Compliant</span>
+              </div>
             </div>
 
             <div>
-              <h4 className="text-white font-semibold mb-4">Why Acadistra</h4>
+              <h4 className="text-white font-semibold mb-4">Product</h4>
               <ul className="space-y-3 text-sm">
                 <li>
-                  <a href="#features" className="hover:text-white transition-colors flex items-center gap-2">
-                    <ChevronRight className="w-4 h-4" />
+                  <a
+                    href="#features"
+                    className="hover:text-white transition-colors"
+                  >
                     Features
                   </a>
                 </li>
                 <li>
-                  <a href="#schools" className="hover:text-white transition-colors flex items-center gap-2">
-                    <ChevronRight className="w-4 h-4" />
-                    Our Schools
+                  <a
+                    href="#schools"
+                    className="hover:text-white transition-colors"
+                  >
+                    Schools
                   </a>
                 </li>
                 <li>
-                  <a href="#contact" className="hover:text-white transition-colors flex items-center gap-2">
-                    <ChevronRight className="w-4 h-4" />
-                    Case Studies
+                  <a
+                    href="#contact"
+                    className="hover:text-white transition-colors"
+                  >
+                    Pricing
                   </a>
                 </li>
               </ul>
@@ -824,53 +890,40 @@ export default function LandingPage() {
                 <li>
                   <a
                     href="mailto:admin@acadistra.com"
-                    className="hover:text-white transition-colors flex items-center gap-2"
+                    className="hover:text-white transition-colors"
                   >
-                    <Send className="w-4 h-4" />
-                    Contact Sales
+                    Contact
                   </a>
                 </li>
                 <li>
                   <a
                     href="https://wa.me/256784828791"
-                    className="hover:text-white transition-colors flex items-center gap-2"
+                    className="hover:text-white transition-colors"
                   >
-                    <MessageSquare className="w-4 h-4" />
-                    WhatsApp Support
+                    Support
                   </a>
                 </li>
                 <li>
-                  <a href="/login" className="hover:text-white transition-colors flex items-center gap-2">
-                    <ChevronRight className="w-4 h-4" />
-                    Client Login
+                  <a
+                    href="/login"
+                    className="hover:text-white transition-colors"
+                  >
+                    Login
                   </a>
                 </li>
               </ul>
             </div>
 
             <div>
-              <h4 className="text-white font-semibold mb-4">Legal</h4>
+              <h4 className="text-white font-semibold mb-4">Contact</h4>
               <ul className="space-y-3 text-sm">
-                <li>
-                  <a href="#" className="hover:text-white transition-colors flex items-center gap-2">
-                    <ChevronRight className="w-4 h-4" />
-                    Privacy Policy
-                  </a>
+                <li className="flex items-center gap-2">
+                  <Send className="w-4 h-4" />
+                  <span>admin@acadistra.com</span>
                 </li>
-                <li>
-                  <a href="#" className="hover:text-white transition-colors flex items-center gap-2">
-                    <ChevronRight className="w-4 h-4" />
-                    Terms of Service
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="mailto:admin@acadistra.com"
-                    className="hover:text-white transition-colors flex items-center gap-2"
-                  >
-                    <Shield className="w-4 h-4" />
-                    Security
-                  </a>
+                <li className="flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4" />
+                  <span>+256 784 828 791</span>
                 </li>
               </ul>
             </div>
@@ -879,12 +932,16 @@ export default function LandingPage() {
           <div className="border-t border-gray-800 pt-8">
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
               <p className="text-sm text-center sm:text-left">
-                &copy; {new Date().getFullYear()} Acadistra. All rights reserved. Built for Ugandan schools 🇺🇬
+                © {new Date().getFullYear()} Acadistra. All rights reserved.
+                Built for Ugandan schools 🇺🇬
               </p>
-              <div className="flex items-center gap-2 text-xs">
-                <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20">
-                  UNEB & NCDC Compliant
-                </span>
+              <div className="flex items-center gap-4 text-sm">
+                <a href="#" className="hover:text-white transition-colors">
+                  Privacy
+                </a>
+                <a href="#" className="hover:text-white transition-colors">
+                  Terms
+                </a>
               </div>
             </div>
           </div>

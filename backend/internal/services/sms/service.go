@@ -191,6 +191,139 @@ func (s *Service) SendSMS(ctx context.Context, req SendSMSRequest) error {
 	return nil
 }
 
+// SendSMSToGuardianAndStaff sends SMS to guardian and any linked staff members
+func (s *Service) SendSMSToGuardianAndStaff(ctx context.Context, guardianID uuid.UUID, schoolID uuid.UUID, message, category string, priority int, createdBy uuid.UUID, metadata models.JSONB) error {
+	var guardian models.Guardian
+	if err := s.db.Preload("StaffLinks.Staff").First(&guardian, "id = ?", guardianID).Error; err != nil {
+		return err
+	}
+
+	// Send to guardian
+	if guardian.Phone != "" {
+		if err := s.SendSMS(ctx, SendSMSRequest{
+			SchoolID:      schoolID,
+			RecipientID:   &guardianID,
+			RecipientType: "guardian",
+			PhoneNumber:   guardian.Phone,
+			Message:       message,
+			Category:      category,
+			Priority:      priority,
+			CreatedBy:     createdBy,
+			Metadata:      metadata,
+		}); err != nil {
+			return err
+		}
+	}
+
+	// Send to linked staff members
+	for _, link := range guardian.StaffLinks {
+		if link.Staff != nil && link.Staff.Phone != "" {
+			staffMetadata := metadata
+			if staffMetadata == nil {
+				staffMetadata = models.JSONB{}
+			}
+			staffMetadata["guardian_id"] = guardianID.String()
+			staffMetadata["guardian_name"] = guardian.FullName
+			staffMetadata["relationship"] = link.Relationship
+			
+			if err := s.SendSMS(ctx, SendSMSRequest{
+				SchoolID:      schoolID,
+				RecipientID:   &link.StaffID,
+				RecipientType: "staff",
+				PhoneNumber:   link.Staff.Phone,
+				Message:       message,
+				Category:      category,
+				Priority:      priority,
+				CreatedBy:     createdBy,
+				Metadata:      staffMetadata,
+			}); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// SendBulkSMSToGuardiansAndStaff sends SMS to multiple guardians and their linked staff
+func (s *Service) SendBulkSMSToGuardiansAndStaff(ctx context.Context, req BulkSMSToGuardiansRequest) (*models.SMSBatch, error) {
+	batch := &models.SMSBatch{
+		SchoolID:    req.SchoolID,
+		Name:        req.Name,
+		Category:    req.Category,
+		TotalCount:  0,
+		CreatedBy:   req.CreatedBy,
+	}
+
+	if err := s.db.Create(batch).Error; err != nil {
+		return nil, err
+	}
+
+	// Process each guardian
+	for _, guardianID := range req.GuardianIDs {
+		var guardian models.Guardian
+		if err := s.db.Preload("StaffLinks.Staff").First(&guardian, "id = ?", guardianID).Error; err != nil {
+			continue
+		}
+
+		msg := req.Message
+		if req.TemplateID != nil && req.Variables != nil {
+			if rendered, err := s.RenderTemplate(*req.TemplateID, req.Variables); err == nil {
+				msg = rendered
+			}
+		}
+
+		metadata := models.JSONB{"batch_id": batch.ID.String()}
+
+		// Queue SMS to guardian
+		if guardian.Phone != "" {
+			sms := &models.SMSQueue{
+				SchoolID:      req.SchoolID,
+				RecipientID:   &guardianID,
+				RecipientType: "guardian",
+				PhoneNumber:   normalizePhone(guardian.Phone),
+				Message:       msg,
+				Category:      req.Category,
+				Priority:      req.Priority,
+				CreatedBy:     req.CreatedBy,
+				Metadata:      metadata,
+			}
+			s.db.Create(sms)
+			batch.TotalCount++
+		}
+
+		// Queue SMS to linked staff
+		for _, link := range guardian.StaffLinks {
+			if link.Staff != nil && link.Staff.Phone != "" {
+				staffMetadata := models.JSONB{
+					"batch_id":      batch.ID.String(),
+					"guardian_id":   guardianID.String(),
+					"guardian_name": guardian.FullName,
+					"relationship":  link.Relationship,
+				}
+
+				sms := &models.SMSQueue{
+					SchoolID:      req.SchoolID,
+					RecipientID:   &link.StaffID,
+					RecipientType: "staff",
+					PhoneNumber:   normalizePhone(link.Staff.Phone),
+					Message:       msg,
+					Category:      req.Category,
+					Priority:      req.Priority,
+					CreatedBy:     req.CreatedBy,
+					Metadata:      staffMetadata,
+				}
+				s.db.Create(sms)
+				batch.TotalCount++
+			}
+		}
+	}
+
+	s.db.Save(batch)
+	go s.processBatch(batch.ID)
+	return batch, nil
+}
+
 // SendBulkSMS sends SMS to multiple recipients
 func (s *Service) SendBulkSMS(ctx context.Context, req BulkSMSRequest) (*models.SMSBatch, error) {
 	batch := &models.SMSBatch{
@@ -494,4 +627,17 @@ type SMSRecipient struct {
 	RecipientType string
 	PhoneNumber   string
 	Variables     map[string]interface{}
+}
+
+// BulkSMSToGuardiansRequest for sending to guardians and their linked staff
+type BulkSMSToGuardiansRequest struct {
+	SchoolID    uuid.UUID
+	Name        string
+	Category    string
+	Message     string
+	TemplateID  *uuid.UUID
+	Variables   map[string]interface{}
+	GuardianIDs []uuid.UUID
+	Priority    int
+	CreatedBy   uuid.UUID
 }
