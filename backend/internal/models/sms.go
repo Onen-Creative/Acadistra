@@ -35,6 +35,7 @@ type SMSTemplate struct {
 type SMSQueue struct {
 	BaseModel
 	SchoolID       uuid.UUID  `gorm:"type:char(36);not null;index" json:"school_id"`
+	BatchID        *uuid.UUID `gorm:"type:char(36);index" json:"batch_id,omitempty"`
 	RecipientID    *uuid.UUID `gorm:"type:char(36);index" json:"recipient_id,omitempty"`
 	RecipientType  string     `gorm:"type:varchar(20)" json:"recipient_type"` // guardian, student, staff
 	PhoneNumber    string     `gorm:"type:varchar(20);not null" json:"phone_number"`
@@ -46,8 +47,8 @@ type SMSQueue struct {
 	SentAt         *time.Time `json:"sent_at,omitempty"`
 	Attempts       int        `gorm:"default:0" json:"attempts"`
 	MaxAttempts    int        `gorm:"default:3" json:"max_attempts"`
-	ProviderID     string     `gorm:"type:varchar(100)" json:"provider_id"`
-	Cost           float64    `gorm:"type:decimal(10,2)" json:"cost"`
+	ProviderID     string     `gorm:"column:provider_message_id;type:varchar(100)" json:"provider_id"`
+	Cost           float64    `gorm:"type:decimal(10,4)" json:"cost"`
 	ErrorMessage   string     `gorm:"type:text" json:"error_message"`
 	Metadata       JSONB      `gorm:"type:json" json:"metadata"`
 	CreatedBy      uuid.UUID  `gorm:"type:char(36);not null" json:"created_by"`
@@ -63,6 +64,7 @@ type SMSBatch struct {
 	TotalCount    int        `gorm:"not null" json:"total_count"`
 	SentCount     int        `gorm:"default:0" json:"sent_count"`
 	FailedCount   int        `gorm:"default:0" json:"failed_count"`
+	PendingCount  int        `gorm:"default:0" json:"pending_count"`
 	Status        string     `gorm:"type:varchar(20);default:'pending'" json:"status"` // pending, processing, completed, failed
 	TotalCost     float64    `gorm:"type:decimal(10,2);default:0" json:"total_cost"`
 	StartedAt     *time.Time `json:"started_at,omitempty"`
