@@ -51,7 +51,21 @@ export default function PaymentReceipt({ payment, studentFees, onClose }: Paymen
   }
 
   const handlePrint = () => {
+    // Create a style element to hide headers/footers
+    const style = document.createElement('style')
+    style.innerHTML = `
+      @page { margin: 0; }
+      @media print {
+        body { margin: 1.6cm; }
+      }
+    `
+    document.head.appendChild(style)
+    
+    // Print
     window.print()
+    
+    // Clean up
+    setTimeout(() => document.head.removeChild(style), 100)
   }
 
   return (
@@ -270,14 +284,16 @@ export default function PaymentReceipt({ payment, studentFees, onClose }: Paymen
       </div>
 
       <style jsx global>{`
+        @page { 
+          margin: 0 !important;
+          size: A4 portrait;
+        }
         @media print {
-          @page { 
-            margin: 0.5in; 
-            size: A4 portrait; 
-          }
           html, body {
             height: auto !important;
             overflow: visible !important;
+            margin: 0 !important;
+            padding: 0 !important;
           }
           body * { 
             visibility: hidden !important; 
@@ -291,8 +307,38 @@ export default function PaymentReceipt({ payment, studentFees, onClose }: Paymen
             left: 0 !important;
             top: 0 !important;
             width: 100% !important;
-            padding: 20px !important;
+            padding: 1.6cm !important;
             margin: 0 !important;
+            font-size: 11px !important;
+            line-height: 1.3 !important;
+          }
+          .receipt-content h1 {
+            font-size: 18px !important;
+            margin-bottom: 2px !important;
+          }
+          .receipt-content h2 {
+            font-size: 14px !important;
+            padding: 6px 12px !important;
+          }
+          .receipt-content h3 {
+            font-size: 12px !important;
+            padding: 6px !important;
+          }
+          .receipt-content p {
+            font-size: 11px !important;
+            margin: 2px 0 !important;
+          }
+          .receipt-content table {
+            font-size: 11px !important;
+          }
+          .receipt-content td, .receipt-content th {
+            padding: 4px 6px !important;
+          }
+          .receipt-content .text-center > div {
+            margin-top: 8px !important;
+          }
+          .receipt-content > div {
+            margin-bottom: 10px !important;
           }
           .no-print { 
             display: none !important; 

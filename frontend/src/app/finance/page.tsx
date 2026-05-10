@@ -16,22 +16,44 @@ export default function FinancePage() {
   const [editingItem, setEditingItem] = useState<any>(null)
   const [term, setTerm] = useState('1')
   const [year, setYear] = useState(new Date().getFullYear())
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalRecords, setTotalRecords] = useState(0)
+  const itemsPerPage = 10
+
+  useEffect(() => {
+    setCurrentPage(1) // Reset to page 1 when tab changes
+  }, [activeTab])
 
   useEffect(() => {
     loadData()
-  }, [term, year])
+  }, [term, year, currentPage, activeTab])
 
   const loadData = async () => {
     try {
-      const params = { term: `Term ${term}`, year }
+      const params = { 
+        term: `Term ${term}`, 
+        year,
+        page: currentPage,
+        limit: itemsPerPage
+      }
       const [incomeRes, expRes, summaryRes] = await Promise.all([
         api.get('/api/v1/finance/income', { params }),
         api.get('/api/v1/finance/expenditure', { params }),
-        api.get('/api/v1/finance/summary', { params })
+        api.get('/api/v1/finance/summary', { params: { term: `Term ${term}`, year } })
       ])
       setIncomes(incomeRes.data.incomes || [])
       setExpenditures(expRes.data.expenditures || [])
       setSummary(summaryRes.data)
+      
+      // Set pagination info
+      if (activeTab === 'income') {
+        setTotalRecords(incomeRes.data.total || incomeRes.data.incomes?.length || 0)
+        setTotalPages(Math.ceil((incomeRes.data.total || incomeRes.data.incomes?.length || 0) / itemsPerPage))
+      } else {
+        setTotalRecords(expRes.data.total || expRes.data.expenditures?.length || 0)
+        setTotalPages(Math.ceil((expRes.data.total || expRes.data.expenditures?.length || 0) / itemsPerPage))
+      }
     } catch (error) {
       console.error('Load data error:', error)
       toast.error('Failed to load data')
@@ -67,6 +89,7 @@ export default function FinancePage() {
       toast.success('Saved successfully')
       setShowModal(false)
       setEditingItem(null)
+      setCurrentPage(1)
       loadData()
     } catch (error) {
       toast.error('Failed to save')
@@ -181,6 +204,48 @@ export default function FinancePage() {
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
+                <div className="flex items-center text-sm text-gray-700">
+                  <span>Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalRecords)} of {totalRecords} records</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  >
+                    First
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  >
+                    Previous
+                  </button>
+                  <span className="px-3 py-1 text-sm">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  >
+                    Next
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  >
+                    Last
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

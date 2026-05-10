@@ -6,6 +6,7 @@ import { DashboardLayout } from '@/components/DashboardLayout'
 import { PageHeader } from '@/components/ui/BeautifulComponents'
 import { SalaryStructureDetailsModal } from '@/components/payroll/SalaryStructureDetailsModal'
 import { EditSalaryStructureModal } from '@/components/payroll/EditSalaryStructureModal'
+import SalaryPaymentReceipt from '@/components/SalaryPaymentReceipt'
 import Toast from '@/components/Toast'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import { api } from '@/services/api'
@@ -62,6 +63,8 @@ export default function PayrollPage() {
   const [showMarkPaid, setShowMarkPaid] = useState(false)
   const [selectedStructure, setSelectedStructure] = useState<any>(null)
   const [selectedPayment, setSelectedPayment] = useState<any>(null)
+  const [showReceipt, setShowReceipt] = useState(false)
+  const [receiptData, setReceiptData] = useState<any>(null)
   const [toast, setToast] = useState({ isOpen: false, title: '', message: '', type: 'success' as any })
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {} })
 
@@ -148,9 +151,19 @@ export default function PayrollPage() {
 
   const markPaidMutation = useMutation({
     mutationFn: ({ id, data }: any) => payrollApi.markPaymentPaid(id, data),
-    onSuccess: () => {
+    onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['payroll-runs'] })
       setShowMarkPaid(false)
+      
+      // Show receipt with updated payment data
+      if (response && selectedPayment) {
+        setReceiptData({
+          payment: { ...selectedPayment, payment_status: 'paid', payment_date: new Date().toISOString(), ...response },
+          salaryStructure: structures?.find((s: any) => s.staff_id === selectedPayment.staff_id)
+        })
+        setShowReceipt(true)
+      }
+      
       setSelectedPayment(null)
       showToast('Payment Marked!', 'Payment has been marked as paid', 'success')
     },
@@ -440,7 +453,7 @@ export default function PayrollPage() {
                                   )}
                                 </td>
                                 <td className="px-6 py-4 text-center">
-                                  {payment.payment_status === 'pending' && (
+                                  {payment.payment_status === 'pending' ? (
                                     <button
                                       onClick={() => {
                                         setSelectedPayment(payment)
@@ -449,6 +462,19 @@ export default function PayrollPage() {
                                       className="inline-flex items-center px-3 py-1 text-sm font-medium text-white bg-green-600 rounded hover:bg-green-700 transition-colors"
                                     >
                                       Mark Paid
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => {
+                                        setReceiptData({
+                                          payment: payment,
+                                          salaryStructure: structures?.find((s: any) => s.staff_id === payment.staff_id)
+                                        })
+                                        setShowReceipt(true)
+                                      }}
+                                      className="inline-flex items-center px-3 py-1 text-sm font-medium text-white bg-purple-600 rounded hover:bg-purple-700 transition-colors"
+                                    >
+                                      View Receipt
                                     </button>
                                   )}
                                 </td>
@@ -611,6 +637,15 @@ export default function PayrollPage() {
 
         <Toast isOpen={toast.isOpen} onClose={() => setToast({ ...toast, isOpen: false })} title={toast.title} message={toast.message} type={toast.type} />
       </div>
+
+      {/* Receipt */}
+      {showReceipt && receiptData && (
+        <SalaryPaymentReceipt
+          payment={receiptData.payment}
+          salaryStructure={receiptData.salaryStructure}
+          onClose={() => setShowReceipt(false)}
+        />
+      )}
     </DashboardLayout>
   )
 }
