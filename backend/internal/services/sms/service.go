@@ -567,7 +567,6 @@ func (s *Service) logSMS(sms *models.SMSQueue) {
 		Cost:         sms.Cost,
 		SentAt:       sms.SentAt,
 		ErrorMessage: sms.ErrorMessage,
-		SentBy:       sms.CreatedBy,
 	}
 	s.db.Create(log)
 }

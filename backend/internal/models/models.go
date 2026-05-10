@@ -686,22 +686,30 @@ type Attendance struct {
 
 // SMSLog tracks all SMS sent
 type SMSLog struct {
-	BaseModel
-	SchoolID     uuid.UUID  `gorm:"type:char(36);not null;index" json:"school_id"`
-	BatchID      *uuid.UUID `gorm:"type:char(36);index" json:"batch_id,omitempty"`
-	QueueID      *uuid.UUID `gorm:"type:char(36);index" json:"queue_id,omitempty"`
-	Recipient    string     `gorm:"type:varchar(20);not null" json:"recipient"`
-	Message      string     `gorm:"type:text;not null" json:"message"`
-	Status       string     `gorm:"type:varchar(20);not null" json:"status"` // pending, sent, failed
-	SMSType      string     `gorm:"type:varchar(50);not null" json:"sms_type"` // attendance, fees, results, general
-	Cost         float64    `gorm:"type:decimal(10,4)" json:"cost"`
-	Provider     string     `gorm:"type:varchar(50)" json:"provider"`
-	ProviderMessageID string `gorm:"column:provider_message_id;type:varchar(100)" json:"provider_message_id"`
-	SentAt       *time.Time `json:"sent_at,omitempty"`
-	DeliveredAt  *time.Time `json:"delivered_at,omitempty"`
-	ErrorMessage string     `gorm:"type:text" json:"error_message"`
-	SentBy       uuid.UUID  `gorm:"type:char(36);not null" json:"sent_by"`
-	School       *School    `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
+	ID               uuid.UUID  `gorm:"type:char(36);primaryKey" json:"id"`
+	SchoolID         uuid.UUID  `gorm:"type:char(36);not null;index" json:"school_id"`
+	BatchID          *uuid.UUID `gorm:"type:char(36);index" json:"batch_id,omitempty"`
+	QueueID          *uuid.UUID `gorm:"type:char(36);index" json:"queue_id,omitempty"`
+	Recipient        string     `gorm:"type:varchar(20);not null" json:"recipient"`
+	Message          string     `gorm:"type:text;not null" json:"message"`
+	Status           string     `gorm:"type:varchar(20);not null" json:"status"` // pending, sent, failed
+	SMSType          string     `gorm:"type:varchar(50);not null;default:'general'" json:"sms_type"` // attendance, fees, results, general
+	Cost             float64    `gorm:"type:decimal(10,4);default:0" json:"cost"`
+	Provider         string     `gorm:"type:varchar(50)" json:"provider"`
+	ProviderMessageID string    `gorm:"column:provider_message_id;type:varchar(100)" json:"provider_message_id"`
+	SentAt           *time.Time `json:"sent_at,omitempty"`
+	DeliveredAt      *time.Time `json:"delivered_at,omitempty"`
+	ErrorMessage     string     `gorm:"type:text" json:"error_message"`
+	CreatedAt        time.Time  `gorm:"default:CURRENT_TIMESTAMP" json:"created_at"`
+	DeletedAt        *time.Time `json:"deleted_at,omitempty"`
+	School           *School    `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
+}
+
+func (s *SMSLog) BeforeCreate(tx *gorm.DB) error {
+	if s.ID == uuid.Nil {
+		s.ID = uuid.New()
+	}
+	return nil
 }
 
 // Notification for in-app notifications
