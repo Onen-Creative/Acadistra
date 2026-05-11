@@ -5,7 +5,7 @@ import { Card, Text, Badge, Button, Group, Stack, TextInput, Textarea, Select, T
 import { IconSend, IconTemplate, IconSettings, IconHistory, IconUsers, IconRefresh, IconPlus, IconCash, IconBell, IconMessageCircle, IconClock, IconSearch } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { smsService, SMSProvider, SMSTemplate, SMSQueue, SMSBatch, SMSLog } from '@/services/sms';
-import { studentsApi, feesApi, schoolsApi, classesApi } from '@/services/api';
+import { studentsApi, feesApi, schoolsApi, classesApi, staffApi } from '@/services/api';
 import { DashboardLayout } from '@/components/DashboardLayout';
 
 export default function SMSPage() {
@@ -33,12 +33,31 @@ export default function SMSPage() {
   const [loadingStudent, setLoadingStudent] = useState(false);
   const [loadingFees, setLoadingFees] = useState(false);
 
+  // Bulk communication
+  const [bulkCommData, setBulkCommData] = useState<any[]>([]);
+  const [loadingBulkComm, setLoadingBulkComm] = useState(false);
+  const [recipientType, setRecipientType] = useState<string>('all');
+  const [bulkCommMessage, setBulkCommMessage] = useState('');
+  const [bulkCommCategory, setBulkCommCategory] = useState('announcement');
+
   // Bulk fees reminder
   const [bulkFeesData, setBulkFeesData] = useState<any[]>([]);
   const [loadingBulk, setLoadingBulk] = useState(false);
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [classes, setClasses] = useState<any[]>([]);
   const [minBalance, setMinBalance] = useState<number>(0);
+  
+  // Batch processing state
+  const [sendingProgress, setSendingProgress] = useState<{
+    total: number;
+    sent: number;
+    failed: number;
+    inProgress: boolean;
+  }>({ total: 0, sent: 0, failed: 0, inProgress: false });
+  
+  // Batch configuration (can be adjusted based on SMS provider limits)
+  const BATCH_SIZE = 50; // Send 50 SMS at a time
+  const BATCH_DELAY = 2000; // 2 seconds between batches
 
   // Provider config modal
   const [providerModalOpen, setProviderModalOpen] = useState(false);
@@ -76,9 +95,17 @@ export default function SMSPage() {
   const loadClasses = async () => {
     try {
       const classesData = await classesApi.list();
-      setClasses(classesData.classes || []);
+      // Backend returns array directly, not wrapped in 'classes' property
+      const classList = Array.isArray(classesData) ? classesData : (classesData.classes || []);
+      setClasses(classList);
+      console.log('Loaded classes:', classList);
     } catch (error: any) {
       console.error('Failed to load classes:', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to load classes',
+        color: 'red',
+      });
     }
   };
 
@@ -166,7 +193,7 @@ export default function SMSPage() {
     setLoading(true);
     try {
       await smsService.sendSMS({
-        phone_number: guardian.phone,
+        phone_number: normalizePhoneNumber(guardian.phone),
         message: feesMessage,
         category: 'fees',
         recipient_type: 'parent',
@@ -263,21 +290,306 @@ export default function SMSPage() {
     }
   };
 
+  const normalizePhoneNumber = (phone: string): string => {
+    if (!phone) return '';
+    
+    // Remove all non-digit characters
+    let cleaned = phone.replace(/\D/g, '');
+    
+    // If starts with 0, replace with 256
+    if (cleaned.startsWith('0')) {
+      cleaned = '256' + cleaned.substring(1);
+    }
+    
+    // If doesn't start with country code, add 256
+    if (!cleaned.startsWith('256')) {
+      cleaned = '256' + cleaned;
+    }
+    
+    // Add + prefix
+    return '+' + cleaned;
+  };
+
+  const handleLoadBulkCommRecipients = async () => {
+    setLoadingBulkComm(true);
+    try {
+      const recipients: any[] = [];
+      
+      // Fetch staff if needed
+      if (recipientType === 'all' || recipientType === 'staff') {
+        const staffData = await staffApi.list({ limit: 10000 });
+        const allStaff = staffData.staff || [];
+        
+        console.log(`Fetched ${allStaff.length} staff members from API`);
+        console.log('Sample staff data:', allStaff.slice(0, 2));
+        
+        for (const staff of allStaff) {
+          const phone = staff.phone || staff.Phone;
+          if (phone) {
+            const normalizedPhone = normalizePhoneNumber(phone);
+            recipients.push({
+              type: 'staff',
+              id: staff.id,
+              name: staff.full_name || `${staff.first_name} ${staff.last_name}`,
+              phone: normalizedPhone,
+              role: staff.role || 'Staff',
+              email: staff.email,
+            });
+          } else {
+            console.log('Staff without phone:', staff.first_name, staff.last_name);
+          }
+        }
+      }
+      
+      // Fetch parents if needed
+      if (recipientType === 'all' || recipientType === 'parents') {
+        const studentsData = await studentsApi.list({ limit: 10000 });
+        const allStudents = studentsData.students || [];
+        
+        console.log(`Fetched ${allStudents.length} students from API`);
+        
+        // Extract unique guardians with phone numbers
+        const guardianMap = new Map();
+        
+        for (const student of allStudents) {
+          if (student.guardians && student.guardians.length > 0) {
+            for (const guardian of student.guardians) {
+              if (guardian.phone && !guardianMap.has(guardian.id)) {
+                const normalizedPhone = normalizePhoneNumber(guardian.phone);
+                guardianMap.set(guardian.id, {
+                  type: 'parent',
+                  id: guardian.id,
+                  name: guardian.full_name,
+                  phone: normalizedPhone,
+                  relationship: guardian.relationship || 'Guardian',
+                  email: guardian.email,
+                  students: [{
+                    id: student.id,
+                    name: `${student.first_name} ${student.last_name}`,
+                    class: student.class_name || 'N/A',
+                  }],
+                });
+              } else if (guardian.phone && guardianMap.has(guardian.id)) {
+                // Add student to existing guardian
+                const existing = guardianMap.get(guardian.id);
+                existing.students.push({
+                  id: student.id,
+                  name: `${student.first_name} ${student.last_name}`,
+                  class: student.class_name || 'N/A',
+                });
+              }
+            }
+          }
+        }
+        
+        recipients.push(...Array.from(guardianMap.values()));
+      }
+      
+      console.log(`Found ${recipients.length} total recipients`);
+      
+      setBulkCommData(recipients);
+      
+      if (recipients.length === 0) {
+        notifications.show({
+          title: 'No Recipients Found',
+          message: 'No recipients with phone numbers found',
+          color: 'yellow',
+        });
+      } else {
+        notifications.show({
+          title: 'Success',
+          message: `Found ${recipients.length} recipients`,
+          color: 'green',
+        });
+      }
+    } catch (error: any) {
+      console.error('Error loading bulk communication recipients:', error);
+      notifications.show({
+        title: 'Error',
+        message: error.response?.data?.error || 'Failed to load recipients',
+        color: 'red',
+      });
+    } finally {
+      setLoadingBulkComm(false);
+    }
+  };
+
+  const handleSendBulkCommunication = async () => {
+    if (bulkCommData.length === 0) {
+      notifications.show({
+        title: 'No Recipients',
+        message: 'Please load recipients first',
+        color: 'red',
+      });
+      return;
+    }
+
+    if (!bulkCommMessage.trim()) {
+      notifications.show({
+        title: 'Validation Error',
+        message: 'Please enter a message',
+        color: 'red',
+      });
+      return;
+    }
+
+    // Initialize progress tracking
+    setSendingProgress({
+      total: bulkCommData.length,
+      sent: 0,
+      failed: 0,
+      inProgress: true,
+    });
+
+    setLoading(true);
+    
+    try {
+      const schoolInfo = school?.name ? `${school.name}\n` : '';
+      
+      const recipients = bulkCommData.map((recipient) => {
+        const message = `${schoolInfo}Dear ${recipient.name},\n\n${bulkCommMessage}\n\nThank you.`;
+        
+        return {
+          recipient_id: recipient.id,
+          recipient_type: recipient.type,
+          phone_number: normalizePhoneNumber(recipient.phone),
+          message: message,
+          name: recipient.name,
+        };
+      });
+
+      // Batch processing configuration
+      const batchSize = BATCH_SIZE;
+      const batchDelay = BATCH_DELAY;
+      
+      let totalSent = 0;
+      let totalFailed = 0;
+      
+      // Process in batches
+      for (let i = 0; i < recipients.length; i += batchSize) {
+        const batch = recipients.slice(i, i + batchSize);
+        
+        const batchResults = await Promise.allSettled(
+          batch.map(recipient => 
+            smsService.sendSMS({
+              recipient_id: recipient.recipient_id,
+              recipient_type: recipient.recipient_type,
+              phone_number: recipient.phone_number,
+              message: recipient.message,
+              category: bulkCommCategory,
+            })
+          )
+        );
+        
+        const batchSent = batchResults.filter(r => r.status === 'fulfilled').length;
+        const batchFailed = batchResults.filter(r => r.status === 'rejected').length;
+        
+        totalSent += batchSent;
+        totalFailed += batchFailed;
+        
+        setSendingProgress({
+          total: recipients.length,
+          sent: totalSent,
+          failed: totalFailed,
+          inProgress: true,
+        });
+        
+        batchResults.forEach((result, index) => {
+          if (result.status === 'rejected') {
+            console.error(`Failed to send SMS to ${batch[index].name}:`, result.reason);
+          }
+        });
+        
+        if (i + batchSize < recipients.length) {
+          await new Promise(resolve => setTimeout(resolve, batchDelay));
+        }
+      }
+
+      setSendingProgress({
+        total: recipients.length,
+        sent: totalSent,
+        failed: totalFailed,
+        inProgress: false,
+      });
+
+      if (totalFailed === 0) {
+        notifications.show({
+          title: 'Success',
+          message: `All ${totalSent} messages sent successfully!`,
+          color: 'green',
+          autoClose: 5000,
+        });
+      } else if (totalSent > 0) {
+        notifications.show({
+          title: 'Partially Completed',
+          message: `Sent ${totalSent} SMS successfully, ${totalFailed} failed.`,
+          color: 'yellow',
+          autoClose: 7000,
+        });
+      } else {
+        notifications.show({
+          title: 'Failed',
+          message: `Failed to send all ${totalFailed} SMS.`,
+          color: 'red',
+          autoClose: 7000,
+        });
+      }
+
+      if (totalFailed === 0) {
+        setBulkCommData([]);
+        setBulkCommMessage('');
+        setRecipientType('all');
+      }
+    } catch (error: any) {
+      console.error('Bulk communication error:', error);
+      notifications.show({
+        title: 'Error',
+        message: error.response?.data?.error || 'Failed to send bulk SMS',
+        color: 'red',
+      });
+      
+      setSendingProgress(prev => ({
+        ...prev,
+        inProgress: false,
+      }));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLoadBulkFeesData = async () => {
     setLoadingBulk(true);
     try {
-      // First, get all fees records with outstanding balances
-      const feesParams: any = {};
+      // Get all students with optional class filter (backend accepts limit parameter)
+      const studentParams: any = { limit: 10000 };
       if (selectedClass) {
-        feesParams.class_id = selectedClass;
+        studentParams.class_id = selectedClass;
       }
       
-      const feesData = await feesApi.list(feesParams);
+      const studentsData = await studentsApi.list(studentParams);
+      const allStudents = studentsData.students || [];
+      
+      console.log(`Fetched ${allStudents.length} students from API`);
+      
+      if (allStudents.length === 0) {
+        notifications.show({
+          title: 'No Students Found',
+          message: 'No students found with the selected filters',
+          color: 'yellow',
+        });
+        setBulkFeesData([]);
+        setLoadingBulk(false);
+        return;
+      }
+      
+      // Get all fees records
+      const feesData = await feesApi.list({ limit: 10000 });
       const allFeesRecords = feesData.fees || [];
+      
+      console.log(`Fetched ${allFeesRecords.length} fees records from API`);
       
       // Group fees by student_id and calculate totals
       const studentFeesMap = new Map();
-      
       for (const fee of allFeesRecords) {
         const studentId = fee.student_id;
         if (!studentFeesMap.has(studentId)) {
@@ -296,48 +608,48 @@ export default function SMSPage() {
         studentFees.records.push(fee);
       }
       
-      // Now load student details for those with outstanding fees
+      // Process students with outstanding fees and guardian phone numbers
       const studentsWithBalance = [];
       
-      for (const [studentId, feesInfo] of studentFeesMap.entries()) {
-        if (feesInfo.outstanding > minBalance) {
-          try {
-            const studentData = await studentsApi.get(studentId);
-            const student = studentData.student;
-            
-            // Get class name from active enrollment
-            let className = 'N/A';
+      for (const student of allStudents) {
+        const feesInfo = studentFeesMap.get(student.id);
+        
+        // Check if student has outstanding fees above minimum
+        if (feesInfo && feesInfo.outstanding > minBalance) {
+          // Get class name from active enrollment or class_name field
+          let className = student.class_name || 'N/A';
+          if (!className || className === 'N/A') {
             if (student.enrollments && student.enrollments.length > 0) {
               const activeEnrollment = student.enrollments.find((e: any) => e.status === 'active');
               if (activeEnrollment?.class) {
-                className = `${activeEnrollment.class.name}`;
+                className = activeEnrollment.class.name || activeEnrollment.class.level;
               }
             }
-            
-            // Get guardian with phone
-            const guardian = student.guardians?.find((g: any) => g.is_primary_contact) || 
-                            student.guardians?.find((g: any) => g.phone) ||
-                            student.guardians?.[0];
-            
-            if (guardian?.phone) {
-              studentsWithBalance.push({
-                student: {
-                  ...student,
-                  full_name: `${student.first_name} ${student.middle_name || ''} ${student.last_name}`.replace(/\s+/g, ' ').trim(),
-                  class_name: className,
-                },
-                guardian,
-                total_fees: feesInfo.total_fees,
-                total_paid: feesInfo.total_paid,
-                outstanding: feesInfo.outstanding,
-                fee_records: feesInfo.records,
-              });
-            }
-          } catch (error) {
-            console.error(`Failed to load student ${studentId}:`, error);
+          }
+          
+          // Get guardian with phone
+          const guardian = student.guardians?.find((g: any) => g.is_primary_contact && g.phone) || 
+                          student.guardians?.find((g: any) => g.phone) ||
+                          student.guardians?.[0];
+          
+          if (guardian?.phone) {
+            studentsWithBalance.push({
+              student: {
+                ...student,
+                full_name: `${student.first_name} ${student.middle_name || ''} ${student.last_name}`.replace(/\s+/g, ' ').trim(),
+                class_name: className,
+              },
+              guardian,
+              total_fees: feesInfo.total_fees,
+              total_paid: feesInfo.total_paid,
+              outstanding: feesInfo.outstanding,
+              fee_records: feesInfo.records,
+            });
           }
         }
       }
+      
+      console.log(`Found ${studentsWithBalance.length} students with outstanding fees and guardian phones`);
       
       setBulkFeesData(studentsWithBalance);
       
@@ -355,6 +667,7 @@ export default function SMSPage() {
         });
       }
     } catch (error: any) {
+      console.error('Error loading bulk fees data:', error);
       notifications.show({
         title: 'Error',
         message: error.response?.data?.error || 'Failed to load bulk fees data',
@@ -375,7 +688,16 @@ export default function SMSPage() {
       return;
     }
 
+    // Initialize progress tracking
+    setSendingProgress({
+      total: bulkFeesData.length,
+      sent: 0,
+      failed: 0,
+      inProgress: true,
+    });
+
     setLoading(true);
+    
     try {
       const schoolInfo = school?.name ? `${school.name}\n` : '';
       
@@ -390,46 +712,115 @@ export default function SMSPage() {
         return {
           recipient_id: item.guardian.id,
           recipient_type: 'parent',
-          phone_number: item.guardian.phone,
+          phone_number: normalizePhoneNumber(item.guardian.phone),
           message: message,
-          variables: {
-            guardian_name: guardianName,
-            student_name: studentName,
-            class_name: className,
-            outstanding_balance: item.outstanding,
-          },
+          guardian_name: guardianName,
+          student_name: studentName,
         };
       });
 
-      // Send each SMS individually through the bulk endpoint
-      const bulkRequests = recipients.map(recipient => 
-        smsService.sendSMS({
-          recipient_id: recipient.recipient_id,
-          recipient_type: recipient.recipient_type,
-          phone_number: recipient.phone_number,
-          message: recipient.message,
-          category: 'fees',
-        })
-      );
+      // Batch processing configuration
+      const batchSize = BATCH_SIZE;
+      const batchDelay = BATCH_DELAY;
+      
+      let totalSent = 0;
+      let totalFailed = 0;
+      
+      // Process in batches
+      for (let i = 0; i < recipients.length; i += batchSize) {
+        const batch = recipients.slice(i, i + batchSize);
+        
+        // Send current batch
+        const batchResults = await Promise.allSettled(
+          batch.map(recipient => 
+            smsService.sendSMS({
+              recipient_id: recipient.recipient_id,
+              recipient_type: recipient.recipient_type,
+              phone_number: recipient.phone_number,
+              message: recipient.message,
+              category: 'fees',
+            })
+          )
+        );
+        
+        // Count successes and failures
+        const batchSent = batchResults.filter(r => r.status === 'fulfilled').length;
+        const batchFailed = batchResults.filter(r => r.status === 'rejected').length;
+        
+        totalSent += batchSent;
+        totalFailed += batchFailed;
+        
+        // Update progress
+        setSendingProgress({
+          total: recipients.length,
+          sent: totalSent,
+          failed: totalFailed,
+          inProgress: true,
+        });
+        
+        // Log failed messages for debugging
+        batchResults.forEach((result, index) => {
+          if (result.status === 'rejected') {
+            console.error(`Failed to send SMS to ${batch[index].guardian_name}:`, result.reason);
+          }
+        });
+        
+        // Add delay between batches (except for the last batch)
+        if (i + batchSize < recipients.length) {
+          await new Promise(resolve => setTimeout(resolve, batchDelay));
+        }
+      }
 
-      await Promise.all(bulkRequests);
-
-      notifications.show({
-        title: 'Success',
-        message: `Bulk fees reminder queued for ${recipients.length} parents`,
-        color: 'green',
+      // Final progress update
+      setSendingProgress({
+        total: recipients.length,
+        sent: totalSent,
+        failed: totalFailed,
+        inProgress: false,
       });
 
-      // Reset
-      setBulkFeesData([]);
-      setSelectedClass('');
-      setMinBalance(0);
+      // Show appropriate notification
+      if (totalFailed === 0) {
+        notifications.show({
+          title: 'Success',
+          message: `All ${totalSent} fees reminders sent successfully!`,
+          color: 'green',
+          autoClose: 5000,
+        });
+      } else if (totalSent > 0) {
+        notifications.show({
+          title: 'Partially Completed',
+          message: `Sent ${totalSent} SMS successfully, ${totalFailed} failed. Check console for details.`,
+          color: 'yellow',
+          autoClose: 7000,
+        });
+      } else {
+        notifications.show({
+          title: 'Failed',
+          message: `Failed to send all ${totalFailed} SMS. Please check your SMS provider configuration.`,
+          color: 'red',
+          autoClose: 7000,
+        });
+      }
+
+      // Reset form only if all succeeded
+      if (totalFailed === 0) {
+        setBulkFeesData([]);
+        setSelectedClass('');
+        setMinBalance(0);
+      }
     } catch (error: any) {
+      console.error('Bulk SMS error:', error);
       notifications.show({
         title: 'Error',
         message: error.response?.data?.error || 'Failed to send bulk SMS',
         color: 'red',
       });
+      
+      setSendingProgress(prev => ({
+        ...prev,
+        inProgress: false,
+      }));
     } finally {
       setLoading(false);
     }
@@ -630,6 +1021,7 @@ export default function SMSPage() {
                   { id: 'send', label: 'Send SMS', icon: IconSend },
                   { id: 'fees-reminder', label: 'Fees Reminder', icon: IconCash },
                   { id: 'bulk-fees-reminder', label: 'Bulk Fees Reminder', icon: IconUsers },
+                  { id: 'bulk-communication', label: 'Bulk Communication', icon: IconBell },
                   { id: 'templates', label: 'Templates', icon: IconTemplate },
                   { id: 'queue', label: 'Queue', icon: IconClock },
                   { id: 'batches', label: 'Batches', icon: IconUsers },
@@ -940,6 +1332,9 @@ export default function SMSPage() {
                         Send fees reminder SMS to all parents whose students have outstanding balances.
                         You can filter by class and minimum balance amount.
                       </Text>
+                      <Text size="xs" className="text-blue-700 mt-2">
+                        ⚡ SMS are sent in batches of 50 with 2-second delays to ensure reliable delivery.
+                      </Text>
                     </div>
 
                     {/* Filters */}
@@ -951,13 +1346,20 @@ export default function SMSPage() {
                         onChange={(value) => setSelectedClass(value || '')}
                         data={[
                           { value: '', label: 'All Classes' },
-                          ...classes.map((cls: any) => ({
-                            value: cls.id,
-                            label: `${cls.name} - ${cls.level}`,
-                          })),
+                          ...classes.map((cls: any) => {
+                            let label = cls.name || cls.level || 'Unknown';
+                            if (cls.stream && !label.includes(cls.stream)) {
+                              label = `${label} ${cls.stream}`;
+                            }
+                            return {
+                              value: cls.id,
+                              label: label,
+                            };
+                          }),
                         ]}
                         size="md"
                         clearable
+                        searchable
                       />
 
                       <NumberInput
@@ -992,9 +1394,61 @@ export default function SMSPage() {
                           </Text>
                         </div>
 
-                        <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                        {/* Progress Indicator */}
+                        {sendingProgress.inProgress && (
+                          <div className="bg-blue-50 border border-blue-300 rounded-lg p-4 mb-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <Text size="sm" fw={500} className="text-blue-900">
+                                Sending SMS... {sendingProgress.sent} of {sendingProgress.total}
+                              </Text>
+                              <Text size="sm" className="text-blue-700">
+                                {Math.round((sendingProgress.sent / sendingProgress.total) * 100)}%
+                              </Text>
+                            </div>
+                            <div className="w-full bg-blue-200 rounded-full h-3 mb-2">
+                              <div 
+                                className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                                style={{ width: `${(sendingProgress.sent / sendingProgress.total) * 100}%` }}
+                              />
+                            </div>
+                            <div className="flex gap-4 text-xs">
+                              <Text className="text-green-700">✓ Sent: {sendingProgress.sent}</Text>
+                              {sendingProgress.failed > 0 && (
+                                <Text className="text-red-700">✗ Failed: {sendingProgress.failed}</Text>
+                              )}
+                              <Text className="text-gray-600">Remaining: {sendingProgress.total - sendingProgress.sent - sendingProgress.failed}</Text>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Summary after completion */}
+                        {!sendingProgress.inProgress && sendingProgress.total > 0 && (
+                          <div className={`border rounded-lg p-4 mb-4 ${
+                            sendingProgress.failed === 0 
+                              ? 'bg-green-50 border-green-300' 
+                              : sendingProgress.sent > 0 
+                                ? 'bg-yellow-50 border-yellow-300'
+                                : 'bg-red-50 border-red-300'
+                          }`}>
+                            <Text size="sm" fw={500} className="mb-2">
+                              {sendingProgress.failed === 0 
+                                ? '✓ All SMS sent successfully!' 
+                                : sendingProgress.sent > 0
+                                  ? '⚠ Partially completed'
+                                  : '✗ Failed to send SMS'}
+                            </Text>
+                            <div className="flex gap-4 text-sm">
+                              <Text className="text-green-700">Sent: {sendingProgress.sent}</Text>
+                              {sendingProgress.failed > 0 && (
+                                <Text className="text-red-700">Failed: {sendingProgress.failed}</Text>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="overflow-x-auto border border-gray-200 rounded-lg max-h-96">
                           <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
+                            <thead className="bg-gray-50 sticky top-0">
                               <tr>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class</th>
@@ -1006,7 +1460,7 @@ export default function SMSPage() {
                               </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                              {bulkFeesData.slice(0, 50).map((item, index) => (
+                              {bulkFeesData.map((item, index) => (
                                 <tr key={index} className="hover:bg-gray-50">
                                   <td className="px-4 py-3 whitespace-nowrap">
                                     <Text size="sm" fw={500}>
@@ -1042,22 +1496,230 @@ export default function SMSPage() {
                           </table>
                         </div>
 
-                        {bulkFeesData.length > 50 && (
-                          <Text size="sm" c="dimmed" mt="xs">
-                            Showing first 50 of {bulkFeesData.length} students. All will receive SMS.
-                          </Text>
-                        )}
-
                         <Button
                           leftSection={<IconSend size={16} />}
                           onClick={handleSendBulkFeesReminder}
                           loading={loading}
-                          disabled={!provider?.is_active}
+                          disabled={!provider?.is_active || sendingProgress.inProgress}
                           size="md"
                           className="bg-purple-600 hover:bg-purple-700 mt-4"
                           fullWidth
                         >
-                          Send Fees Reminder to {bulkFeesData.length} Parents
+                          {sendingProgress.inProgress 
+                            ? `Sending... ${sendingProgress.sent}/${sendingProgress.total}` 
+                            : `Send Fees Reminder to ${bulkFeesData.length} Parents`}
+                        </Button>
+                      </div>
+                    )}
+                  </Stack>
+                </div>
+              )}
+
+              {/* Bulk Communication View */}
+              {activeView === 'bulk-communication' && (
+                <div>
+                  <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+                    <IconBell className="text-purple-600" />
+                    Bulk Communication
+                  </h2>
+                  <Stack gap="md">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <Text size="sm" fw={500} className="text-blue-900 mb-2">ℹ️ Information</Text>
+                      <Text size="sm" className="text-blue-800">
+                        Send announcements, alerts, or general messages to staff, parents, or both.
+                        Select recipient type and compose your message.
+                      </Text>
+                      <Text size="xs" className="text-blue-700 mt-2">
+                        ⚡ SMS are sent in batches of 50 with 2-second delays to ensure reliable delivery.
+                      </Text>
+                    </div>
+
+                    {/* Recipient Type Filter */}
+                    <Select
+                      label="Select Recipients"
+                      placeholder="Choose recipient type"
+                      value={recipientType}
+                      onChange={(value) => setRecipientType(value || 'all')}
+                      data={[
+                        { value: 'all', label: 'All (Staff & Parents)' },
+                        { value: 'staff', label: 'Staff Only' },
+                        { value: 'parents', label: 'Parents Only' },
+                      ]}
+                      size="md"
+                      required
+                    />
+
+                    <Select
+                      label="Message Category"
+                      value={bulkCommCategory}
+                      onChange={(value) => setBulkCommCategory(value || 'announcement')}
+                      data={[
+                        { value: 'announcement', label: 'Announcement' },
+                        { value: 'alert', label: 'Alert' },
+                        { value: 'general', label: 'General' },
+                        { value: 'event', label: 'Event' },
+                        { value: 'reminder', label: 'Reminder' },
+                      ]}
+                      size="md"
+                    />
+
+                    <Button
+                      leftSection={<IconRefresh size={16} />}
+                      onClick={handleLoadBulkCommRecipients}
+                      loading={loadingBulkComm}
+                      size="md"
+                      variant="light"
+                    >
+                      Load Recipients
+                    </Button>
+
+                    {/* Recipients Table */}
+                    {bulkCommData.length > 0 && (
+                      <div>
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                          <Text size="sm" fw={500} className="text-green-900">
+                            Found {bulkCommData.length} recipients
+                          </Text>
+                          <Text size="sm" className="text-green-800 mt-1">
+                            {bulkCommData.filter(r => r.type === 'staff').length} Staff • {bulkCommData.filter(r => r.type === 'parent').length} Parents
+                          </Text>
+                        </div>
+
+                        {/* Progress Indicator */}
+                        {sendingProgress.inProgress && (
+                          <div className="bg-blue-50 border border-blue-300 rounded-lg p-4 mb-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <Text size="sm" fw={500} className="text-blue-900">
+                                Sending SMS... {sendingProgress.sent} of {sendingProgress.total}
+                              </Text>
+                              <Text size="sm" className="text-blue-700">
+                                {Math.round((sendingProgress.sent / sendingProgress.total) * 100)}%
+                              </Text>
+                            </div>
+                            <div className="w-full bg-blue-200 rounded-full h-3 mb-2">
+                              <div 
+                                className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                                style={{ width: `${(sendingProgress.sent / sendingProgress.total) * 100}%` }}
+                              />
+                            </div>
+                            <div className="flex gap-4 text-xs">
+                              <Text className="text-green-700">✓ Sent: {sendingProgress.sent}</Text>
+                              {sendingProgress.failed > 0 && (
+                                <Text className="text-red-700">✗ Failed: {sendingProgress.failed}</Text>
+                              )}
+                              <Text className="text-gray-600">Remaining: {sendingProgress.total - sendingProgress.sent - sendingProgress.failed}</Text>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Summary after completion */}
+                        {!sendingProgress.inProgress && sendingProgress.total > 0 && (
+                          <div className={`border rounded-lg p-4 mb-4 ${
+                            sendingProgress.failed === 0 
+                              ? 'bg-green-50 border-green-300' 
+                              : sendingProgress.sent > 0 
+                                ? 'bg-yellow-50 border-yellow-300'
+                                : 'bg-red-50 border-red-300'
+                          }`}>
+                            <Text size="sm" fw={500} className="mb-2">
+                              {sendingProgress.failed === 0 
+                                ? '✓ All SMS sent successfully!' 
+                                : sendingProgress.sent > 0
+                                  ? '⚠ Partially completed'
+                                  : '✗ Failed to send SMS'}
+                            </Text>
+                            <div className="flex gap-4 text-sm">
+                              <Text className="text-green-700">Sent: {sendingProgress.sent}</Text>
+                              {sendingProgress.failed > 0 && (
+                                <Text className="text-red-700">Failed: {sendingProgress.failed}</Text>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="overflow-x-auto border border-gray-200 rounded-lg max-h-96">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50 sticky top-0">
+                              <tr>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Details</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {bulkCommData.map((recipient, index) => (
+                                <tr key={index} className="hover:bg-gray-50">
+                                  <td className="px-4 py-3 whitespace-nowrap">
+                                    <Badge color={recipient.type === 'staff' ? 'blue' : 'green'}>
+                                      {recipient.type === 'staff' ? 'Staff' : 'Parent'}
+                                    </Badge>
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap">
+                                    <Text size="sm" fw={500}>{recipient.name}</Text>
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap">
+                                    <Text size="sm">{recipient.phone}</Text>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    {recipient.type === 'staff' ? (
+                                      <Text size="sm" c="dimmed">{recipient.role}</Text>
+                                    ) : (
+                                      <Text size="sm" c="dimmed">
+                                        {recipient.students?.length || 0} child{recipient.students?.length !== 1 ? 'ren' : ''}
+                                      </Text>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Message Composer */}
+                        <div className="mt-6">
+                          <Textarea
+                            label="Message"
+                            placeholder="Type your message here..."
+                            value={bulkCommMessage}
+                            onChange={(e) => setBulkCommMessage(e.target.value)}
+                            minRows={6}
+                            maxLength={160}
+                            required
+                            size="md"
+                          />
+                          <Text size="sm" c="dimmed" mt="xs">
+                            {bulkCommMessage.length}/160 characters
+                          </Text>
+
+                          {/* Message Preview */}
+                          {bulkCommMessage && (
+                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mt-4">
+                              <Text size="sm" fw={500} mb="xs">Message Preview:</Text>
+                              <Text size="sm" className="whitespace-pre-wrap">
+                                {school?.name && `${school.name}\n`}
+                                Dear [Recipient Name],
+                                {"\n\n"}
+                                {bulkCommMessage}
+                                {"\n\n"}
+                                Thank you.
+                              </Text>
+                            </div>
+                          )}
+                        </div>
+
+                        <Button
+                          leftSection={<IconSend size={16} />}
+                          onClick={handleSendBulkCommunication}
+                          loading={loading}
+                          disabled={!provider?.is_active || !bulkCommMessage.trim() || sendingProgress.inProgress}
+                          size="md"
+                          className="bg-purple-600 hover:bg-purple-700 mt-4"
+                          fullWidth
+                        >
+                          {sendingProgress.inProgress 
+                            ? `Sending... ${sendingProgress.sent}/${sendingProgress.total}` 
+                            : `Send Message to ${bulkCommData.length} Recipients`}
                         </Button>
                       </div>
                     )}

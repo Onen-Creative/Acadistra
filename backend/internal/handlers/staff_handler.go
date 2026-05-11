@@ -184,6 +184,7 @@ func (h *StaffHandler) GetAllStaff(c *gin.Context) {
 		FirstName          string     `json:"first_name"`
 		MiddleName         string     `json:"middle_name,omitempty"`
 		LastName           string     `json:"last_name"`
+		FullName           string     `json:"full_name"`
 		Email              string     `json:"email"`
 		Phone              string     `json:"phone,omitempty"`
 		Role               string     `json:"role"`
@@ -203,6 +204,13 @@ func (h *StaffHandler) GetAllStaff(c *gin.Context) {
 			userIDStr = &uid
 		}
 		
+		// Build full name
+		fullName := s.FirstName
+		if s.MiddleName != "" {
+			fullName += " " + s.MiddleName
+		}
+		fullName += " " + s.LastName
+		
 		sr := StaffResponse{
 			ID:            s.ID.String(),
 			UserID:        userIDStr,
@@ -210,6 +218,7 @@ func (h *StaffHandler) GetAllStaff(c *gin.Context) {
 			FirstName:     s.FirstName,
 			MiddleName:    s.MiddleName,
 			LastName:      s.LastName,
+			FullName:      fullName,
 			Email:         s.Email,
 			Phone:         s.Phone,
 			Role:          s.Role,
@@ -221,7 +230,7 @@ func (h *StaffHandler) GetAllStaff(c *gin.Context) {
 		result = append(result, sr)
 	}
 
-	c.JSON(http.StatusOK, result)
+	c.JSON(http.StatusOK, gin.H{"staff": result})
 }
 
 // GetStaffByID retrieves a single staff member

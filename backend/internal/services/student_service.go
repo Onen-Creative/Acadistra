@@ -40,8 +40,8 @@ func (s *StudentService) List(schoolID string, params StudentListParams) (*Stude
 	if limit == 0 {
 		limit = 200
 	}
-	if limit > 2000 {
-		limit = 2000
+	if limit > 10000 {
+		limit = 10000
 	}
 
 	filter := repositories.StudentListFilter{

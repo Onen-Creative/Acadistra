@@ -58,7 +58,7 @@ type MonitoringConfig struct {
 func Load() (*Config, error) {
 	godotenv.Load()
 
-	accessExpiry, _ := time.ParseDuration(getEnv("JWT_ACCESS_EXPIRY", "15m"))
+	accessExpiry, _ := time.ParseDuration(getEnv("JWT_ACCESS_EXPIRY", "30m"))
 	refreshExpiry, _ := time.ParseDuration(getEnv("JWT_REFRESH_EXPIRY", "168h"))
 
 	// Prepare database DSN
