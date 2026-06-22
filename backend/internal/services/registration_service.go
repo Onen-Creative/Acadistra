@@ -113,7 +113,7 @@ type RegistrationRequest struct {
 	Village          string
 	ClassLevel       string
 	ClassID          string
-	Term             string
+	// Note: Term field removed - enrollments are yearly
 	Year             int
 	ResidenceType    string
 	PreviousSchool   string
@@ -144,7 +144,7 @@ func (s *RegistrationService) RegisterStudentComprehensive(schoolID uuid.UUID, c
 			return nil, fmt.Errorf("class not found")
 		}
 	} else {
-		class, err = s.repo.FindOrCreateClass(schoolID, req.ClassLevel, req.Term, req.Year)
+		class, err = s.repo.FindOrCreateClass(schoolID, req.ClassLevel, req.Year)
 		if err != nil {
 			return nil, err
 		}
@@ -194,11 +194,10 @@ func (s *RegistrationService) RegisterStudentComprehensive(schoolID uuid.UUID, c
 		DisabilityStatus: req.DisabilityStatus,
 	}
 
-	// Create enrollment
+	// Create enrollment (yearly, no term field)
 	enrollment := &models.Enrollment{
 		ClassID:    class.ID,
 		Year:       req.Year,
-		Term:       req.Term,
 		Status:     "active",
 		EnrolledOn: time.Now(),
 	}

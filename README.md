@@ -24,6 +24,7 @@ Access at http://localhost:3000 with `admin@acadistra.com` / `Admin@123`
 
 ✅ Multi-section support (ECCE, P1-P7, S1-S6)
 ✅ **Standardized curriculum subjects** - All schools use the same subjects per level
+✅ **Yearly class system** - Classes created once per year, students stay together all terms
 ✅ Role-based access (Admin, Teacher, Bursar, Librarian, Nurse, Parent)
 ✅ Offline-first marks entry
 ✅ UNEB & NCDC grading engines

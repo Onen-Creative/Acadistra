@@ -56,7 +56,6 @@ export default function StudentsPage() {
   const [activeStep, setActiveStep] = useState(0)
   const [importId, setImportId] = useState('')
   const [importYear, setImportYear] = useState('2026')
-  const [importTerm, setImportTerm] = useState('Term 1')
   const [importClass, setImportClass] = useState('')
   const [importDetails, setImportDetails] = useState<any>(null)
   const [user, setUser] = useState<any>(null)
@@ -70,25 +69,21 @@ export default function StudentsPage() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, selectedClass, selectedGender, selectedLevel, selectedYear, selectedTerm, pageSize, showAll])
+  }, [searchTerm, selectedClass, selectedGender, selectedLevel, selectedYear, pageSize, showAll])
 
   const { data: studentsData, isLoading } = useQuery({
-    queryKey: ['students', searchTerm, selectedClass, selectedGender, selectedLevel, selectedYear, selectedTerm, currentPage, pageSize, showAll],
+    queryKey: ['students', searchTerm, selectedClass, selectedGender, selectedLevel, selectedYear, currentPage, pageSize, showAll],
     queryFn: async () => {
       const params: any = {
         page: currentPage,
-        limit: showAll ? -1 : pageSize // Use -1 to get all students
+        limit: showAll ? -1 : pageSize
       }
       
       if (searchTerm) params.search = searchTerm
       if (selectedClass) params.class_id = selectedClass
       if (selectedGender) params.gender = selectedGender
       if (selectedLevel) params.level = selectedLevel
-      
-      if (selectedLevel || selectedClass) {
-        if (selectedYear) params.year = selectedYear
-        if (selectedTerm) params.term = selectedTerm
-      }
+      if (selectedYear) params.year = selectedYear
       
       const response = await studentsApi.list(params)
       
@@ -120,11 +115,9 @@ export default function StudentsPage() {
 
 
   const { data: classesData } = useQuery({
-    queryKey: ['classes', selectedYear, selectedTerm],
+    queryKey: ['classes', selectedYear],
     queryFn: async () => {
-      const params: any = {}
-      if (selectedYear) params.year = selectedYear
-      if (selectedTerm) params.term = selectedTerm
+      const params: any = { year: selectedYear }
       const response = await classesApi.list(params)
       return Array.isArray(response) ? { classes: response } : response
     },
@@ -185,10 +178,10 @@ export default function StudentsPage() {
   })
 
   const { data: photoClassStudents } = useQuery({
-    queryKey: ['students-for-photos', photoUploadClass, selectedYear, selectedTerm],
+    queryKey: ['students-for-photos', photoUploadClass, selectedYear],
     queryFn: async () => {
       if (!photoUploadClass) return []
-      const params: any = { class_id: photoUploadClass, year: selectedYear, term: selectedTerm, limit: -1 } // Get all students
+      const params: any = { class_id: photoUploadClass, year: selectedYear, limit: -1 }
       const response = await studentsApi.list(params)
       return Array.isArray(response) ? response : response.students
     },
@@ -331,7 +324,7 @@ export default function StudentsPage() {
     }
     try {
       const token = localStorage.getItem('access_token')
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/v1/import/templates/students?year=${importYear}&term=${importTerm}&class_id=${importClass}&token=${token}`)
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/v1/import/templates/students?year=${importYear}&class_id=${importClass}&token=${token}`)
       const blob = await res.blob()
       
       // Extract filename from Content-Disposition header
@@ -380,7 +373,6 @@ export default function StudentsPage() {
       if (selectedGender) params.append('gender', selectedGender)
       if (selectedLevel) params.append('level', selectedLevel)
       if (selectedYear) params.append('year', selectedYear)
-      if (selectedTerm) params.append('term', selectedTerm)
       
       const token = localStorage.getItem('access_token')
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/v1/students/export?${params.toString()}`, {
@@ -393,7 +385,7 @@ export default function StudentsPage() {
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = `students_${selectedLevel || 'all'}_${selectedYear}_${selectedTerm.replace(' ', '')}.xlsx`
+      link.download = `students_${selectedLevel || 'all'}_${selectedYear}.xlsx`
       document.body.appendChild(link)
       link.click()
       link.remove()
@@ -1012,9 +1004,9 @@ export default function StudentsPage() {
         </Modal>
 
         {/* Import Modal */}
-        <Modal opened={importModalOpened} onClose={() => { closeImport(); setActiveStep(0); setFile(null); setImportId(''); setImportYear('2026'); setImportTerm('Term 1'); setImportClass(''); setImportDetails(null); }} title="Import Students" size="xl">
+        <Modal opened={importModalOpened} onClose={() => { closeImport(); setActiveStep(0); setFile(null); setImportId(''); setImportYear('2026'); setImportClass(''); setImportDetails(null); }} title="Import Students" size="xl">
           <Stepper active={activeStep}>
-            <Stepper.Step label="Select Context" description="Choose year, term & class">
+            <Stepper.Step label="Select Context" description="Choose year & class">
               <div className="space-y-4 mt-6">
                 <Text size="sm" c="dimmed">Select the academic context for the import. The template will be pre-filled with this information.</Text>
                 <Select
@@ -1023,14 +1015,6 @@ export default function StudentsPage() {
                   value={importYear}
                   onChange={(value) => setImportYear(value || '2026')}
                   data={['2024', '2025', '2026', '2027'].map(y => ({ value: y, label: y }))}
-                  required
-                />
-                <Select
-                  label="Term"
-                  placeholder="Select term"
-                  value={importTerm}
-                  onChange={(value) => setImportTerm(value || '1')}
-                  data={[{ value: 'Term 1', label: 'Term 1' }, { value: 'Term 2', label: 'Term 2' }, { value: 'Term 3', label: 'Term 3' }]}
                   required
                 />
                 <Select
@@ -1057,7 +1041,7 @@ export default function StudentsPage() {
               <div className="space-y-4 mt-6">
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <Text size="sm" fw={500} c="blue">Selected Context:</Text>
-                  <Text size="sm" c="dimmed">Year: {importYear} | Term: {importTerm} | Class: {classesData?.classes?.find((c: any) => c.id === importClass)?.name}</Text>
+                  <Text size="sm" c="dimmed">Year: {importYear} | Class: {classesData?.classes?.find((c: any) => c.id === importClass)?.name}</Text>
                 </div>
                 <FileInput
                   label="Upload Filled Template"
@@ -1202,7 +1186,7 @@ export default function StudentsPage() {
                 </div>
                 <Title order={3}>Import Completed!</Title>
                 <Text size="sm" c="dimmed" mt="xs">Students have been successfully imported to {classesData?.classes?.find((c: any) => c.id === importClass)?.name}</Text>
-                <Button mt="md" onClick={() => { setActiveStep(0); setFile(null); setImportId(''); setImportYear('2026'); setImportTerm('Term 1'); setImportClass(''); setImportDetails(null); closeImport(); }}>
+                <Button mt="md" onClick={() => { setActiveStep(0); setFile(null); setImportId(''); setImportYear('2026'); setImportClass(''); setImportDetails(null); closeImport(); }}>
                   Close
                 </Button>
               </div>

@@ -18,7 +18,7 @@ const classSchema = z.object({
   teacher_id: z.string().optional(),
   capacity: z.number().min(10).max(100),
   year: z.number().min(2020).max(2030),
-  term: z.string().min(1, 'Term is required'),
+  // Note: term field removed - classes are yearly
 })
 
 type ClassFormData = z.infer<typeof classSchema>
@@ -93,7 +93,7 @@ export default function ClassesPage() {
       teacher_id: '',
       capacity: 30,
       year: 2026,
-      term: 'Term 1',
+      // Note: term removed - classes are yearly
     },
   })
 
@@ -154,7 +154,7 @@ export default function ClassesPage() {
       teacher_profile_id: values.teacher_id || undefined,
       capacity: Number(values.capacity),
       year: Number(values.year),
-      term: values.term,
+      // Note: term removed - classes are yearly
     }
     if (editingClass) {
       updateClassMutation.mutate({ id: editingClass.id, data: payload })
@@ -170,7 +170,7 @@ export default function ClassesPage() {
     setValue('teacher_id', classItem.teacher_id || '')
     setValue('capacity', classItem.capacity)
     setValue('year', classItem.year)
-    setValue('term', classItem.term)
+    // Note: term removed - classes are yearly
     setCreateModalOpen(true)
   }
 
@@ -214,7 +214,7 @@ export default function ClassesPage() {
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h3 className="text-xl font-bold text-gray-800">{classItem.name}</h3>
-                  <p className="text-sm text-gray-500">Year {classItem.year} • Term {classItem.term}</p>
+                  <p className="text-sm text-gray-500">Year {classItem.year}</p>
                 </div>
                 <div className="relative">
                   <button className="text-gray-400 hover:text-gray-600 text-2xl" onClick={(e) => {
@@ -307,18 +307,6 @@ export default function ClassesPage() {
                     required
                     error={errors.year?.message}
                     placeholder="2026"
-                  />
-                  <FormSelect
-                    {...register('term')}
-                    label="Term"
-                    icon="📖"
-                    required
-                    error={errors.term?.message}
-                    options={[
-                      { value: 'Term 1', label: 'Term 1' },
-                      { value: 'Term 2', label: 'Term 2' },
-                      { value: 'Term 3', label: 'Term 3' }
-                    ]}
                   />
                 </FormSection>
 

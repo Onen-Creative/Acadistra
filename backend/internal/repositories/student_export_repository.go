@@ -7,7 +7,7 @@ import (
 )
 
 type StudentExportRepository interface {
-	FindStudentsWithFilters(schoolID, level, classID, year, term, gender, search string) ([]models.Student, error)
+	FindStudentsWithFilters(schoolID, level, classID, year, gender, search string) ([]models.Student, error)
 	LoadGuardians(studentID uuid.UUID) ([]models.Guardian, error)
 	LoadActiveEnrollment(studentID uuid.UUID) (*models.Enrollment, error)
 }
@@ -20,10 +20,10 @@ func NewStudentExportRepository(db *gorm.DB) StudentExportRepository {
 	return &studentExportRepository{db: db}
 }
 
-func (r *studentExportRepository) FindStudentsWithFilters(schoolID, level, classID, year, term, gender, search string) ([]models.Student, error) {
+func (r *studentExportRepository) FindStudentsWithFilters(schoolID, level, classID, year, gender, search string) ([]models.Student, error) {
 	query := r.db.Table("students").Where("students.school_id = ? AND students.deleted_at IS NULL", schoolID)
 
-	needsJoin := level != "" || classID != "" || year != "" || term != ""
+	needsJoin := level != "" || classID != "" || year != ""
 
 	if needsJoin {
 		query = query.Joins("INNER JOIN enrollments ON enrollments.student_id = students.id AND enrollments.status = 'active'")
@@ -37,9 +37,6 @@ func (r *studentExportRepository) FindStudentsWithFilters(schoolID, level, class
 		}
 		if year != "" {
 			query = query.Where("enrollments.year = ?", year)
-		}
-		if term != "" {
-			query = query.Where("enrollments.term = ?", term)
 		}
 	}
 

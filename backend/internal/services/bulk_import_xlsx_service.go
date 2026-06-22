@@ -862,36 +862,29 @@ func (s *BulkImportXLSXService) validateMarksRow(row []string, schoolID, classID
 func (s *BulkImportXLSXService) ApproveImport(importID, approverID uuid.UUID) error {
 	var bulkImport models.BulkImport
 	if err := s.db.First(&bulkImport, importID).Error; err != nil {
-		return err
+		return fmt.Errorf("import not found: %w", err)
 	}
 
 	if bulkImport.Status != "pending" {
 		return errors.New("import already processed")
 	}
 
-	tx := s.db.Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
-
 	var data []map[string]interface{}
-	json.Unmarshal([]byte(bulkImport.Data), &data)
+	if err := json.Unmarshal([]byte(bulkImport.Data), &data); err != nil {
+		return fmt.Errorf("failed to parse import data: %w", err)
+	}
 
 	switch bulkImport.ImportType {
 	case "students":
-		for _, item := range data {
-			if err := s.createStudent(tx, item, bulkImport.SchoolID); err != nil {
-				tx.Rollback()
-				return err
+		for i, item := range data {
+			if err := s.createStudent(s.db, item, bulkImport.SchoolID); err != nil {
+				return fmt.Errorf("failed to create student at row %d: %w", i+1, err)
 			}
 		}
 	case "marks":
-		for _, item := range data {
-			if err := s.createOrUpdateResult(tx, item, bulkImport.SchoolID); err != nil {
-				tx.Rollback()
-				return err
+		for i, item := range data {
+			if err := s.createOrUpdateResult(s.db, item, bulkImport.SchoolID); err != nil {
+				return fmt.Errorf("failed to create/update result at row %d: %w", i+1, err)
 			}
 		}
 	}
@@ -901,26 +894,21 @@ func (s *BulkImportXLSXService) ApproveImport(importID, approverID uuid.UUID) er
 	bulkImport.ApprovedBy = &approverID
 	bulkImport.ApprovedAt = &now
 
-	if err := tx.Save(&bulkImport).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	return tx.Commit().Error
+	return s.db.Save(&bulkImport).Error
 }
 
-func (s *BulkImportXLSXService) createStudent(tx *gorm.DB, data map[string]interface{}, schoolID uuid.UUID) error {
+func (s *BulkImportXLSXService) createStudent(db *gorm.DB, data map[string]interface{}, schoolID uuid.UUID) error {
 	now := time.Now()
 
 	// Get school and class info
 	var school models.School
-	if err := tx.First(&school, schoolID).Error; err != nil {
+	if err := db.First(&school, schoolID).Error; err != nil {
 		return fmt.Errorf("school not found: %w", err)
 	}
 
 	classID, _ := uuid.Parse(data["class_id"].(string))
 	var class models.Class
-	if err := tx.First(&class, classID).Error; err != nil {
+	if err := db.First(&class, classID).Error; err != nil {
 		return fmt.Errorf("class not found: %w", err)
 	}
 
@@ -932,12 +920,11 @@ func (s *BulkImportXLSXService) createStudent(tx *gorm.DB, data map[string]inter
 		}
 	}
 
-	// Find last admission number and check for duplicates
+	// Find last admission number
 	var lastStudent models.Student
 	var sequence int = 0
 	pattern := fmt.Sprintf("%s/%s/%d/%%", schoolInitials, class.Name, class.Year)
-	// Exclude soft-deleted students by using Unscoped() is NOT needed - GORM automatically excludes them
-	if err := tx.Where("school_id = ? AND admission_no LIKE ?", schoolID, pattern).
+	if err := db.Where("school_id = ? AND admission_no LIKE ?", schoolID, pattern).
 		Order("admission_no DESC").First(&lastStudent).Error; err == nil {
 		parts := strings.Split(lastStudent.AdmissionNo, "/")
 		if len(parts) == 4 {
@@ -948,23 +935,6 @@ func (s *BulkImportXLSXService) createStudent(tx *gorm.DB, data map[string]inter
 	}
 	sequence++
 	admissionNo := fmt.Sprintf("%s/%s/%d/%03d", schoolInitials, class.Name, class.Year, sequence)
-	
-	// Check if admission number already exists (including soft-deleted records)
-	var existingStudent models.Student
-	if err := tx.Unscoped().Where("school_id = ? AND admission_no = ?", schoolID, admissionNo).First(&existingStudent).Error; err == nil {
-		// Admission number exists (even if soft-deleted), try next sequence
-		for i := 0; i < 100; i++ { // Try up to 100 times
-			sequence++
-			admissionNo = fmt.Sprintf("%s/%s/%d/%03d", schoolInitials, class.Name, class.Year, sequence)
-			if err := tx.Unscoped().Where("school_id = ? AND admission_no = ?", schoolID, admissionNo).First(&existingStudent).Error; err != nil {
-				// Found available admission number
-				break
-			}
-			if i == 99 {
-				return fmt.Errorf("unable to generate unique admission number after 100 attempts")
-			}
-		}
-	}
 
 	student := models.Student{
 		SchoolID:      schoolID,
@@ -994,6 +964,7 @@ func (s *BulkImportXLSXService) createStudent(tx *gorm.DB, data map[string]inter
 	if lin, ok := data["lin"].(string); ok && lin != "" {
 		student.LIN = lin
 	}
+	// Only set SchoolPayCode if it's not empty to avoid duplicate empty string constraint violations
 	if schoolPayCode, ok := data["schoolpay_code"].(string); ok && schoolPayCode != "" {
 		student.SchoolPayCode = schoolPayCode
 	}
@@ -1013,30 +984,35 @@ func (s *BulkImportXLSXService) createStudent(tx *gorm.DB, data map[string]inter
 		student.Village = village
 	}
 
-	if err := tx.Create(&student).Error; err != nil {
-		// Check if it's a duplicate key error
-		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "idx_admission_school") {
-			return fmt.Errorf("student with admission number %s already exists", admissionNo)
-		}
-		return err
+	// Check if student with this admission number already exists
+	var existing models.Student
+	if err := db.Where("school_id = ? AND admission_no = ?", schoolID, admissionNo).First(&existing).Error; err == nil {
+		// Student already exists, skip
+		return nil
 	}
 
-	if classIDStr, ok := data["class_id"].(string); ok && classIDStr != "" {
-		classID, _ := uuid.Parse(classIDStr)
-		var class models.Class
-		tx.First(&class, classID)
+	if err := db.Create(&student).Error; err != nil {
+		return fmt.Errorf("failed to create student: %w", err)
+	}
 
-		enrollment := models.Enrollment{
-			StudentID:  student.ID,
-			ClassID:    classID,
-			Year:       class.Year,
-			Term:       class.Term,
-			Status:     "active",
-			EnrolledOn: time.Now(),
-		}
-		if err := tx.Create(&enrollment).Error; err != nil {
-			return err
-		}
+	// Create enrollment
+	enrollment := models.Enrollment{
+		StudentID:  student.ID,
+		ClassID:    classID,
+		Year:       class.Year,
+		Status:     "active",
+		EnrolledOn: time.Now(),
+	}
+	
+	// Check if enrollment already exists
+	var existingEnrollment models.Enrollment
+	if err := db.Where("student_id = ? AND class_id = ? AND year = ?", student.ID, classID, class.Year).First(&existingEnrollment).Error; err == nil {
+		// Enrollment already exists, skip
+		return nil
+	}
+	
+	if err := db.Create(&enrollment).Error; err != nil {
+		return fmt.Errorf("failed to create enrollment: %w", err)
 	}
 
 	if guardianName, ok := data["guardian_name"].(string); ok && guardianName != "" {
@@ -1061,21 +1037,21 @@ func (s *BulkImportXLSXService) createStudent(tx *gorm.DB, data map[string]inter
 		if address, ok := data["guardian_address"].(string); ok && address != "" {
 			guardian.Address = address
 		}
-		if err := tx.Create(&guardian).Error; err != nil {
-			return err
+		if err := db.Create(&guardian).Error; err != nil {
+			return fmt.Errorf("failed to create guardian: %w", err)
 		}
 	}
 
 	return nil
 }
 
-func (s *BulkImportXLSXService) createOrUpdateResult(tx *gorm.DB, data map[string]interface{}, schoolID uuid.UUID) error {
+func (s *BulkImportXLSXService) createOrUpdateResult(db *gorm.DB, data map[string]interface{}, schoolID uuid.UUID) error {
 	studentID, _ := uuid.Parse(data["student_id"].(string))
 	classID, _ := uuid.Parse(data["class_id"].(string))
 	subjectID, _ := uuid.Parse(data["subject_id"].(string))
 
 	var existing models.SubjectResult
-	err := tx.Where("student_id = ? AND subject_id = ? AND term = ? AND year = ?",
+	err := db.Where("student_id = ? AND subject_id = ? AND term = ? AND year = ?",
 		studentID, subjectID, data["term"], data["year"]).First(&existing).Error
 
 	examType := data["exam_type"].(string)
@@ -1107,7 +1083,7 @@ func (s *BulkImportXLSXService) createOrUpdateResult(tx *gorm.DB, data map[strin
 		}
 		rawMarks[examType] = examTypeData
 		existing.RawMarks = rawMarks
-		return tx.Save(&existing).Error
+		return db.Save(&existing).Error
 	}
 
 	// Create new
@@ -1123,7 +1099,7 @@ func (s *BulkImportXLSXService) createOrUpdateResult(tx *gorm.DB, data map[strin
 		Year:      int(data["year"].(float64)),
 		RawMarks:  rawMarks,
 	}
-	return tx.Create(&result).Error
+	return db.Create(&result).Error
 }
 
 // RejectImport rejects the import

@@ -15,7 +15,7 @@ type RegistrationRepository interface {
 	CheckAdmissionNumberExists(schoolID uuid.UUID, admissionNo string) (bool, error)
 	GetSchool(schoolID uuid.UUID) (*models.School, error)
 	GetClass(classID, schoolID uuid.UUID) (*models.Class, error)
-	FindOrCreateClass(schoolID uuid.UUID, level, term string, year int) (*models.Class, error)
+	FindOrCreateClass(schoolID uuid.UUID, level string, year int) (*models.Class, error)
 }
 
 type registrationRepository struct {
@@ -91,16 +91,16 @@ func (r *registrationRepository) GetClass(classID, schoolID uuid.UUID) (*models.
 	return &class, err
 }
 
-func (r *registrationRepository) FindOrCreateClass(schoolID uuid.UUID, level, term string, year int) (*models.Class, error) {
+func (r *registrationRepository) FindOrCreateClass(schoolID uuid.UUID, level string, year int) (*models.Class, error) {
 	var class models.Class
-	err := r.db.Where("school_id = ? AND level = ? AND term = ? AND year = ?", schoolID, level, term, year).First(&class).Error
+	// Classes are yearly, not per term
+	err := r.db.Where("school_id = ? AND level = ? AND year = ?", schoolID, level, year).First(&class).Error
 	if err == gorm.ErrRecordNotFound {
 		class = models.Class{
 			SchoolID: schoolID,
 			Name:     level,
 			Level:    level,
 			Year:     year,
-			Term:     term,
 		}
 		if err := r.db.Create(&class).Error; err != nil {
 			return nil, err

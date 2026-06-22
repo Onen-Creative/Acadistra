@@ -16,6 +16,11 @@ func NewSystemMonitoringService(db *gorm.DB) *SystemMonitoringService {
 	return &SystemMonitoringService{db: db}
 }
 
+// DB returns the database instance
+func (s *SystemMonitoringService) DB() *gorm.DB {
+	return s.db
+}
+
 // CreateSession creates a new user session
 func (s *SystemMonitoringService) CreateSession(userID uuid.UUID, schoolID *uuid.UUID, token, ip, userAgent string) error {
 	session := &models.UserSession{
@@ -52,6 +57,7 @@ func (s *SystemMonitoringService) EndSession(token string) error {
 // GetActiveSessions returns count of active sessions
 func (s *SystemMonitoringService) GetActiveSessions() (int64, error) {
 	var count int64
+	// Consider sessions active if activity within last 30 minutes
 	err := s.db.Model(&models.UserSession{}).
 		Where("is_active = ? AND last_activity > ?", true, time.Now().Add(-30*time.Minute)).
 		Count(&count).Error
@@ -61,6 +67,7 @@ func (s *SystemMonitoringService) GetActiveSessions() (int64, error) {
 // GetActiveUsers returns count of unique active users
 func (s *SystemMonitoringService) GetActiveUsers() (int64, error) {
 	var count int64
+	// Consider users active if they have activity within last 30 minutes
 	err := s.db.Model(&models.UserSession{}).
 		Where("is_active = ? AND last_activity > ?", true, time.Now().Add(-30*time.Minute)).
 		Distinct("user_id").
@@ -154,17 +161,19 @@ func (s *SystemMonitoringService) GenerateDailyReport(date time.Time) error {
 		Distinct("user_id").
 		Count(&activeUsers)
 	
-	// Session stats
+	// Session stats - improved duration calculation
 	var totalSessions int64
 	var avgDuration float64
 	s.db.Model(&models.UserSession{}).
 		Where("login_at >= ? AND login_at < ?", startOfDay, endOfDay).
 		Count(&totalSessions)
 	
+	// Calculate average session duration properly
 	s.db.Raw(`
-		SELECT AVG(EXTRACT(EPOCH FROM (COALESCE(logout_at, last_activity) - login_at)) / 60)
+		SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (COALESCE(logout_at, last_activity) - login_at)) / 60), 0)
 		FROM user_sessions
 		WHERE login_at >= ? AND login_at < ?
+		AND EXTRACT(EPOCH FROM (COALESCE(logout_at, last_activity) - login_at)) > 0
 	`, startOfDay, endOfDay).Scan(&avgDuration)
 	
 	// Request stats
@@ -234,6 +243,7 @@ func (s *SystemMonitoringService) GenerateDailyReport(date time.Time) error {
 		LEFT JOIN user_sessions us ON s.id = us.school_id AND us.login_at >= ? AND us.login_at < ?
 		LEFT JOIN api_request_logs al ON s.id = al.school_id AND al.timestamp >= ? AND al.timestamp < ?
 		GROUP BY s.id, s.name
+		HAVING COUNT(DISTINCT us.user_id) > 0 OR COUNT(al.id) > 0
 		ORDER BY active_users DESC
 	`, startOfDay, endOfDay, startOfDay, endOfDay).Scan(&schoolActivity)
 	
@@ -253,8 +263,31 @@ func (s *SystemMonitoringService) GenerateDailyReport(date time.Time) error {
 		schoolActivityJSON["schools"] = schoolActivity
 	}
 	
+	// Check if report already exists for this date
+	var existingReport models.DailySystemReport
+	if err := s.db.Where("date = ?", startOfDay).First(&existingReport).Error; err == nil {
+		// Update existing report
+		existingReport.TotalUsers = int(totalUsers)
+		existingReport.ActiveUsers = int(activeUsers)
+		existingReport.TotalSessions = int(totalSessions)
+		existingReport.AvgSessionDuration = avgDuration
+		existingReport.TotalRequests = int(totalRequests)
+		existingReport.SuccessfulRequests = int(successfulRequests)
+		existingReport.FailedRequests = int(failedRequests)
+		existingReport.AvgResponseTime = avgResponseTime
+		existingReport.SlowestEndpoint = slowestEndpoint.Path
+		existingReport.SlowestResponseTime = slowestEndpoint.ResponseTime
+		existingReport.PeakHour = peakHour.Hour
+		existingReport.PeakHourRequests = int(peakHour.Requests)
+		existingReport.ErrorRate = errorRate
+		existingReport.TopErrors = topErrorsJSON
+		existingReport.SchoolActivity = schoolActivityJSON
+		return s.db.Save(&existingReport).Error
+	}
+	
+	// Create new report
 	report := &models.DailySystemReport{
-		Date:                date,
+		Date:                startOfDay,
 		TotalUsers:          int(totalUsers),
 		ActiveUsers:         int(activeUsers),
 		TotalSessions:       int(totalSessions),
@@ -295,6 +328,19 @@ func (s *SystemMonitoringService) CleanupOldLogs(daysToKeep int) error {
 	}
 	
 	return nil
+}
+
+// ExpireInactiveSessions marks sessions as inactive if no activity in last 2 hours
+func (s *SystemMonitoringService) ExpireInactiveSessions() error {
+	twoHoursAgo := time.Now().Add(-2 * time.Hour)
+	now := time.Now()
+	
+	return s.db.Model(&models.UserSession{}).
+		Where("is_active = ? AND last_activity < ?", true, twoHoursAgo).
+		Updates(map[string]interface{}{
+			"is_active": false,
+			"logout_at": now,
+		}).Error
 }
 
 

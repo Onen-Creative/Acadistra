@@ -91,13 +91,23 @@ func main() {
 		}
 	}()
 	
+	// Expire inactive sessions (every 15 minutes)
+	go func() {
+		ticker := time.NewTicker(15 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			monitoringService.ExpireInactiveSessions()
+		}
+	}()
+	
 	// Start daily report generation (at 1 AM)
 	go func() {
 		for {
 			now := time.Now()
 			next := time.Date(now.Year(), now.Month(), now.Day()+1, 1, 0, 0, 0, now.Location())
 			time.Sleep(time.Until(next))
-			monitoringService.GenerateDailyReport(now)
+			yesterday := now.AddDate(0, 0, -1)
+			monitoringService.GenerateDailyReport(yesterday)
 		}
 	}()
 	

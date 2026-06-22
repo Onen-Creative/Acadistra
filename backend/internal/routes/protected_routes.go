@@ -133,6 +133,7 @@ func setupSystemAdminRoutes(protected *gin.RouterGroup, deps *Dependencies) {
 	sysAdmin.GET("/monitoring/active-users", monitoringHandler.GetActiveUsers)
 	sysAdmin.GET("/monitoring/audit-logs", monitoringHandler.GetEnhancedAuditLogs)
 	sysAdmin.GET("/monitoring/system-stats", monitoringHandler.GetSystemStats)
+	sysAdmin.GET("/monitoring/system-health", monitoringHandler.GetSystemHealth)
 	sysAdmin.GET("/monitoring/daily-reports", monitoringHandler.GetDailyReports)
 	sysAdmin.GET("/monitoring/performance-metrics", monitoringHandler.GetPerformanceMetrics)
 	sysAdmin.GET("/monitoring/slowest-endpoints", monitoringHandler.GetSlowestEndpoints)
@@ -296,6 +297,7 @@ func setupSchoolAdminRoutes(protected *gin.RouterGroup, deps *Dependencies) {
 		schoolAdminOrDOS.PUT("/students/:id", studentHandler.Update)
 		schoolAdminOrDOS.DELETE("/students/:id", studentHandler.Delete)
 		schoolAdminOrDOS.POST("/students/:id/promote", studentHandler.PromoteOrDemote)
+		schoolAdminOrDOS.POST("/students/bulk-promote", studentHandler.BulkPromote)
 
 		// Guardian management
 		schoolAdminOrDOS.POST("/guardians", guardianHandler.Create)

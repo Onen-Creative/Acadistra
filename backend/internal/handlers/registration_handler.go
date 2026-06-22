@@ -54,13 +54,14 @@ type ComprehensiveRegistrationRequest struct {
 	Village          string          `json:"village"`
 	ClassLevel       string          `json:"class_level" binding:"required"`
 	ClassID          string          `json:"class_id"`
-	Term             string          `json:"term" binding:"required"`
+	// Note: Term field removed - enrollments are yearly
 	Year             int             `json:"year" binding:"required"`
 	ResidenceType    string          `json:"residence_type"`
 	PreviousSchool   string          `json:"previous_school"`
 	PreviousClass    string          `json:"previous_class"`
 	SpecialNeeds     string          `json:"special_needs"`
 	DisabilityStatus string          `json:"disability_status"`
+	PhotoURL         string          `json:"photo_url"`
 	Guardians        []GuardianInput `json:"guardians" binding:"required,min=1"`
 }
 
@@ -166,7 +167,7 @@ func (h *RegistrationHandler) RegisterStudent(c *gin.Context) {
 		Village:          req.Village,
 		ClassLevel:       req.ClassLevel,
 		ClassID:          req.ClassID,
-		Term:             req.Term,
+		// Note: Term removed - enrollments are yearly
 		Year:             req.Year,
 		ResidenceType:    req.ResidenceType,
 		PreviousSchool:   req.PreviousSchool,

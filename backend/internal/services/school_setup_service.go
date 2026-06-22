@@ -31,31 +31,27 @@ func (s *SchoolSetupService) SetupSchool(school *models.School, levels []string)
 
 func (s *SchoolSetupService) createClasses(tx *gorm.DB, schoolID uuid.UUID, levels []string) error {
 	currentYear := time.Now().Year()
-	terms := []string{"Term1", "Term2", "Term3"}
 
 	for _, level := range levels {
-		for _, term := range terms {
-			// Check if class already exists
-			var existing models.Class
-			err := tx.Where("school_id = ? AND level = ? AND year = ? AND term = ?", schoolID, level, currentYear, term).First(&existing).Error
-			if err == nil {
-				// Class already exists, skip
-				continue
-			}
-			if err != gorm.ErrRecordNotFound {
-				return err
-			}
+		// Check if class already exists (yearly, not per term)
+		var existing models.Class
+		err := tx.Where("school_id = ? AND level = ? AND year = ?", schoolID, level, currentYear).First(&existing).Error
+		if err == nil {
+			// Class already exists, skip
+			continue
+		}
+		if err != gorm.ErrRecordNotFound {
+			return err
+		}
 
-			class := models.Class{
-				SchoolID: schoolID,
-				Name:     fmt.Sprintf("%s %s %d", level, term, currentYear),
-				Level:    level,
-				Year:     currentYear,
-				Term:     term,
-			}
-			if err := tx.Create(&class).Error; err != nil {
-				return err
-			}
+		class := models.Class{
+			SchoolID: schoolID,
+			Name:     level,
+			Level:    level,
+			Year:     currentYear,
+		}
+		if err := tx.Create(&class).Error; err != nil {
+			return err
 		}
 	}
 	return nil

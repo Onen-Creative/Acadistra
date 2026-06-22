@@ -60,7 +60,7 @@ func (s *AttendanceService) MarkSingle(schoolID, userID string, req MarkAttendan
 		SchoolID:  uuid.MustParse(schoolID),
 		ClassID:   req.ClassID,
 		Year:      class.Year,
-		Term:      class.Term,
+		Term:      req.Term,
 		Date:      date,
 		Status:    req.Status,
 		Remarks:   req.Remarks,
@@ -158,7 +158,7 @@ func (s *AttendanceService) BulkMark(schoolID, userID, userRole string, req Bulk
 				SchoolID:  uuid.MustParse(schoolID),
 				ClassID:   classUUID,
 				Year:      class.Year,
-				Term:      class.Term,
+				Term:      req.Term,
 				Date:      date,
 				Status:    status,
 				Remarks:   remarks,
@@ -557,6 +557,7 @@ type MarkAttendanceRequest struct {
 	StudentID uuid.UUID `json:"student_id" binding:"required"`
 	ClassID   uuid.UUID `json:"class_id" binding:"required"`
 	Date      string    `json:"date" binding:"required"`
+	Term      string    `json:"term" binding:"required"`
 	Status    string    `json:"status" binding:"required"`
 	Remarks   string    `json:"remarks"`
 }
@@ -564,6 +565,7 @@ type MarkAttendanceRequest struct {
 type BulkMarkRequest struct {
 	ClassID     string                   `json:"class_id" binding:"required"`
 	Date        string                   `json:"date" binding:"required"`
+	Term        string                   `json:"term" binding:"required"`
 	Attendances []map[string]interface{} `json:"attendances" binding:"required"`
 }
 

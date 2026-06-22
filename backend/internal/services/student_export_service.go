@@ -16,8 +16,8 @@ func NewStudentExportService(repo repositories.StudentExportRepository) *Student
 	return &StudentExportService{repo: repo}
 }
 
-func (s *StudentExportService) ExportStudentsToExcel(schoolID, level, classID, year, term, gender, search string) (*excelize.File, error) {
-	students, err := s.repo.FindStudentsWithFilters(schoolID, level, classID, year, term, gender, search)
+func (s *StudentExportService) ExportStudentsToExcel(schoolID, level, classID, year, gender, search string) (*excelize.File, error) {
+	students, err := s.repo.FindStudentsWithFilters(schoolID, level, classID, year, gender, search)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch students: %w", err)
 	}
@@ -33,10 +33,10 @@ func (s *StudentExportService) ExportStudentsToExcel(schoolID, level, classID, y
 		}
 	}
 
-	return s.generateExcelFile(students, level, year, term)
+	return s.generateExcelFile(students, level, year)
 }
 
-func (s *StudentExportService) generateExcelFile(students []models.Student, level, year, term string) (*excelize.File, error) {
+func (s *StudentExportService) generateExcelFile(students []models.Student, level, year string) (*excelize.File, error) {
 	f := excelize.NewFile()
 	sheetName := "Students"
 	f.SetSheetName("Sheet1", sheetName)
@@ -46,8 +46,8 @@ func (s *StudentExportService) generateExcelFile(students []models.Student, leve
 	if level != "" {
 		titleText += fmt.Sprintf(" - %s", level)
 	}
-	if year != "" && term != "" {
-		titleText += fmt.Sprintf(" (%s, %s)", year, term)
+	if year != "" {
+		titleText += fmt.Sprintf(" (%s)", year)
 	}
 
 	f.SetCellValue(sheetName, "A1", titleText)

@@ -31,7 +31,7 @@ const studentSchema = z.object({
   class_level: z.string().min(1, 'Required'),
   class_id: z.string().min(1, 'Required'),
   year: z.number().min(2020).max(2030),
-  term: z.string().min(1, 'Required'),
+  // Note: term field removed - enrollments are yearly
   previous_school: z.string().optional(),
   previous_class: z.string().optional(),
   special_needs: z.string().optional(),
@@ -101,7 +101,7 @@ export default function StudentRegistrationPage() {
       nationality: 'Ugandan',
       residence_type: 'Day',
       year: 2026,
-      term: 'Term 1',
+      // Note: term removed - enrollments are yearly
       gender: 'Male',
     },
   })
@@ -184,7 +184,7 @@ export default function StudentRegistrationPage() {
       class_level: data.class_level,
       class_id: data.class_id,
       year: data.year,
-      term: data.term,
+      // Note: term removed - enrollments are yearly
       previous_school: data.previous_school || '',
       previous_class: data.previous_class || '',
       special_needs: data.special_needs || '',
@@ -293,9 +293,6 @@ export default function StudentRegistrationPage() {
                     ...(classesData?.classes?.filter((c: any) => c.level === selectedLevel).map((c: any) => ({ value: c.id, label: c.name })) || [])
                   ]} />
                   <FormInput {...register('year')} type="number" label="Academic Year" required placeholder="2026" />
-                  <FormSelect {...register('term')} label="Term" required options={[
-                    { value: 'Term 1', label: 'Term 1' }, { value: 'Term 2', label: 'Term 2' }, { value: 'Term 3', label: 'Term 3' }
-                  ]} />
                 </div>
               </div>
 

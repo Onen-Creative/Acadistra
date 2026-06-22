@@ -1,16 +1,19 @@
 'use client'
 
+import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { classesApi, studentsApi, attendanceApi, subjectsApi } from '@/services/api'
 import { DashboardLayout } from '@/components/DashboardLayout'
 import { PageHeader, StatCard } from '@/components/ui/BeautifulComponents'
+import { BulkPromotionModal } from '@/components/BulkPromotionModal'
 import Link from 'next/link'
 
 export default function ClassDetailsPage() {
   const params = useParams()
   const router = useRouter()
   const classId = params.id as string
+  const [promotionModalOpen, setPromotionModalOpen] = useState(false)
 
   const { data: classData, isLoading: classLoading } = useQuery({
     queryKey: ['class', classId],
@@ -59,12 +62,23 @@ export default function ClassDetailsPage() {
           title={classInfo?.name || 'Class Details'}
           subtitle={`${classInfo?.level} • Year ${classInfo?.year} • ${classInfo?.term}`}
           action={
-            <button
-              onClick={() => router.back()}
-              className="px-6 py-3 rounded-xl font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all duration-300"
-            >
-              ← Back
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setPromotionModalOpen(true)}
+                className="px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 transition-all duration-300 shadow-lg flex items-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+                Promote Students
+              </button>
+              <button
+                onClick={() => router.back()}
+                className="px-6 py-3 rounded-xl font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all duration-300"
+              >
+                ← Back
+              </button>
+            </div>
           }
         />
 
@@ -277,6 +291,15 @@ export default function ClassDetailsPage() {
           </Link>
         </div>
       </div>
+
+      {/* Bulk Promotion Modal */}
+      <BulkPromotionModal
+        opened={promotionModalOpen}
+        onClose={() => setPromotionModalOpen(false)}
+        sourceClassId={classId}
+        sourceClassName={classInfo?.name || ''}
+        currentYear={String(classInfo?.year || new Date().getFullYear())}
+      />
     </DashboardLayout>
   )
 }

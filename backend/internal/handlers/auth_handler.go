@@ -142,9 +142,13 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 		}
 	}
 
-	// End user session
+	// End user session - extract Bearer token properly
 	if authHeader := c.GetHeader("Authorization"); authHeader != "" {
-		go h.monitoringService.EndSession(authHeader)
+		tokenStr := authHeader
+		if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+			tokenStr = authHeader[7:]
+		}
+		go h.monitoringService.EndSession(tokenStr)
 	}
 
 	if err := h.authService.RevokeToken(req.RefreshToken); err != nil {

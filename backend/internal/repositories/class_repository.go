@@ -10,11 +10,11 @@ import (
 type ClassRepository interface {
 	BaseRepository
 	FindBySchoolID(schoolID uuid.UUID) ([]models.Class, error)
-	FindByYearAndTerm(schoolID uuid.UUID, year int, term string) ([]models.Class, error)
+	FindByYearAndTerm(schoolID uuid.UUID, year int, term string) ([]models.Class, error) // Deprecated: term is ignored
 	FindWithStudentCount(schoolID uuid.UUID) ([]map[string]interface{}, error)
 	FindByLevel(schoolID uuid.UUID, level string) ([]models.Class, error)
 	UpdateTeacher(classID, teacherID uuid.UUID) error
-	FindDuplicate(schoolID uuid.UUID, level, stream, year, term string) (*models.Class, error)
+	FindDuplicate(schoolID uuid.UUID, level, stream, year string) (*models.Class, error)
 	CountActiveEnrollments(classID string) (int64, error)
 	FindByFilters(schoolID, year, term, level string) ([]models.Class, error)
 	FindByTeacherName(schoolID, name string) ([]models.Class, error)
@@ -41,7 +41,8 @@ func (r *classRepository) FindBySchoolID(schoolID uuid.UUID) ([]models.Class, er
 
 func (r *classRepository) FindByYearAndTerm(schoolID uuid.UUID, year int, term string) ([]models.Class, error) {
 	var classes []models.Class
-	err := r.db.Where("school_id = ? AND year = ? AND term = ?", schoolID, year, term).
+	// Term is ignored as classes are yearly
+	err := r.db.Where("school_id = ? AND year = ?", schoolID, year).
 		Order("level ASC, stream ASC").
 		Find(&classes).Error
 	return classes, err
@@ -77,10 +78,10 @@ func (r *classRepository) UpdateTeacher(classID, teacherID uuid.UUID) error {
 		Update("teacher_id", teacherID).Error
 }
 
-func (r *classRepository) FindDuplicate(schoolID uuid.UUID, level, stream, year, term string) (*models.Class, error) {
+func (r *classRepository) FindDuplicate(schoolID uuid.UUID, level, stream, year string) (*models.Class, error) {
 	var class models.Class
-	err := r.db.Where("school_id = ? AND level = ? AND stream = ? AND year = ? AND term = ?",
-		schoolID, level, stream, year, term).First(&class).Error
+	err := r.db.Where("school_id = ? AND level = ? AND stream = ? AND year = ?",
+		schoolID, level, stream, year).First(&class).Error
 	if err != nil {
 		return nil, err
 	}
@@ -104,9 +105,7 @@ func (r *classRepository) FindByFilters(schoolID, year, term, level string) ([]m
 	if year != "" {
 		query = query.Where("year = ?", year)
 	}
-	if term != "" {
-		query = query.Where("term = ?", term)
-	}
+	// term parameter ignored - classes are yearly
 	if level != "" {
 		query = query.Where("level = ?", level)
 	}

@@ -239,3 +239,31 @@ func (h *StudentHandler) GetMyChildren(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"students": students, "total": len(students)})
 }
+
+// BulkPromote promotes multiple students to a new class for a new year
+func (h *StudentHandler) BulkPromote(c *gin.Context) {
+	schoolID := c.GetString("tenant_school_id")
+
+	var req struct {
+		StudentIDs []string `json:"student_ids" binding:"required"`
+		NewClassID string   `json:"new_class_id" binding:"required"`
+		NewYear    int      `json:"new_year" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	count, err := h.svc.BulkPromote(req.StudentIDs, schoolID, req.NewClassID, req.NewYear)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to promote students"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Students promoted successfully",
+		"promoted_count": count,
+		"total_requested": len(req.StudentIDs),
+	})
+}

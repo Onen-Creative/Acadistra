@@ -21,17 +21,16 @@ func (h *StudentExportHandler) ExportStudents(c *gin.Context) {
 	level := c.Query("level")
 	classID := c.Query("class_id")
 	year := c.Query("year")
-	term := c.Query("term")
 	gender := c.Query("gender")
 	search := c.Query("search")
 
-	f, err := h.service.ExportStudentsToExcel(schoolID, level, classID, year, term, gender, search)
+	f, err := h.service.ExportStudentsToExcel(schoolID, level, classID, year, gender, search)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to export students"})
 		return
 	}
 
-	filename := fmt.Sprintf("students_%s_%s_%s.xlsx", level, year, term)
+	filename := fmt.Sprintf("students_%s_%s.xlsx", level, year)
 	if level == "" {
 		filename = "students_export.xlsx"
 	}

@@ -26,7 +26,7 @@ type ClassWithCount struct {
 }
 
 func (s *ClassService) List(schoolID, year, term, level string) ([]ClassWithCount, error) {
-	classes, err := s.repo.FindByFilters(schoolID, year, term, level)
+	classes, err := s.repo.FindByFilters(schoolID, year, "", level) // term not used for class lookup
 	if err != nil {
 		return nil, err
 	}
@@ -71,9 +71,9 @@ func (s *ClassService) Create(class *models.Class, userRole, tenantSchoolID stri
 
 	class.Name = buildClassName(class.Level, class.Stream)
 
-	// Check duplicate
-	if _, err := s.repo.FindDuplicate(class.SchoolID, class.Level, class.Stream, fmt.Sprint(class.Year), class.Term); err == nil {
-		return errors.New("class with this level and stream already exists for this term/year")
+	// Check duplicate - classes are unique per school/year/level/stream (no term)
+	if _, err := s.repo.FindDuplicate(class.SchoolID, class.Level, class.Stream, fmt.Sprint(class.Year)); err == nil {
+		return errors.New("class with this level and stream already exists for this year")
 	}
 
 	return s.repo.Create(class)
@@ -138,9 +138,7 @@ func (s *ClassService) GetStudents(classID, year, term string) ([]models.Student
 	if year != "" {
 		query = query.Where("year = ?", year)
 	}
-	if term != "" {
-		query = query.Where("term = ?", term)
-	}
+	// Note: term parameter ignored - enrollments are yearly now
 	var enrollments []models.Enrollment
 	if err := query.Find(&enrollments).Error; err != nil {
 		return nil, err

@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,9 +17,9 @@ func RequestLogger(monitoringService *services.SystemMonitoringService) gin.Hand
 		// Process request
 		c.Next()
 		
-		// Calculate response time
+		// Calculate response time in microseconds, then convert to milliseconds with decimal precision
 		duration := time.Since(start)
-		responseTime := float64(duration.Milliseconds())
+		responseTime := float64(duration.Microseconds()) / 1000.0 // Convert to milliseconds with decimal precision
 		
 		// Get user and school info
 		var userID, schoolID *uuid.UUID
@@ -54,7 +55,9 @@ func RequestLogger(monitoringService *services.SystemMonitoringService) gin.Hand
 		
 		// Update session activity if user is authenticated
 		if token := c.GetHeader("Authorization"); token != "" {
-			go monitoringService.UpdateSessionActivity(token)
+			// Extract Bearer token
+			tokenStr := strings.TrimPrefix(token, "Bearer ")
+			go monitoringService.UpdateSessionActivity(tokenStr)
 		}
 	}
 }

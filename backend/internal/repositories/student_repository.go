@@ -137,9 +137,7 @@ func (r *studentRepository) ListWithFilters(f StudentListFilter) ([]models.Stude
 		if f.Year != "" {
 			query = query.Where("enrollments.year = ?", f.Year)
 		}
-		if f.Term != "" {
-			query = query.Where("enrollments.term = ?", f.Term)
-		}
+		// Note: Term filter removed - enrollments are yearly
 	}
 
 	if f.Search != "" {

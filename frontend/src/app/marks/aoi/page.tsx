@@ -35,9 +35,9 @@ export default function AOIMarksEntryPage() {
   }, [])
 
   const { data: classesData } = useQuery({
-    queryKey: ['classes'],
+    queryKey: ['classes', year],
     queryFn: async () => {
-      const res = await classesApi.list()
+      const res = await classesApi.list({ year: parseInt(year) })
       return Array.isArray(res) ? { classes: res } : res
     }
   })
@@ -56,10 +56,10 @@ export default function AOIMarksEntryPage() {
   })
 
   const { data: studentsData } = useQuery({
-    queryKey: ['students', classId],
+    queryKey: ['students', classId, year],
     queryFn: async () => {
       if (!classId) return { students: [] }
-      const res = await studentsApi.list({ class_id: classId, limit: -1 })
+      const res = await studentsApi.list({ class_id: classId, year: parseInt(year), limit: -1 })
       return Array.isArray(res) ? { students: res } : res
     },
     enabled: !!classId

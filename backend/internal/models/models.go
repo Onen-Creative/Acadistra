@@ -88,17 +88,16 @@ type User struct {
 	School       *School    `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
 }
 
-// Class represents a class/grade
+// Class represents a class/grade (created yearly, not per term)
 type Class struct {
 	BaseModel
-	SchoolID         uuid.UUID        `gorm:"type:char(36);not null;index:idx_class_school_year_term" json:"school_id"`
+	SchoolID         uuid.UUID        `gorm:"type:char(36);not null;index:idx_class_school_year" json:"school_id"`
 	Name             string           `gorm:"type:varchar(100);not null" json:"name"`
 	Level            string           `gorm:"type:varchar(50);not null" json:"level"`
 	Stream           string           `gorm:"type:varchar(10);default:''" json:"stream"`
 	Capacity         int              `gorm:"default:30" json:"capacity"`
 	TeacherProfileID *uuid.UUID       `gorm:"column:teacher_profile_id;type:char(36);index" json:"teacher_profile_id"`
-	Year             int              `gorm:"not null;index:idx_class_school_year_term" json:"year"`
-	Term             string           `gorm:"type:varchar(10);not null;index:idx_class_school_year_term" json:"term"`
+	Year             int              `gorm:"not null;index:idx_class_school_year;uniqueIndex:idx_class_unique" json:"year"`
 	School           *School          `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
 	TeacherProfile   *TeacherProfile  `gorm:"foreignKey:TeacherProfileID" json:"teacher_profile,omitempty"`
 }
@@ -173,13 +172,12 @@ type GuardianStaff struct {
 	School           *School   `gorm:"foreignKey:SchoolID" json:"school,omitempty"`
 }
 
-// Enrollment links students to classes
+// Enrollment links students to classes (yearly, not per term)
 type Enrollment struct {
 	BaseModel
-	StudentID  uuid.UUID  `gorm:"type:char(36);not null;index:idx_enrollment_student_class" json:"student_id"`
-	ClassID    uuid.UUID  `gorm:"type:char(36);not null;index:idx_enrollment_student_class" json:"class_id"`
-	Year       int        `gorm:"not null;index" json:"year"`
-	Term       string     `gorm:"type:varchar(10);not null" json:"term"`
+	StudentID  uuid.UUID  `gorm:"type:char(36);not null;uniqueIndex:idx_enrollment_unique" json:"student_id"`
+	ClassID    uuid.UUID  `gorm:"type:char(36);not null;uniqueIndex:idx_enrollment_unique;index:idx_enrollment_class" json:"class_id"`
+	Year       int        `gorm:"not null;uniqueIndex:idx_enrollment_unique;index:idx_enrollment_year" json:"year"`
 	Status     string     `gorm:"type:varchar(20);default:'active'" json:"status"`
 	EnrolledOn time.Time  `gorm:"type:date" json:"enrolled_on"`
 	LeftOn     *time.Time `gorm:"type:date" json:"left_on,omitempty"`

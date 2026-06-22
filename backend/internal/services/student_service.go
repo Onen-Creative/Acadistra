@@ -216,15 +216,14 @@ func (s *StudentService) PromoteOrDemote(studentID, schoolID, newClassID string,
 		return nil, err
 	}
 
-	// Deactivate current enrollment
-	s.db.Model(&models.Enrollment{}).Where("student_id = ? AND status = 'active'", sid).Update("status", "completed")
+	// Deactivate current enrollment for this year
+	s.db.Model(&models.Enrollment{}).Where("student_id = ? AND year = ? AND status = 'active'", sid, year).Update("status", "completed")
 
-	// Create new enrollment
+	// Create new yearly enrollment (no term field)
 	newEnrollment := models.Enrollment{
 		StudentID:  sid,
 		ClassID:    classUUID,
 		Year:       year,
-		Term:       term,
 		Status:     "active",
 		EnrolledOn: time.Now(),
 	}
@@ -234,6 +233,53 @@ func (s *StudentService) PromoteOrDemote(studentID, schoolID, newClassID string,
 	}
 
 	return &newEnrollment, nil
+}
+
+// BulkPromote promotes multiple students to a new class for a new year
+func (s *StudentService) BulkPromote(studentIDs []string, schoolID, newClassID string, newYear int) (int, error) {
+	schoolUUID, err := uuid.Parse(schoolID)
+	if err != nil {
+		return 0, err
+	}
+	classUUID, err := uuid.Parse(newClassID)
+	if err != nil {
+		return 0, err
+	}
+
+	// Verify new class exists
+	var newClass models.Class
+	if err := s.db.Where("id = ? AND school_id = ?", classUUID, schoolUUID).First(&newClass).Error; err != nil {
+		return 0, err
+	}
+
+	successCount := 0
+	for _, studentID := range studentIDs {
+		sid, err := uuid.Parse(studentID)
+		if err != nil {
+			continue
+		}
+
+		// Check if enrollment already exists for new year
+		var existing models.Enrollment
+		if err := s.db.Where("student_id = ? AND year = ?", sid, newYear).First(&existing).Error; err == nil {
+			continue // Skip if already enrolled for this year
+		}
+
+		// Create new enrollment
+		enrollment := models.Enrollment{
+			StudentID:  sid,
+			ClassID:    classUUID,
+			Year:       newYear,
+			Status:     "active",
+			EnrolledOn: time.Now(),
+		}
+
+		if err := s.db.Create(&enrollment).Error; err == nil {
+			successCount++
+		}
+	}
+
+	return successCount, nil
 }
 
 // Keep original simple methods for backward compatibility

@@ -138,3 +138,69 @@ func (h *SystemMonitoringHandler) GenerateDailyReport(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Daily report generated successfully", "date": dateStr})
 }
+
+func (h *SystemMonitoringHandler) GetSystemHealth(c *gin.Context) {
+	// Get comprehensive system health metrics
+	activeUsers, _ := h.service.GetActiveUsers()
+	activeSessions, _ := h.service.GetActiveSessions()
+	
+	// Get metrics from last hour
+	var metrics struct {
+		Total   int64
+		Errors  int64
+		AvgTime float64
+	}
+	
+	h.service.DB().Raw(`
+		SELECT 
+			COUNT(*) as total,
+			COUNT(CASE WHEN status_code >= 400 THEN 1 END) as errors,
+			COALESCE(AVG(response_time), 0) as avg_time
+		FROM api_request_logs
+		WHERE timestamp > NOW() - INTERVAL '1 hour'
+	`).Scan(&metrics)
+	
+	var slowest struct {
+		Path string
+		Time float64
+	}
+	h.service.DB().Raw(`
+		SELECT path, response_time as time
+		FROM api_request_logs
+		WHERE timestamp > NOW() - INTERVAL '1 hour'
+		ORDER BY response_time DESC
+		LIMIT 1
+	`).Scan(&slowest)
+	
+	errorRate := 0.0
+	if metrics.Total > 0 {
+		errorRate = float64(metrics.Errors) / float64(metrics.Total) * 100
+	}
+	
+	// System status based on metrics
+	status := "healthy"
+	if errorRate > 10 {
+		status = "degraded"
+	} else if errorRate > 20 {
+		status = "unhealthy"
+	}
+	if metrics.AvgTime > 1000 {
+		status = "slow"
+	}
+	
+	c.JSON(http.StatusOK, gin.H{
+		"status":              status,
+		"timestamp":           time.Now(),
+		"active_users":        activeUsers,
+		"active_sessions":     activeSessions,
+		"requests_last_hour":  metrics.Total,
+		"errors_last_hour":    metrics.Errors,
+		"error_rate":          errorRate,
+		"avg_response_time":   metrics.AvgTime,
+		"slowest_endpoint":    slowest.Path,
+		"max_response_time":   slowest.Time,
+		"uptime":              time.Since(startTime).Seconds(),
+	})
+}
+
+var startTime = time.Now()
